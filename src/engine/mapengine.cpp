@@ -26,18 +26,18 @@
 * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-#include "core.h"
+#include "mapengine.h"
 #include "coordtransform.h"
 
 #ifdef DEBUG_CORE
-qlonglong internals::Core::debugcounter=0;
+qlonglong internals::MapEngine::debugcounter=0;
 #endif
 
 using namespace projections;
 
 namespace internals {
 
-Core::Core(core::MapService *mapService) :
+MapEngine::MapEngine(core::MapService *mapService) :
     MouseWheelZooming(false),
     currentPosition(0,0),
     currentPositionPixel(0,0),
@@ -64,12 +64,12 @@ Core::Core(core::MapService *mapService) :
     tilesToload=0;
 }
 
-Core::~Core()
+MapEngine::~MapEngine()
 {
     ProcessLoadTaskCallback.waitForDone();
 }
 
-void Core::run()
+void MapEngine::run()
 {
     MrunningThreads.lock();
     ++runningThreads;
@@ -142,7 +142,7 @@ void Core::run()
 #endif //DEBUG_CORE
                                 img = service->GetImageFrom(tl, task.Pos, task.Zoom);
 #ifdef DEBUG_CORE
-                                qDebug()<<"Core::run:gotimage size:"<<img.count()<<" ID="<<debug<<" time="<<t.elapsed();
+                                qDebug()<<"MapEngine::run:gotimage size:"<<img.count()<<" ID="<<debug<<" time="<<t.elapsed();
 #endif //DEBUG_CORE
 
                                 if(img.length()!=0)
@@ -151,7 +151,7 @@ void Core::run()
                                     {
                                         t->Overlays.append(img);
 #ifdef DEBUG_CORE
-                                        qDebug()<<"Core::run append img:"<<img.length()<<" to tile:"<<t->GetPos().ToString()<<" now has "<<t->Overlays.count()<<" overlays"<<" ID="<<debug;
+                                        qDebug()<<"MapEngine::run append img:"<<img.length()<<" to tile:"<<t->GetPos().ToString()<<" now has "<<t->Overlays.count()<<" overlays"<<" ID="<<debug;
 #endif //DEBUG_CORE
 
                                     }
@@ -181,8 +181,8 @@ void Core::run()
                             emit OnNeedInvalidation();
 
 #ifdef DEBUG_CORE
-                            qDebug()<<"Core::run add tile "<<t->GetPos().ToString()<<" to matrix index "<<task.Pos.ToString()<<" ID="<<debug;
-                            qDebug()<<"Core::run matrix index "<<task.Pos.ToString()<<" as tile with "<<Matrix.TileAt(task.Pos)->Overlays.count()<<" ID="<<debug;
+                            qDebug()<<"MapEngine::run add tile "<<t->GetPos().ToString()<<" to matrix index "<<task.Pos.ToString()<<" ID="<<debug;
+                            qDebug()<<"MapEngine::run matrix index "<<task.Pos.ToString()<<" as tile with "<<Matrix.TileAt(task.Pos)->Overlays.count()<<" ID="<<debug;
 #endif //DEBUG_CORE
                         }
                         else
@@ -231,7 +231,7 @@ void Core::run()
     MrunningThreads.unlock();
 }
 
-diagnostics Core::GetDiagnostics()
+diagnostics MapEngine::GetDiagnostics()
 {
     MrunningThreads.lock();
     diag=service->GetDiagnostics();
@@ -240,7 +240,7 @@ diagnostics Core::GetDiagnostics()
     return diag;
 }
 
-void Core::SetZoom(const int &value)
+void MapEngine::SetZoom(const int &value)
 {
     if (!isDragging)
     {
@@ -266,7 +266,7 @@ void Core::SetZoom(const int &value)
     }
 }
 
-void Core::SetCurrentPosition(const PointLatLng &value)
+void MapEngine::SetCurrentPosition(const PointLatLng &value)
 {
     if(!IsDragging())
     {
@@ -291,7 +291,7 @@ void Core::SetCurrentPosition(const PointLatLng &value)
     }
 }
 
-void Core::SetMapType(const MapType::Types &value)
+void MapEngine::SetMapType(const MapType::Types &value)
 {
 
     if(value != GetMapType())
@@ -340,7 +340,7 @@ void Core::SetMapType(const MapType::Types &value)
     }
 }
 
-void Core::StartSystem()
+void MapEngine::StartSystem()
 {
     if(!started)
     {
@@ -351,14 +351,14 @@ void Core::StartSystem()
     }
 }
 
-void Core::UpdateCenterTileXYLocation()
+void MapEngine::UpdateCenterTileXYLocation()
 {
     PointLatLng center = FromLocalToLatLng(Width/2, Height/2);
     Point centerPixel = Projection()->FromLatLngToPixel(ToTileDatum(center), Zoom());
     centerTileXYLocation = Projection()->FromPixelToTileXY(centerPixel);
 }
 
-void Core::OnMapSizeChanged(int const& width, int const& height)
+void MapEngine::OnMapSizeChanged(int const& width, int const& height)
 {
     Width = width;
     Height = height;
@@ -376,7 +376,7 @@ void Core::OnMapSizeChanged(int const& width, int const& height)
     }
 }
 
-void Core::OnMapClose()
+void MapEngine::OnMapClose()
 {
     //        if(waitOnEmptyTasks != null)
     //        {
@@ -393,7 +393,7 @@ void Core::OnMapClose()
     CancelAsyncTasks();
 }
 
-RectLatLng Core::CurrentViewArea()
+RectLatLng MapEngine::CurrentViewArea()
 {
     // 视野边界用用户坐标(WGS-84)表示
     PointLatLng p = FromTileDatum(Projection()->FromPixelToLatLng(-renderOffset.X(), -renderOffset.Y(), Zoom()));
@@ -403,28 +403,28 @@ RectLatLng Core::CurrentViewArea()
 
 }
 
-PointLatLng Core::ToTileDatum(PointLatLng const& pt) const
+PointLatLng MapEngine::ToTileDatum(PointLatLng const& pt) const
 {
     if(MapType::DatumByType(mapType) == MapType::DatumGCJ02)
         return coordtransform::WGS84ToGCJ02(pt);
     return pt;
 }
 
-PointLatLng Core::FromTileDatum(PointLatLng const& pt) const
+PointLatLng MapEngine::FromTileDatum(PointLatLng const& pt) const
 {
     if(MapType::DatumByType(mapType) == MapType::DatumGCJ02)
         return coordtransform::GCJ02ToWGS84(pt);
     return pt;
 }
 
-PointLatLng Core::FromLocalToLatLng(int const& x, int const& y)
+PointLatLng MapEngine::FromLocalToLatLng(int const& x, int const& y)
 {
     // 屏幕像素 -> 瓦片坐标系经纬度 -> 用户坐标(WGS-84)
     return FromTileDatum(Projection()->FromPixelToLatLng(Point(x - renderOffset.X(), y - renderOffset.Y()), Zoom()));
 }
 
 
-Point Core::FromLatLngToLocal(PointLatLng const& latlng)
+Point MapEngine::FromLatLngToLocal(PointLatLng const& latlng)
 {
     // 用户坐标(WGS-84) -> 瓦片坐标系经纬度 -> 屏幕像素
     Point pLocal = Projection()->FromLatLngToPixel(ToTileDatum(latlng), Zoom());
@@ -432,7 +432,7 @@ Point Core::FromLatLngToLocal(PointLatLng const& latlng)
     return pLocal;
 }
 
-int Core::GetMaxZoomToFitRect(RectLatLng const& rect)
+int MapEngine::GetMaxZoomToFitRect(RectLatLng const& rect)
 {
     int zoom = 0;
 
@@ -455,21 +455,21 @@ int Core::GetMaxZoomToFitRect(RectLatLng const& rect)
     return zoom;
 }
 
-void Core::BeginDrag(Point const& pt)
+void MapEngine::BeginDrag(Point const& pt)
 {
     dragPoint.SetX(pt.X() - renderOffset.X());
     dragPoint.SetY(pt.Y() - renderOffset.Y());
     isDragging = true;
 }
 
-void Core::EndDrag()
+void MapEngine::EndDrag()
 {
     isDragging = false;
     emit OnNeedInvalidation();
 
 }
 
-void Core::ReloadMap()
+void MapEngine::ReloadMap()
 {
     if(started)
     {
@@ -492,7 +492,7 @@ void Core::ReloadMap()
     }
 }
 
-void Core::GoToCurrentPosition()
+void MapEngine::GoToCurrentPosition()
 {
     // reset stuff
     renderOffset = Point::Empty;
@@ -503,7 +503,7 @@ void Core::GoToCurrentPosition()
     Drag(Point(-(GetcurrentPositionGPixel().X() - Width/2), -(GetcurrentPositionGPixel().Y() - Height/2)));
 }
 
-void Core::GoToCurrentPositionOnZoom()
+void MapEngine::GoToCurrentPositionOnZoom()
 {
     // reset stuff
     renderOffset = Point::Empty;
@@ -538,7 +538,7 @@ void Core::GoToCurrentPositionOnZoom()
     UpdateCenterTileXYLocation();
 }
 
-void Core::DragOffset(Point const& offset)
+void MapEngine::DragOffset(Point const& offset)
 {
     renderOffset.Offset(offset);
 
@@ -559,7 +559,7 @@ void Core::DragOffset(Point const& offset)
     emit OnMapDrag();
 }
 
-void Core::Drag(Point const& pt)
+void MapEngine::Drag(Point const& pt)
 {
     renderOffset.SetX(pt.X() - dragPoint.X());
     renderOffset.SetY(pt.Y() - dragPoint.Y());
@@ -585,7 +585,7 @@ void Core::Drag(Point const& pt)
 
 }
 
-void Core::CancelAsyncTasks()
+void MapEngine::CancelAsyncTasks()
 {
     if(started)
     {
@@ -603,7 +603,7 @@ void Core::CancelAsyncTasks()
     }
 }
 
-void Core::UpdateBounds()
+void MapEngine::UpdateBounds()
 {
     MtileDrawingList.lock();
     {
@@ -629,7 +629,7 @@ void Core::UpdateBounds()
                         MtileToload.unlock();
                         tileLoadQueue.enqueue(task);
 #ifdef DEBUG_CORE
-                        qDebug()<<"Core::UpdateBounds new Task"<<task.Pos.ToString();
+                        qDebug()<<"MapEngine::UpdateBounds new Task"<<task.Pos.ToString();
 #endif //DEBUG_CORE
                         ProcessLoadTaskCallback.start(this);
                     }
@@ -643,7 +643,7 @@ void Core::UpdateBounds()
     UpdateGroundResolution();
 }
 
-void Core::FindTilesAround(QList<Point> &list)
+void MapEngine::FindTilesAround(QList<Point> &list)
 {
     list.clear();;
     for(int i = -sizeOfMapArea.Width(); i <= sizeOfMapArea.Width(); i++)
@@ -675,7 +675,7 @@ void Core::FindTilesAround(QList<Point> &list)
     }
 }
 
-void Core::UpdateGroundResolution()
+void MapEngine::UpdateGroundResolution()
 {
     double rez = Projection()->GetGroundResolution(Zoom(), CurrentPosition().Lat());
     pxRes100m =   (int) (100.0 / rez); // 100 meters

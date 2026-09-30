@@ -1,7 +1,7 @@
 /**
 ******************************************************************************
 *
-* @file       pureimagecache.cpp
+* @file       tilediskcache.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
 * @brief      
 * @see        The GNU Public License (GPL) Version 3
@@ -26,7 +26,7 @@
 * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-#include "pureimagecache.h"
+#include "tilediskcache.h"
 #include <QDateTime>
 #include <QSettings>
 
@@ -34,14 +34,14 @@
 
 namespace core {
 
-qlonglong PureImageCache::ConnCounter=0;
+qlonglong TileDiskCache::ConnCounter=0;
 
-PureImageCache::PureImageCache()
+TileDiskCache::TileDiskCache()
 {
 
 }
 
-void PureImageCache::setGtileCache(const QString &value)
+void TileDiskCache::setGtileCache(const QString &value)
 {
     lock.lockForWrite();
     gtilecache=value;
@@ -66,13 +66,13 @@ void PureImageCache::setGtileCache(const QString &value)
     lock.unlock();
 }
 
-QString PureImageCache::GtileCache()
+QString TileDiskCache::GtileCache()
 {
     return gtilecache;
 }
 
 
-bool PureImageCache::CreateEmptyDB(const QString &file)
+bool TileDiskCache::CreateEmptyDB(const QString &file)
 {
 #ifdef DEBUG_PUREIMAGECACHE
     qDebug()<<"Create database at!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!:"<<file;
@@ -176,7 +176,7 @@ bool PureImageCache::CreateEmptyDB(const QString &file)
     return true;
 }
 
-bool PureImageCache::PutImageToCache(const QByteArray &tile, const MapType::Types &type,
+bool TileDiskCache::PutImageToCache(const QByteArray &tile, const MapType::Types &type,
                                      const Point &pos, const int &zoom)
 {
     if(gtilecache.isEmpty()|gtilecache.isNull())
@@ -221,7 +221,7 @@ bool PureImageCache::PutImageToCache(const QByteArray &tile, const MapType::Type
     return true;
 }
 
-QByteArray PureImageCache::GetImageFromCache(MapType::Types type, Point pos, int zoom)
+QByteArray TileDiskCache::GetImageFromCache(MapType::Types type, Point pos, int zoom)
 {
     lock.lockForRead();
     QByteArray ar;
@@ -262,7 +262,7 @@ QByteArray PureImageCache::GetImageFromCache(MapType::Types type, Point pos, int
     return ar;
 }
 
-void PureImageCache::deleteOlderTiles(int const& days)
+void TileDiskCache::deleteOlderTiles(int const& days)
 {
     if(gtilecache.isEmpty()|gtilecache.isNull())
         return;
@@ -305,8 +305,8 @@ void PureImageCache::deleteOlderTiles(int const& days)
     }
 }
 
-// PureImageCache::ExportMapDataToDB("C:/Users/Xapo/Documents/mapcontrol/debug/mapscache/data.qmdb","C:/Users/Xapo/Documents/mapcontrol/debug/mapscache/data2.qmdb");
-bool PureImageCache::ExportMapDataToDB(QString sourceFile, QString destFile)
+// TileDiskCache::ExportMapDataToDB("C:/Users/Xapo/Documents/mapcontrol/debug/mapscache/data.qmdb","C:/Users/Xapo/Documents/mapcontrol/debug/mapscache/data2.qmdb");
+bool TileDiskCache::ExportMapDataToDB(QString sourceFile, QString destFile)
 {
     bool ret=true;
     QList<long> add;

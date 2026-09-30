@@ -1,7 +1,7 @@
 /**
 ******************************************************************************
 *
-* @file       kibertilecache.h
+* @file       tileimage.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
 * @brief      
 * @see        The GNU Public License (GPL) Version 3
@@ -9,7 +9,6 @@
 * @{
 * 
 *****************************************************************************/
-
 /* 
 * This program is free software; you can redistribute it and/or modify 
 * it under the terms of the GNU General Public License as published by 
@@ -25,36 +24,21 @@
 * with this program; if not, write to the Free Software Foundation, Inc., 
 * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
+#ifndef PUREIMAGE_H
+#define PUREIMAGE_H
 
-#ifndef KIBERTILECACHE_H
-#define KIBERTILECACHE_H
+#include <QPixmap>
+#include <QByteArray>
 
-#include "rawtile.h"
-#include <QMutex>
-#include <QReadWriteLock>
-#include <QQueue>
-#include <QDebug>
-#include "debugheader.h"
 
 namespace core {
-    class KiberTileCache
+    class TileImageProxy
     {
     public:
-        KiberTileCache();
-
-        void setMemoryCacheCapacity(const int &value);
-        int MemoryCacheCapacity();
-        double MemoryCacheSize(){return memoryCacheSize/1048576.0;}
-        void RemoveMemoryOverload();
-        QReadWriteLock kiberCacheLock;
-        QHash <RawTile,QByteArray> cachequeue;
-        QQueue <RawTile> list;
-        long memoryCacheSize;
-
-    private:
-        int _MemoryCacheCapacity;
-
+        TileImageProxy();
+        static QPixmap FromStream(const QByteArray &array);
+        static bool Save(const QByteArray &array,QPixmap &pic);
     };
-}
 
-#endif // KIBERTILECACHE_H
+}
+#endif // PUREIMAGE_H

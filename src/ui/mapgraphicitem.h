@@ -30,7 +30,7 @@
 #define MAPGRAPHICITEM_H
 
 #include <QGraphicsItem>
-#include "core.h"
+#include "mapengine.h"
 //#include "point.h"
 #include "diagnostics.h"
 #include "omapconfiguration.h"
@@ -66,7 +66,7 @@ public:
         * @param configuration the configuration to be used
         * @return
         */
-    MapGraphicItem(internals::Core *core,Configuration *configuration);
+    MapGraphicItem(internals::MapEngine *core,Configuration *configuration);
 
     QRectF boundingRect() const;
 
@@ -160,7 +160,7 @@ protected:
 private:
     bool showDragons;
     bool SetZoomToFitRect(internals::RectLatLng const& rect);
-    internals::Core *core;
+    internals::MapEngine *core;
     Configuration *config;
     bool showTileGridLines;
     qreal MapRenderTransform;

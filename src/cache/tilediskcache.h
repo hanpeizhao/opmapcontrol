@@ -1,7 +1,7 @@
 /**
 ******************************************************************************
 *
-* @file       pureimagecache.h
+* @file       tilediskcache.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
 * @brief      
 * @see        The GNU Public License (GPL) Version 3
@@ -38,16 +38,16 @@
 #include "maptype.h"
 #include "point.h"
 #include <QVariant>
-#include "pureimage.h"
+#include "tileimage.h"
 #include <QList>
 #include <QMutex>
 #include <QReadWriteLock>
 namespace core {
-    class PureImageCache
+    class TileDiskCache
     {
 
     public:
-        PureImageCache();
+        TileDiskCache();
         static bool CreateEmptyDB(const QString &file);
         bool PutImageToCache(const QByteArray &tile,const MapType::Types &type,const core::Point &pos, const int &zoom);
         QByteArray GetImageFromCache(MapType::Types type, core::Point pos, int zoom);

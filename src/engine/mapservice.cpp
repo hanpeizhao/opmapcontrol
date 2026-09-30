@@ -52,7 +52,7 @@ void MapService::setLanguage(const LanguageType::Types &value)
     languageStr = LanguageType().toShortString(value);
 }
 
-QByteArray MapService::GetTileFromMemoryCache(const RawTile &tile)
+QByteArray MapService::GetTileFromMemoryCache(const TileKey &tile)
 {
     kiberCacheLock.lockForRead();
     QByteArray pic;
@@ -61,7 +61,7 @@ QByteArray MapService::GetTileFromMemoryCache(const RawTile &tile)
     return pic;
 }
 
-void MapService::AddTileToMemoryCache(const RawTile &tile, const QByteArray &pic)
+void MapService::AddTileToMemoryCache(const TileKey &tile, const QByteArray &pic)
 {
     kiberCacheLock.lockForWrite();
     TilesInMemory.memoryCacheSize += pic.size();
@@ -79,7 +79,7 @@ QByteArray MapService::GetImageFrom(const MapType::Types &type, const Point &pos
 
     if(useMemoryCache)
     {
-        ret = GetTileFromMemoryCache(RawTile(type, pos, zoom));
+        ret = GetTileFromMemoryCache(TileKey(type, pos, zoom));
         if(!ret.isEmpty())
         {
             errorvars.lock();
@@ -100,7 +100,7 @@ QByteArray MapService::GetImageFrom(const MapType::Types &type, const Point &pos
                 errorvars.unlock();
                 if(useMemoryCache)
                 {
-                    AddTileToMemoryCache(RawTile(type, pos, zoom), ret);
+                    AddTileToMemoryCache(TileKey(type, pos, zoom), ret);
                 }
                 return ret;
             }
@@ -180,7 +180,7 @@ QByteArray MapService::GetImageFrom(const MapType::Types &type, const Point &pos
             errorvars.unlock();
             if (useMemoryCache)
             {
-                AddTileToMemoryCache(RawTile(type, pos, zoom), ret);
+                AddTileToMemoryCache(TileKey(type, pos, zoom), ret);
             }
 
             if(accessmode != AccessMode::ServerOnly)

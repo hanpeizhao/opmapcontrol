@@ -50,7 +50,7 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
 
     service=new core::MapService;
     configuration->SetMapService(service);
-    core=new internals::Core(service);
+    core=new internals::MapEngine(service);
     map=new MapGraphicItem(core, config);
     mscene.addItem(map);
     this->setScene(&mscene);

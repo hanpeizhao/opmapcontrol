@@ -1,7 +1,7 @@
 /**
 ******************************************************************************
 *
-* @file       rawtile.h
+* @file       tilememorycache.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
 * @brief      
 * @see        The GNU Public License (GPL) Version 3
@@ -9,6 +9,7 @@
 * @{
 * 
 *****************************************************************************/
+
 /* 
 * This program is free software; you can redistribute it and/or modify 
 * it under the terms of the GNU General Public License as published by 
@@ -24,33 +25,36 @@
 * with this program; if not, write to the Free Software Foundation, Inc., 
 * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
-#ifndef RAWTILE_H
-#define RAWTILE_H
 
-#include "maptype.h"
-#include "point.h"
-#include <QString>
-#include <QHash>
+#ifndef KIBERTILECACHE_H
+#define KIBERTILECACHE_H
+
+#include "tilekey.h"
+#include <QMutex>
+#include <QReadWriteLock>
+#include <QQueue>
+#include <QDebug>
+#include "debugheader.h"
 
 namespace core {
-    class RawTile
+    class TileMemoryCache
     {
-        friend uint qHash(RawTile const& tile);
-        friend bool operator==(RawTile const& lhs,RawTile const& rhs);
-
     public:
-        RawTile(const MapType::Types &Type,const core::Point &Pos,const int &Zoom);
-        QString ToString(void);
-        MapType::Types Type();
-        core::Point Pos();
-        int Zoom();
-        void setType(const MapType::Types &value);
-        void setPos(const core::Point &value);
-        void setZoom(const int &value);
+        TileMemoryCache();
+
+        void setMemoryCacheCapacity(const int &value);
+        int MemoryCacheCapacity();
+        double MemoryCacheSize(){return memoryCacheSize/1048576.0;}
+        void RemoveMemoryOverload();
+        QReadWriteLock kiberCacheLock;
+        QHash <TileKey,QByteArray> cachequeue;
+        QQueue <TileKey> list;
+        long memoryCacheSize;
+
     private:
-        MapType::Types type;
-        core::Point pos;
-        int zoom;
+        int _MemoryCacheCapacity;
+
     };
 }
-#endif // RAWTILE_H
+
+#endif // KIBERTILECACHE_H

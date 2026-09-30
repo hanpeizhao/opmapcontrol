@@ -469,7 +469,7 @@ public:
 
 private:
     core::MapService *service;   ///< 地图数据服务（构造创建、析构释放）
-    internals::Core *core;
+    internals::MapEngine *core;
     QGraphicsScene mscene;
     bool useOpenGL;
     MapType y;

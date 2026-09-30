@@ -18,10 +18,10 @@
 #include <QReadWriteLock>
 #include <QVector>
 
-#include "rawtile.h"
+#include "tilekey.h"
 #include "point.h"
-#include "kibertilecache.h"
-#include "pureimagecache.h"
+#include "tilememorycache.h"
+#include "tilediskcache.h"
 #include "tilecachequeue.h"
 #include "cacheitemqueue.h"
 #include "accessmode.h"
@@ -71,14 +71,14 @@ public:
     /// 空瓦片重试次数
     int RetryLoadTile;
 
-    // ---- 缓存设施（Core 与配置项直接访问） ----
-    KiberTileCache TilesInMemory;       ///< 内存瓦片 LRU 缓存
+    // ---- 缓存设施（MapEngine 与配置项直接访问） ----
+    TileMemoryCache TilesInMemory;       ///< 内存瓦片 LRU 缓存
     QReadWriteLock kiberCacheLock;      ///< 保护 TilesInMemory
-    PureImageCache ImageCache;          ///< 磁盘瓦片库（SQLite）
+    TileDiskCache ImageCache;          ///< 磁盘瓦片库（SQLite）
 
 private:
-    QByteArray GetTileFromMemoryCache(const RawTile &tile);
-    void AddTileToMemoryCache(const RawTile &tile, const QByteArray &pic);
+    QByteArray GetTileFromMemoryCache(const TileKey &tile);
+    void AddTileToMemoryCache(const TileKey &tile, const QByteArray &pic);
 
     UrlFactory urlFactory;              ///< 瓦片 URL 工厂（含代理/UA/超时）
     AllLayersOfType allLayers;          ///< 地图类型 → 图层列表

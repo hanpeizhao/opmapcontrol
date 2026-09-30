@@ -33,7 +33,7 @@
 #include <QObject>
 #include <QMessageBox>
 
-#include "core.h"
+#include "mapengine.h"
 #include "mapripform.h"
 
 
@@ -44,7 +44,7 @@ class MapRipper : public QThread
     Q_OBJECT
 
 public:
-    MapRipper(internals::Core *, internals::RectLatLng const&);
+    MapRipper(internals::MapEngine *, internals::RectLatLng const&);
 
     void run();
 
@@ -59,7 +59,7 @@ private:
     bool cancel;
     MapRipForm * progressForm;
     int maxzoom;
-    internals::Core * core;
+    internals::MapEngine * core;
 
 signals:
     void percentageChanged(int const& perc);

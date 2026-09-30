@@ -39,10 +39,10 @@ HEADERS += \
     ./src/platform/diagnostics.h \
     ./src/platform/mousewheelzoomtype.h \
     ./src/platform/debugheader.h \
-    ./src/cache/rawtile.h \
-    ./src/cache/pureimage.h \
-    ./src/cache/kibertilecache.h \
-    ./src/cache/pureimagecache.h \
+    ./src/cache/tilekey.h \
+    ./src/cache/tileimage.h \
+    ./src/cache/tilememorycache.h \
+    ./src/cache/tilediskcache.h \
     ./src/cache/tilecachequeue.h \
     ./src/cache/cacheitemqueue.h \
     ./src/cache/accessmode.h \
@@ -51,7 +51,7 @@ HEADERS += \
     ./src/providers/providerstrings.h \
     ./src/providers/languagetype.h \
     ./src/engine/mapservice.h \
-    ./src/engine/core.h \
+    ./src/engine/mapengine.h \
     ./src/engine/tile.h \
     ./src/engine/tilematrix.h \
     ./src/engine/loadtask.h \
@@ -85,17 +85,17 @@ SOURCES += \
     ./src/platform/coordtransform.cpp \
     ./src/platform/diagnostics.cpp \
     ./src/platform/mousewheelzoomtype.cpp \
-    ./src/cache/rawtile.cpp \
-    ./src/cache/pureimage.cpp \
-    ./src/cache/kibertilecache.cpp \
-    ./src/cache/pureimagecache.cpp \
+    ./src/cache/tilekey.cpp \
+    ./src/cache/tileimage.cpp \
+    ./src/cache/tilememorycache.cpp \
+    ./src/cache/tilediskcache.cpp \
     ./src/cache/tilecachequeue.cpp \
     ./src/cache/cacheitemqueue.cpp \
     ./src/providers/urlfactory.cpp \
     ./src/providers/providerstrings.cpp \
     ./src/providers/languagetype.cpp \
     ./src/engine/mapservice.cpp \
-    ./src/engine/core.cpp \
+    ./src/engine/mapengine.cpp \
     ./src/engine/tile.cpp \
     ./src/engine/tilematrix.cpp \
     ./src/engine/loadtask.cpp \

@@ -173,7 +173,7 @@ public:
     * @param destDB the destination DB. If it doesnt exhist it will be created.
     * @return
     */
-    void ExportMapDataToDB(QString const& sourceDB, QString const& destDB)const{core::PureImageCache::ExportMapDataToDB(sourceDB,destDB);}
+    void ExportMapDataToDB(QString const& sourceDB, QString const& destDB)const{core::TileDiskCache::ExportMapDataToDB(sourceDB,destDB);}
     /**
     * @brief Returns the location for the SQLite Database used for caching and the geocoding cache files
     *

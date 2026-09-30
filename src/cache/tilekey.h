@@ -1,7 +1,7 @@
 /**
 ******************************************************************************
 *
-* @file       pureimage.h
+* @file       tilekey.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
 * @brief      
 * @see        The GNU Public License (GPL) Version 3
@@ -24,21 +24,33 @@
 * with this program; if not, write to the Free Software Foundation, Inc., 
 * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
-#ifndef PUREIMAGE_H
-#define PUREIMAGE_H
+#ifndef RAWTILE_H
+#define RAWTILE_H
 
-#include <QPixmap>
-#include <QByteArray>
-
+#include "maptype.h"
+#include "point.h"
+#include <QString>
+#include <QHash>
 
 namespace core {
-    class PureImageProxy
+    class TileKey
     {
-    public:
-        PureImageProxy();
-        static QPixmap FromStream(const QByteArray &array);
-        static bool Save(const QByteArray &array,QPixmap &pic);
-    };
+        friend uint qHash(TileKey const& tile);
+        friend bool operator==(TileKey const& lhs,TileKey const& rhs);
 
+    public:
+        TileKey(const MapType::Types &Type,const core::Point &Pos,const int &Zoom);
+        QString ToString(void);
+        MapType::Types Type();
+        core::Point Pos();
+        int Zoom();
+        void setType(const MapType::Types &value);
+        void setPos(const core::Point &value);
+        void setZoom(const int &value);
+    private:
+        MapType::Types type;
+        core::Point pos;
+        int zoom;
+    };
 }
-#endif // PUREIMAGE_H
+#endif // RAWTILE_H

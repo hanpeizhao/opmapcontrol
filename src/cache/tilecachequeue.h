@@ -34,7 +34,7 @@
 #include <QWaitCondition>
 #include <QObject>
 #include <QMutexLocker>
-#include "pureimagecache.h"
+#include "tilediskcache.h"
 
 
 namespace core {
@@ -43,7 +43,7 @@ namespace core {
     {
         Q_OBJECT
     public:
-        explicit TileCacheQueue(PureImageCache *imageCache);
+        explicit TileCacheQueue(TileDiskCache *imageCache);
         ~TileCacheQueue();
         void EnqueueCacheTask(CacheItemQueue *task);
 
@@ -51,7 +51,7 @@ namespace core {
         QQueue<CacheItemQueue*> tileCacheQueue;
     private:
         void run();
-        PureImageCache *imageCache;   ///< 目标磁盘缓存（归 MapService 所有）
+        TileDiskCache *imageCache;   ///< 目标磁盘缓存（归 MapService 所有）
         QMutex mutex;
         QMutex waitmutex;
         QWaitCondition waitc;

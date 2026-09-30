@@ -35,7 +35,7 @@
 
 namespace mapcontrol {
 
-MapGraphicItem::MapGraphicItem(internals::Core *core, Configuration *configuration) :
+MapGraphicItem::MapGraphicItem(internals::MapEngine *core, Configuration *configuration) :
     core(core),
     config(configuration),
     MapRenderTransform(1),
@@ -402,7 +402,7 @@ void MapGraphicItem::DrawMap2D(QPainter *painter)
                                     if(!found)
                                         found = true;
                                     {
-                                        painter->drawPixmap(core->tileRect.X(),core->tileRect.Y(), core->tileRect.Width(), core->tileRect.Height(),PureImageProxy::FromStream(img));
+                                        painter->drawPixmap(core->tileRect.X(),core->tileRect.Y(), core->tileRect.Width(), core->tileRect.Height(),TileImageProxy::FromStream(img));
                                         // qDebug()<<"tile:"<<core->tileRect.X()<<core->tileRect.Y();
                                     }
                                 }

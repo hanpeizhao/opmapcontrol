@@ -1,7 +1,7 @@
 /**
 ******************************************************************************
 *
-* @file       kibertilecache.cpp
+* @file       tilememorycache.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
 * @brief      
 * @see        The GNU Public License (GPL) Version 3
@@ -26,32 +26,32 @@
 * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-#include "kibertilecache.h"
+#include "tilememorycache.h"
 
 //TODO add readwrite lock
 
 namespace core {
 
-KiberTileCache::KiberTileCache()
+TileMemoryCache::TileMemoryCache()
 {
     memoryCacheSize = 0;
     _MemoryCacheCapacity = 22;
 }
 
-void KiberTileCache::setMemoryCacheCapacity(const int &value)
+void TileMemoryCache::setMemoryCacheCapacity(const int &value)
 {
     kiberCacheLock.lockForWrite();
     _MemoryCacheCapacity=value;
     kiberCacheLock.unlock();
 }
-int KiberTileCache::MemoryCacheCapacity()
+int TileMemoryCache::MemoryCacheCapacity()
 {
     kiberCacheLock.lockForRead();
     return _MemoryCacheCapacity;
     kiberCacheLock.unlock();
 }
 
-void KiberTileCache::RemoveMemoryOverload()
+void TileMemoryCache::RemoveMemoryOverload()
 {
     while(MemoryCacheSize()>MemoryCacheCapacity())
     {
@@ -60,7 +60,7 @@ void KiberTileCache::RemoveMemoryOverload()
 #ifdef DEBUG_MEMORY_CACHE
             qDebug()<<"Cleaning Memory cache="<<" started with "<<cachequeue.count()<<" tile "<<"ocupying "<<memoryCacheSize<<" bytes";
 #endif
-            RawTile first=list.dequeue();
+            TileKey first=list.dequeue();
             memoryCacheSize-=cachequeue.value(first).size();
             cachequeue.remove(first);
         }

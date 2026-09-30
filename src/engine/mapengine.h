@@ -61,7 +61,7 @@ class MapGraphicItem;
 
 namespace internals {
 
-class Core:public QObject, public QRunnable
+class MapEngine:public QObject, public QRunnable
 {
     Q_OBJECT
 
@@ -69,8 +69,8 @@ class Core:public QObject, public QRunnable
     friend class mapcontrol::MapGraphicItem;
 
 public:
-    explicit Core(core::MapService *mapService);
-    ~Core();
+    explicit MapEngine(core::MapService *mapService);
+    ~MapEngine();
 
     /// 所属的地图数据服务（MapRipper 等经此访问缓存与下载）
     core::MapService *Service()const{return service;}

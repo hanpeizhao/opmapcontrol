@@ -34,7 +34,7 @@
 namespace core {
 
 
-TileCacheQueue::TileCacheQueue(PureImageCache *cache) : imageCache(cache)
+TileCacheQueue::TileCacheQueue(TileDiskCache *cache) : imageCache(cache)
 {
 
 }

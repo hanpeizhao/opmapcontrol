@@ -1,7 +1,7 @@
 /**
 ******************************************************************************
 *
-* @file       pureimage.cpp
+* @file       tilekey.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
 * @brief      
 * @see        The GNU Public License (GPL) Version 3
@@ -24,25 +24,64 @@
 * with this program; if not, write to the Free Software Foundation, Inc., 
 * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
-#include "pureimage.h"
-
+#include "tilekey.h"
 
  
 namespace core {
-PureImageProxy::PureImageProxy()
+
+TileKey::TileKey(const MapType::Types &Type, const Point &Pos, const int &Zoom)
 {
-
+    zoom=Zoom;
+    type=Type;
+    pos=Pos;
 }
 
-QPixmap PureImageProxy::FromStream(const QByteArray &array)
+QString TileKey::ToString()
 {
-    return QPixmap::fromImage(QImage::fromData(array));
+    return QString("%1 at zoom %2, pos:%3,%4").arg(type).arg(zoom).arg(pos.X()).arg(pos.Y());
 }
 
-bool PureImageProxy::Save(const QByteArray &array, QPixmap &pic)
+Point TileKey::Pos()
 {
-    pic=QPixmap::fromImage(QImage::fromData(array));
-    return true;
+    return pos;
 }
 
+MapType::Types TileKey::Type()
+{
+    return type;
 }
+
+int TileKey::Zoom()
+{
+    return zoom;
+}
+
+void TileKey::setType(const MapType::Types &value)
+{
+    type=value;
+}
+
+void TileKey::setPos(const Point &value)
+{
+    pos=value;
+}
+
+void TileKey::setZoom(const int &value)
+{
+    zoom=value;
+}
+
+uint qHash(TileKey const& tile)
+{
+    // TileKey tile=tilee;
+    quint64 tmp=(((quint64)(tile.zoom))<<54)+(((quint64)(tile.type))<<36)+(((quint64)(tile.pos.X()))<<18)+(((quint64)(tile.pos.Y())));
+  //  quint64 tmp5=tmp+tmp2+tmp3+tmp4;
+    return ::qHash(tmp);
+}
+
+bool operator==(TileKey const &lhs,TileKey const &rhs)
+{
+    return (lhs.pos==rhs.pos && lhs.zoom==rhs.zoom && lhs.type==rhs.type);
+}
+
+} // end of namespace core

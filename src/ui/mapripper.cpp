@@ -30,7 +30,7 @@
 
 namespace mapcontrol {
 
-MapRipper::MapRipper(internals::Core * core, const internals::RectLatLng & rect):
+MapRipper::MapRipper(internals::MapEngine * core, const internals::RectLatLng & rect):
     sleep(1), cancel(false), progressForm(0), core(core)
 {
     if(!rect.IsEmpty()) {
