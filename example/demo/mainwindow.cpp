@@ -1500,6 +1500,7 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
         return;   // 保持 PickFence，直到点"结束围栏"
     case PickMock:
         // 点选喂位置：点哪喂哪（所见即所得），模式保持可连续喂点
+        ensureUAV();   // 统一经 ensureUAV 创建图标（库直连创建会落到无人机默认图）
         if (opmap::UAVItem *u = m_map->GetUAV(0))
             u->DeleteTrail();   // 手动喂点是瞬移定位不是运动：清旧轨迹避免乱线
         m_map->UpdateVehiclePosition(p);
@@ -1521,9 +1522,13 @@ opmap::UAVItem* MainWindow::ensureUAV()
     opmap::UAVItem *uav = m_map->GetUAV(0);
     if (!uav)
         uav = m_map->AddUAV(0);
-    if (firstCreate)
+    if (firstCreate) {
         logEvent(QString::fromUtf8("无人机图标已出现：它代表当前遥测位置（由位置源喂点驱动），"
                                    "出现即说明有位置源/飞行模拟在工作"));
+        // 默认图标统一为位置标记（大头针）：所有位置源语义一致，
+        // 航点飞行开始时才换成四旋翼（SetIcon mapquad），停止后再恢复
+        uav->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));
+    }
     uav->SetTrailType(opmap::UAVTrailType::ByTimeElapsed);
     uav->SetTrailTime(1);   // 每 1 秒记录一个轨迹点，飞行轨迹清晰可见
     uav->SetShowTrail(m_trailCheck->isChecked());
