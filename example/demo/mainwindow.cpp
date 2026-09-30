@@ -1342,6 +1342,9 @@ void MainWindow::onLocateClicked()
         return;
     }
     if (m_hasRealPos) {
+        // 图标与窗口中心都回到真实位置：图标此前可能停在导航起点（假想位置）；
+        // 若正在导航，真实位置偏离路线会触发库内偏航自动重规划（正确的接管语义）
+        m_map->UpdateVehiclePosition(m_lastRealPos);
         m_map->SetCurrentPosition(m_lastRealPos);
         return;
     }
