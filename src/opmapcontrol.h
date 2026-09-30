@@ -17,5 +17,7 @@
 #include "abstractrouteprovider.h"
 #include "osrmrouteprovider.h"
 #include "amaprouteprovider.h"
+#include "navigationengine.h"
+#include "routeitem.h"
 
 #endif // OPMAPCONTROL_H

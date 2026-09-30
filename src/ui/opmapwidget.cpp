@@ -31,6 +31,9 @@
 #include <QMetaObject>
 #include "waypointitem.h"
 #include "geoutils.h"
+#include "osrmrouteprovider.h"
+#include "navigationengine.h"
+#include "routeitem.h"
 
 namespace opmap {
 
@@ -45,7 +48,11 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     showhome(false),
     diagTimer(0),
     showDiag(false),
-    diagGraphItem(0)
+    diagGraphItem(0),
+    routeProvider(0),
+    navEngine(0),
+    routeItem(0),
+    vehiclePosValid(false)
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
@@ -71,6 +78,26 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     SetShowDiagnostics(showDiag);
     this->setMouseTracking(followmouse);
     SetShowCompass(true);
+
+    // —— 车载导航：provider → 引擎 → 路线绘制项 ——
+    routeProvider = new OsrmRouteProvider(this);
+    navEngine = new NavigationEngine(this);
+    navEngine->SetRouteProvider(routeProvider);
+    routeItem = new RouteItem(map);
+    routeItem->hide();
+
+    connect(navEngine, SIGNAL(routePlanned(opmap::Route)), routeItem, SLOT(SetRoute(opmap::Route)));
+    connect(navEngine, SIGNAL(routePlanned(opmap::Route)), this, SIGNAL(navigationRouteReady(opmap::Route)));
+    connect(navEngine, SIGNAL(rerouteReady(opmap::Route)), routeItem, SLOT(SetRoute(opmap::Route)));
+    connect(navEngine, SIGNAL(rerouteReady(opmap::Route)), this, SIGNAL(rerouteReady(opmap::Route)));
+    connect(navEngine, SIGNAL(progressUpdated(double,double,int,QString)),
+            routeItem, SLOT(SetTraveledDistance(double)));
+    connect(navEngine, SIGNAL(progressUpdated(double,double,int,QString)),
+            this, SLOT(onNavProgress(double,double,int,QString)));
+    connect(navEngine, SIGNAL(offRouteDetected(opmap::PointLatLng,double)),
+            this, SIGNAL(offRouteDetected(opmap::PointLatLng,double)));
+    connect(navEngine, SIGNAL(arrived()), this, SIGNAL(navigationArrived()));
+    connect(navEngine, SIGNAL(navigationFailed(QString)), this, SIGNAL(navigationFailed(QString)));
 }
 
 void OPMapWidget::SetShowDiagnostics(bool const& value)
@@ -210,6 +237,73 @@ void OPMapWidget::SetShowHome(const bool &value)
     }
 }
 
+// ————————————————— 车载导航 —————————————————
+
+void OPMapWidget::SetRouteProvider(opmap::AbstractRouteProvider *provider)
+{
+    if (!provider || provider == routeProvider)
+        return;
+    delete routeProvider;          // 接管所有权；在途请求随 QNAM 释放中止
+    routeProvider = provider;
+    routeProvider->setParent(this);
+    navEngine->SetRouteProvider(routeProvider);
+}
+
+void OPMapWidget::NavigateTo(opmap::PointLatLng const& dest)
+{
+    const opmap::PointLatLng from = vehiclePosValid ? vehiclePos
+                                                    : map->core->CurrentPosition();
+    navEngine->NavigateTo(from, dest);
+}
+
+void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
+{
+    // UAV 图标同步（直接用 AddUAV，避免 SetShowUAV 连带创建 GPSItem）
+    UAVItem *uav = GetUAV(0);
+    if (!uav)
+        uav = AddUAV(0);
+    if (vehiclePosValid && geoutils::haversineDistanceM(vehiclePos, pos) > 1.0)
+        uav->SetUAVHeading(geoutils::bearingDeg(vehiclePos, pos));
+    uav->SetUAVPos(pos, 0);
+
+    vehiclePos = pos;
+    vehiclePosValid = true;
+    navEngine->UpdatePosition(pos);
+}
+
+void OPMapWidget::StopNavigation()
+{
+    navEngine->Stop();
+    routeItem->ClearRoute();
+}
+
+void OPMapWidget::SetShowRoute(bool const& value)
+{
+    routeItem->setVisible(value);
+}
+
+bool OPMapWidget::ShowRoute() const
+{
+    return routeItem->isVisible();
+}
+
+opmap::Route OPMapWidget::CurrentNavigationRoute() const
+{
+    return navEngine->CurrentRoute();
+}
+
+bool OPMapWidget::IsNavigating() const
+{
+    return navEngine->IsNavigating();
+}
+
+void OPMapWidget::onNavProgress(double traveledM, double remainingM, int remainingS,
+                                const QString &instruction)
+{
+    Q_UNUSED(traveledM);
+    emit navigationProgress(remainingM, remainingS, instruction);
+}
+
 void OPMapWidget::resizeEvent(QResizeEvent *event)
 {
     if (scene())
@@ -235,6 +329,12 @@ void OPMapWidget::showEvent(QShowEvent *event)
 
 OPMapWidget::~OPMapWidget()
 {
+    // 先停导航引擎并释放路由 provider（中止在途网络请求），再走原有析构链
+    if (navEngine)
+        navEngine->Stop();
+    delete navEngine;
+    delete routeProvider;
+
     delete UAV;
 
     foreach(UAVItem* uav, this->UAVS) {

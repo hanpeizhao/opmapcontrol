@@ -2,7 +2,7 @@
 ******************************************************************************
 *
 * @file       mainwindow.h
-* @brief      示例主窗口：地图浏览、航点管理、路径规划与导航模拟的面板组装
+* @brief      示例主窗口：地图浏览、航点管理与车载导航（库能力）的面板组装
 * @see        The GNU Public License (GPL) Version 3
 * @{
 *
@@ -24,15 +24,14 @@
 
 class WaypointStore;
 class NavigationSimulator;
-class QGraphicsPathItem;
-class QGraphicsEllipseItem;
 
 /**
-* @brief 示例程序主窗口
+* @brief 示例程序主窗口（车载导航式调用库）
 *
-* 只负责组装与信号转发：中央为 OPMapWidget 地图，右侧三个停靠面板
-* （航点管理 / 路径规划 / 导航模拟），业务逻辑分别在
-* WaypointStore、RouteService、NavigationSimulator 中。
+* 中央为 OPMapWidget 地图；右侧停靠面板：航点管理 / 车载导航 / 行车模拟。
+* 路径规划、沿路指引、偏航重规划、路线绘制全部来自库（NavigateTo /
+* UpdateVehiclePosition + navigation* 信号）；本窗口只做面板组装与横幅展示，
+* 另以 NavigationSimulator 模拟行车喂点。
 */
 class MainWindow : public QMainWindow
 {
@@ -48,7 +47,6 @@ private slots:
     void onMapMouseMove(QMouseEvent *event);
     void onZoomChanged(double zoomt, double zoom, double zoomd);
     void onTilesStill(int number);
-    void rebuildRouteItems();   ///< 地图拖动/缩放/平移后重算路线绘制项坐标
 
     // 航点面板
     void onAddWaypointClicked();
@@ -58,34 +56,40 @@ private slots:
     void onExportWaypointsClicked();
     void onWaypointListItemClicked(QListWidgetItem *item);
 
-    // 路径规划面板
-    void onSetOriginClicked();
-    void onSetDestClicked();
-    void onPlanClicked();
-    void onFollowRouteClicked();
-    void onRouteReady(const opmap::Route &route);
-    void onRouteFailed(const QString &reason);
+    // 导航面板
+    void onPickDestClicked();
+    void onNavigateClicked();
+    void onStopNavClicked();
+    void onProviderChanged(int index);
+    void onNavigationRouteReady(const opmap::Route &route);
+    void onNavProgress(double remainingMeters, int remainingSeconds, const QString &instruction);
+    void onOffRouteDetected(const opmap::PointLatLng &pos, double deviationMeters);
+    void onRerouteReady(const opmap::Route &route);
+    void onNavigationArrived();
+    void onNavigationFailed(const QString &reason);
 
-    // 导航模拟面板
+    // 行车模拟面板
     void onSimStartClicked();
     void onSimPauseClicked();
     void onSimStopClicked();
+    void onYawClicked();
     void onSpeedChanged(int index);
     void onFollowToggled(bool on);
     void onTrailToggled(bool on);
     void onSimStatus(int current, int total, const QString &message);
-    void onWaypointReached(int index);
     void onSimFinished();
 
     // 离线下载
     void onRipMapClicked();
+
+protected:
+    void resizeEvent(QResizeEvent *event);
 
 private:
     enum PickMode
     {
         PickNone,
         PickWaypoint,
-        PickOrigin,
         PickDest
     };
 
@@ -95,13 +99,13 @@ private:
     void applyPickPoint(const opmap::PointLatLng &p);
     void setPickMode(PickMode mode);
     void refreshWaypointList();
-    void clearRouteItems();
     opmap::UAVItem* ensureUAV();
-    opmap::AbstractRouteProvider* ensureRouteProvider();   ///< 按面板选择创建/复用路由 provider
+    void applyProviderFromUI();   ///< 按面板选择创建/更新库内路由 provider
+    void setBanner(const QString &headline, const QString &subText, const QString &bgColor);
+    void repositionBanner();
 
     opmap::OPMapWidget *m_map;
     WaypointStore *m_store;
-    opmap::AbstractRouteProvider *m_routeProvider;
     NavigationSimulator *m_simulator;
 
     // 航点面板
@@ -109,41 +113,36 @@ private:
     QPushButton *m_addWpBtn;
     QPushButton *m_delWpBtn;
 
-    // 路径规划面板
-    QLabel *m_originLabel;
+    // 导航面板
     QLabel *m_destLabel;
     QComboBox *m_providerCombo;
     QLineEdit *m_amapKeyEdit;
-    QPushButton *m_planBtn;
-    QPushButton *m_followRouteBtn;
-    QLabel *m_routeInfo;
+    QPushButton *m_navBtn;
+    QPushButton *m_stopNavBtn;
+    QLabel *m_navInfo;
 
-    // 导航模拟面板
+    // 行车模拟面板
     QPushButton *m_simStartBtn;
     QPushButton *m_simPauseBtn;
     QPushButton *m_simStopBtn;
+    QPushButton *m_yawBtn;
     QComboBox *m_speedCombo;
     QCheckBox *m_followCheck;
     QCheckBox *m_trailCheck;
     QLabel *m_simInfo;
+
+    // 指令横幅（地图底部叠加）
+    QLabel *m_banner;
 
     // 状态栏
     QLabel *m_posLabel;
     QLabel *m_tileLabel;
 
     PickMode m_pickMode;
-    opmap::PointLatLng m_origin;
     opmap::PointLatLng m_dest;
-    bool m_hasOrigin;
     bool m_hasDest;
-    QList<opmap::PointLatLng> m_routePts;
-    double m_routeMeters;
-    int m_routeSeconds;
-
-    // 路线绘制 item（挂在地图书签场景，随地图变化重算）
-    QGraphicsPathItem *m_routeItem;
-    QGraphicsEllipseItem *m_originMarker;
-    QGraphicsEllipseItem *m_destMarker;
+    bool m_providerIsAmap;       ///< 当前库内 provider 是否为高德
+    opmap::Route m_navRoute;     ///< 最近一次导航路线（喂跟车模拟器）
 };
 
 #endif // MAINWINDOW_H

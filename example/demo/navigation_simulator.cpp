@@ -2,7 +2,7 @@
 ******************************************************************************
 *
 * @file       navigation_simulator.cpp
-* @brief      导航模拟器：驱动 UAV 位置沿航点序列或路线折线推进
+* @brief      跟车模拟器：沿导航路线折线匀速推进车辆位置，驱动库内导航引擎
 * @see        The GNU Public License (GPL) Version 3
 * @{
 *
@@ -10,70 +10,65 @@
 
 #include "navigation_simulator.h"
 
-#include "uavitem.h"
-#include "waypointitem.h"
 #include "geoutils.h"
-
-#include <QtMath>
 
 namespace {
 
-const double kArriveThresholdM = 30.0;    ///< 到达判定距离（米）
-const int kTickMs = 100;                  ///< 推进周期（毫秒）
+const int kTickMs = 100;   ///< 推进周期（毫秒）
 
 } // anonymous namespace
 
 NavigationSimulator::NavigationSimulator(QObject *parent)
     : QObject(parent),
-      m_uav(0),
       m_currentPos(0, 0),
+      m_heading(0),
       m_index(0),
       m_speed(15.0),
       m_running(false),
-      m_pathMode(false),
       m_paused(false)
 {
     m_timer.setInterval(kTickMs);
     connect(&m_timer, SIGNAL(timeout()), this, SLOT(onTick()));
 }
 
-void NavigationSimulator::setWaypointRoute(const QList<opmap::WayPointItem*> &wps)
+void NavigationSimulator::setPath(const QList<opmap::PointLatLng> &pts)
 {
-    m_waypoints = wps;
-    m_pathPoints.clear();
-    m_pathAltitudes.clear();
-    m_pathMode = false;
-    m_index = 0;
-    if (!wps.isEmpty())
-        m_currentPos = wps.first()->Coord();
-}
-
-void NavigationSimulator::setPathRoute(const QList<opmap::PointLatLng> &pts, int altitudeMeters)
-{
-    m_pathPoints = pts;
-    m_pathAltitudes.clear();
-    for (int i = 0; i < pts.size(); ++i)
-        m_pathAltitudes.append(altitudeMeters);
-    m_waypoints.clear();
-    m_pathMode = true;
+    m_path = pts;
     m_index = 0;
     if (!pts.isEmpty())
         m_currentPos = pts.first();
 }
 
+void NavigationSimulator::reroute(const QList<opmap::PointLatLng> &pts)
+{
+    if (pts.size() < 2)
+        return;
+    m_path = pts;
+    // 找距当前位置最近的折线点，从其下一点继续跟车
+    int best = 0;
+    double bestDist = -1.0;
+    for (int i = 0; i < pts.size(); ++i) {
+        const double d = opmap::geoutils::haversineDistanceM(m_currentPos, pts.at(i));
+        if (bestDist < 0 || d < bestDist) {
+            bestDist = d;
+            best = i;
+        }
+    }
+    m_index = qMin(best + 1, pts.size() - 1);
+}
+
 void NavigationSimulator::start()
 {
-    if (m_pathMode ? m_pathPoints.size() < 2 : m_waypoints.size() < 1)
+    if (m_path.size() < 2)
         return;
     if (!m_paused) {
         m_index = 0;
-        m_currentPos = m_pathMode ? m_pathPoints.first() : m_waypoints.first()->Coord();
+        m_currentPos = m_path.first();
     }
     m_paused = false;
     m_running = true;
     m_timer.start();
-    emit statusUpdated(0, m_pathMode ? m_pathPoints.size() : m_waypoints.size(),
-                       QString::fromUtf8("飞行中"));
+    emit statusUpdated(0, m_path.size(), QString::fromUtf8("行车中"));
 }
 
 void NavigationSimulator::pause()
@@ -82,8 +77,7 @@ void NavigationSimulator::pause()
         return;
     m_paused = true;
     m_timer.stop();
-    emit statusUpdated(m_index, m_pathMode ? m_pathPoints.size() : m_waypoints.size(),
-                       QString::fromUtf8("已暂停"));
+    emit statusUpdated(m_index, m_path.size(), QString::fromUtf8("已暂停"));
 }
 
 void NavigationSimulator::stop()
@@ -95,72 +89,46 @@ void NavigationSimulator::stop()
     emit statusUpdated(0, 0, QString::fromUtf8("已停止"));
 }
 
-void NavigationSimulator::advanceTarget()
+void NavigationSimulator::simulateYaw()
 {
-    ++m_index;
-    const int total = m_pathMode ? m_pathPoints.size() : m_waypoints.size();
-    if (m_index >= total) {
-        m_timer.stop();
-        m_running = false;
-        emit finished();
-        emit statusUpdated(total, total, QString::fromUtf8("航线飞行完成"));
-    }
+    if (!m_running || m_path.isEmpty())
+        return;
+    // 沿当前航向的垂直方向甩出 80~120 米，模拟驶离路线
+    const double side = (qrand() % 2 == 0) ? 90.0 : 270.0;
+    const double dist = 80.0 + (qrand() % 41);
+    m_currentPos = opmap::geoutils::destPoint(m_currentPos, m_heading + side, dist);
+    emit positionChanged(m_currentPos, m_heading);
 }
 
 void NavigationSimulator::onTick()
 {
-    if (!m_uav)
-        return;
-
-    const int total = m_pathMode ? m_pathPoints.size() : m_waypoints.size();
-    if (m_index >= total) {
+    if (m_index >= m_path.size()) {
         m_timer.stop();
         m_running = false;
         return;
     }
 
-    // 当前目标
-    opmap::PointLatLng target;
-    int altitude = 0;
-    if (m_pathMode) {
-        target = m_pathPoints.at(m_index);
-        altitude = m_pathAltitudes.at(m_index);
-    } else {
-        opmap::WayPointItem *wp = m_waypoints.at(m_index);
-        target = wp->Coord();
-        altitude = (int)wp->Altitude();
-    }
-
     const double step = m_speed * kTickMs / 1000.0;
-    double dist = opmap::geoutils::haversineDistanceM(m_currentPos, target);
+    double dist = opmap::geoutils::haversineDistanceM(m_currentPos, m_path.at(m_index));
 
-    // 到达判定：距离不足一步，或已跨过目标点
-    while (dist <= kArriveThresholdM || dist <= step) {
-        m_currentPos = target;
-
-        if (m_pathMode) {
-            advanceTarget();
-            if (m_index >= total)
-                return;
-            target = m_pathPoints.at(m_index);
-        } else {
-            opmap::WayPointItem *wp = m_waypoints.at(m_index);
-            wp->SetReached(true);
-            emit waypointReached(m_index);
-            advanceTarget();
-            if (m_index >= total)
-                return;
-            target = m_waypoints.at(m_index)->Coord();
-            altitude = (int)m_waypoints.at(m_index)->Altitude();
+    // 到达判定：距离不足一步直接落点并切下一目标
+    while (dist <= step) {
+        m_currentPos = m_path.at(m_index);
+        emit positionChanged(m_currentPos, m_heading);
+        ++m_index;
+        if (m_index >= m_path.size()) {
+            m_timer.stop();
+            m_running = false;
+            emit finished();
+            emit statusUpdated(m_path.size(), m_path.size(), QString::fromUtf8("跟车完成"));
+            return;
         }
-
-        dist = opmap::geoutils::haversineDistanceM(m_currentPos, target);
+        dist = opmap::geoutils::haversineDistanceM(m_currentPos, m_path.at(m_index));
     }
 
-    const double heading = opmap::geoutils::bearingDeg(m_currentPos, target);
-    m_currentPos = opmap::geoutils::destPoint(m_currentPos, heading, step);
+    m_heading = opmap::geoutils::bearingDeg(m_currentPos, m_path.at(m_index));
+    m_currentPos = opmap::geoutils::destPoint(m_currentPos, m_heading, step);
 
-    m_uav->SetUAVPos(m_currentPos, altitude);
-    m_uav->SetUAVHeading(heading);
-    emit statusUpdated(m_index, total, QString::fromUtf8("飞往目标 %1/%2").arg(m_index + 1).arg(total));
+    emit positionChanged(m_currentPos, m_heading);
+    emit statusUpdated(m_index, m_path.size(), QString::fromUtf8("行车中"));
 }

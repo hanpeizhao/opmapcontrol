@@ -2,7 +2,7 @@
 ******************************************************************************
 *
 * @file       mainwindow.cpp
-* @brief      示例主窗口：地图浏览、航点管理、路径规划与导航模拟的面板组装
+* @brief      示例主窗口：地图浏览、航点管理与车载导航（库能力）的面板组装
 * @see        The GNU Public License (GPL) Version 3
 * @{
 *
@@ -16,13 +16,10 @@
 #include <QtWidgets/QStatusBar>
 #include <QtWidgets/QVBoxLayout>
 #include <QtWidgets/QHBoxLayout>
-#include <QtWidgets/QGroupBox>
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QFileDialog>
-#include <QtWidgets/QGraphicsPathItem>
-#include <QtWidgets/QGraphicsEllipseItem>
-#include <QtGui/QPen>
-#include <QtGui/QBrush>
+#include <QtCore/QTimer>
+#include <QtGui/QResizeEvent>
 
 #include "waypoint_store.h"
 #include "navigation_simulator.h"
@@ -33,42 +30,41 @@ namespace {
 const opmap::PointLatLng kHomePos(34.2609, 108.9424);   ///< 初始位置：西安
 const double kHomeZoom = 12.0;
 
+const char *kBannerNormal   = "rgba(20,20,20,220)";    ///< 指令横幅常态底色
+const char *kBannerOffRoute = "rgba(170,120,0,220)";   ///< 偏航警示底色（黄）
+const char *kBannerArrived  = "rgba(0,110,40,220)";    ///< 到达提示底色（绿）
+
 } // anonymous namespace
 
 MainWindow::MainWindow()
     : m_map(new opmap::OPMapWidget(this)),
       m_store(new WaypointStore(m_map)),
-      m_routeProvider(0),
       m_simulator(new NavigationSimulator(this)),
       m_wpList(new QListWidget(this)),
       m_addWpBtn(new QPushButton(QString::fromUtf8("地图点选添加"), this)),
       m_delWpBtn(new QPushButton(QString::fromUtf8("删除选中"), this)),
-      m_originLabel(new QLabel(QString::fromUtf8("起点：未设置"), this)),
-      m_destLabel(new QLabel(QString::fromUtf8("终点：未设置"), this)),
+      m_destLabel(new QLabel(QString::fromUtf8("目的地：未设置"), this)),
       m_providerCombo(new QComboBox(this)),
       m_amapKeyEdit(new QLineEdit(this)),
-      m_planBtn(new QPushButton(QString::fromUtf8("规划路线"), this)),
-      m_followRouteBtn(new QPushButton(QString::fromUtf8("沿路线导航"), this)),
-      m_routeInfo(new QLabel(QString::fromUtf8("尚未规划"), this)),
-      m_simStartBtn(new QPushButton(QString::fromUtf8("开始"), this)),
+      m_navBtn(new QPushButton(QString::fromUtf8("开始导航"), this)),
+      m_stopNavBtn(new QPushButton(QString::fromUtf8("停止导航"), this)),
+      m_navInfo(new QLabel(QString::fromUtf8("空闲"), this)),
+      m_simStartBtn(new QPushButton(QString::fromUtf8("开始跟车"), this)),
       m_simPauseBtn(new QPushButton(QString::fromUtf8("暂停"), this)),
       m_simStopBtn(new QPushButton(QString::fromUtf8("停止"), this)),
+      m_yawBtn(new QPushButton(QString::fromUtf8("模拟偏航"), this)),
       m_speedCombo(new QComboBox(this)),
-      m_followCheck(new QCheckBox(QString::fromUtf8("地图跟随 UAV"), this)),
-      m_trailCheck(new QCheckBox(QString::fromUtf8("显示飞行轨迹"), this)),
+      m_followCheck(new QCheckBox(QString::fromUtf8("地图跟随车辆"), this)),
+      m_trailCheck(new QCheckBox(QString::fromUtf8("显示行车轨迹"), this)),
       m_simInfo(new QLabel(QString::fromUtf8("空闲"), this)),
+      m_banner(new QLabel(m_map)),
       m_posLabel(new QLabel(tr("lng: --, lat: --"), this)),
       m_tileLabel(new QLabel(tr("tiles: --"), this)),
       m_pickMode(PickNone),
-      m_hasOrigin(false),
       m_hasDest(false),
-      m_routeMeters(0),
-      m_routeSeconds(0),
-      m_routeItem(0),
-      m_originMarker(0),
-      m_destMarker(0)
+      m_providerIsAmap(false)
 {
-    setWindowTitle(QString::fromUtf8("opmapcontrol 示例 — 地图/航点/路径规划导航"));
+    setWindowTitle(QString::fromUtf8("opmapcontrol 示例 — 地图/航点/车载导航"));
     resize(1200, 800);
 
     setCentralWidget(m_map);
@@ -81,15 +77,21 @@ MainWindow::MainWindow()
     connect(m_map, SIGNAL(mouseMove(QMouseEvent*)), this, SLOT(onMapMouseMove(QMouseEvent*)));
     connect(m_map, SIGNAL(zoomChanged(double,double,double)), this, SLOT(onZoomChanged(double,double,double)));
     connect(m_map, SIGNAL(OnTilesStillToLoad(int)), this, SLOT(onTilesStill(int)));
-    // 地图拖动/缩放/移动后重算路线绘制 item 坐标
-    connect(m_map, SIGNAL(OnMapDrag()), this, SLOT(rebuildRouteItems()));
-    connect(m_map, SIGNAL(OnMapZoomChanged()), this, SLOT(rebuildRouteItems()));
-    connect(m_map, SIGNAL(OnCurrentPositionChanged(opmap::PointLatLng)), this, SLOT(rebuildRouteItems()));
 
-    // 模拟器
+    // 库导航信号 → 面板/横幅
+    connect(m_map, SIGNAL(navigationRouteReady(opmap::Route)), this, SLOT(onNavigationRouteReady(opmap::Route)));
+    connect(m_map, SIGNAL(navigationProgress(double,int,QString)), this, SLOT(onNavProgress(double,int,QString)));
+    connect(m_map, SIGNAL(offRouteDetected(opmap::PointLatLng,double)),
+            this, SLOT(onOffRouteDetected(opmap::PointLatLng,double)));
+    connect(m_map, SIGNAL(rerouteReady(opmap::Route)), this, SLOT(onRerouteReady(opmap::Route)));
+    connect(m_map, SIGNAL(navigationArrived()), this, SLOT(onNavigationArrived()));
+    connect(m_map, SIGNAL(navigationFailed(QString)), this, SLOT(onNavigationFailed(QString)));
+
+    // 跟车模拟 → 喂库（库内同步 UAV 图标并驱动导航引擎）
+    connect(m_simulator, SIGNAL(positionChanged(opmap::PointLatLng,double)),
+            m_map, SLOT(UpdateVehiclePosition(opmap::PointLatLng)));
     connect(m_simulator, SIGNAL(statusUpdated(int,int,QString)),
             this, SLOT(onSimStatus(int,int,QString)));
-    connect(m_simulator, SIGNAL(waypointReached(int)), this, SLOT(onWaypointReached(int)));
     connect(m_simulator, SIGNAL(finished()), this, SLOT(onSimFinished()));
 
     setupMenus();
@@ -99,6 +101,11 @@ MainWindow::MainWindow()
     m_followCheck->setChecked(true);
     m_trailCheck->setChecked(true);
     setPickMode(PickNone);
+
+    // 指令横幅：地图底部叠加，默认隐藏
+    m_banner->setTextFormat(Qt::RichText);
+    m_banner->setAlignment(Qt::AlignCenter);
+    m_banner->hide();
 }
 
 void MainWindow::setupMenus()
@@ -165,33 +172,32 @@ void MainWindow::setupDocks()
     connect(m_wpList, SIGNAL(itemClicked(QListWidgetItem*)),
             this, SLOT(onWaypointListItemClicked(QListWidgetItem*)));
 
-    // —— 路径规划面板 ——
-    QWidget *routePanel = new QWidget(this);
-    QVBoxLayout *routeLayout = new QVBoxLayout(routePanel);
-    QPushButton *setOriginBtn = new QPushButton(QString::fromUtf8("① 在地图上点选起点"), routePanel);
-    QPushButton *setDestBtn = new QPushButton(QString::fromUtf8("② 在地图上点选终点"), routePanel);
-    connect(setOriginBtn, SIGNAL(clicked()), this, SLOT(onSetOriginClicked()));
-    connect(setDestBtn, SIGNAL(clicked()), this, SLOT(onSetDestClicked()));
-    routeLayout->addWidget(setOriginBtn);
-    routeLayout->addWidget(setDestBtn);
-    routeLayout->addWidget(m_originLabel);
-    routeLayout->addWidget(m_destLabel);
+    // —— 车载导航面板 ——
+    QWidget *navPanel = new QWidget(this);
+    QVBoxLayout *navLayout = new QVBoxLayout(navPanel);
+    QPushButton *pickDestBtn = new QPushButton(QString::fromUtf8("① 在地图上点选目的地"), navPanel);
+    connect(pickDestBtn, SIGNAL(clicked()), this, SLOT(onPickDestClicked()));
+    navLayout->addWidget(pickDestBtn);
+    navLayout->addWidget(m_destLabel);
     QHBoxLayout *providerRow = new QHBoxLayout();
-    providerRow->addWidget(new QLabel(QString::fromUtf8("服务："), routePanel));
+    providerRow->addWidget(new QLabel(QString::fromUtf8("服务："), navPanel));
     m_providerCombo->addItem(QString::fromUtf8("OSRM（免 key）"));
     m_providerCombo->addItem(QString::fromUtf8("高德（需 key）"));
     providerRow->addWidget(m_providerCombo);
-    routeLayout->addLayout(providerRow);
+    navLayout->addLayout(providerRow);
     m_amapKeyEdit->setPlaceholderText(QString::fromUtf8("高德 Web 服务 key（选高德时填写）"));
-    routeLayout->addWidget(m_amapKeyEdit);
-    routeLayout->addWidget(m_planBtn);
-    routeLayout->addWidget(m_routeInfo);
-    m_followRouteBtn->setEnabled(false);
-    routeLayout->addWidget(m_followRouteBtn);
-    connect(m_planBtn, SIGNAL(clicked()), this, SLOT(onPlanClicked()));
-    connect(m_followRouteBtn, SIGNAL(clicked()), this, SLOT(onFollowRouteClicked()));
+    navLayout->addWidget(m_amapKeyEdit);
+    QHBoxLayout *navBtnRow = new QHBoxLayout();
+    navBtnRow->addWidget(m_navBtn);
+    navBtnRow->addWidget(m_stopNavBtn);
+    navLayout->addLayout(navBtnRow);
+    navLayout->addWidget(m_navInfo);
+    navLayout->addStretch(1);
+    connect(m_navBtn, SIGNAL(clicked()), this, SLOT(onNavigateClicked()));
+    connect(m_stopNavBtn, SIGNAL(clicked()), this, SLOT(onStopNavClicked()));
+    connect(m_providerCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onProviderChanged(int)));
 
-    // —— 导航模拟面板 ——
+    // —— 行车模拟面板 ——
     QWidget *simPanel = new QWidget(this);
     QVBoxLayout *simLayout = new QVBoxLayout(simPanel);
     QHBoxLayout *simBtnRow = new QHBoxLayout();
@@ -207,6 +213,7 @@ void MainWindow::setupDocks()
     m_speedCombo->setCurrentIndex(1);
     speedRow->addWidget(m_speedCombo);
     simLayout->addLayout(speedRow);
+    simLayout->addWidget(m_yawBtn);
     simLayout->addWidget(m_followCheck);
     simLayout->addWidget(m_trailCheck);
     simLayout->addWidget(m_simInfo);
@@ -214,21 +221,22 @@ void MainWindow::setupDocks()
     connect(m_simStartBtn, SIGNAL(clicked()), this, SLOT(onSimStartClicked()));
     connect(m_simPauseBtn, SIGNAL(clicked()), this, SLOT(onSimPauseClicked()));
     connect(m_simStopBtn, SIGNAL(clicked()), this, SLOT(onSimStopClicked()));
+    connect(m_yawBtn, SIGNAL(clicked()), this, SLOT(onYawClicked()));
     connect(m_speedCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onSpeedChanged(int)));
     connect(m_followCheck, SIGNAL(toggled(bool)), this, SLOT(onFollowToggled(bool)));
     connect(m_trailCheck, SIGNAL(toggled(bool)), this, SLOT(onTrailToggled(bool)));
 
     QDockWidget *wpDock = new QDockWidget(QString::fromUtf8("航点"), this);
     wpDock->setWidget(wpPanel);
-    QDockWidget *routeDock = new QDockWidget(QString::fromUtf8("路径规划"), this);
-    routeDock->setWidget(routePanel);
-    QDockWidget *simDock = new QDockWidget(QString::fromUtf8("导航模拟"), this);
+    QDockWidget *navDock = new QDockWidget(QString::fromUtf8("车载导航"), this);
+    navDock->setWidget(navPanel);
+    QDockWidget *simDock = new QDockWidget(QString::fromUtf8("行车模拟"), this);
     simDock->setWidget(simPanel);
     addDockWidget(Qt::RightDockWidgetArea, wpDock);
-    addDockWidget(Qt::RightDockWidgetArea, routeDock);
+    addDockWidget(Qt::RightDockWidgetArea, navDock);
     addDockWidget(Qt::RightDockWidgetArea, simDock);
-    tabifyDockWidget(wpDock, routeDock);
-    tabifyDockWidget(routeDock, simDock);
+    tabifyDockWidget(wpDock, navDock);
+    tabifyDockWidget(navDock, simDock);
     wpDock->raise();
 }
 
@@ -349,83 +357,131 @@ void MainWindow::refreshWaypointList()
     }
 }
 
-// ————————————————— 路径规划面板 —————————————————
+// ————————————————— 车载导航面板 —————————————————
 
-void MainWindow::onSetOriginClicked()
-{
-    setPickMode(PickOrigin);
-    statusBar()->showMessage(QString::fromUtf8("在地图上点击设置起点"), 5000);
-}
-
-void MainWindow::onSetDestClicked()
+void MainWindow::onPickDestClicked()
 {
     setPickMode(PickDest);
-    statusBar()->showMessage(QString::fromUtf8("在地图上点击设置终点"), 5000);
+    statusBar()->showMessage(QString::fromUtf8("在地图上点击设置目的地"), 5000);
 }
 
-void MainWindow::onPlanClicked()
+void MainWindow::onNavigateClicked()
 {
-    if (!m_hasOrigin || !m_hasDest) {
-        QMessageBox::information(this, QString::fromUtf8("提示"), QString::fromUtf8("请先在地图上点选起点与终点"));
+    if (!m_hasDest) {
+        QMessageBox::information(this, QString::fromUtf8("提示"),
+                                 QString::fromUtf8("请先在地图上点选目的地"));
         return;
     }
-    m_planBtn->setEnabled(false);
-    m_routeInfo->setText(QString::fromUtf8("规划中…"));
-    statusBar()->showMessage(QString::fromUtf8("正在请求路径规划（需联网）…"));
-    ensureRouteProvider()->requestRoute(m_origin, m_dest);
+    if (m_pickMode != PickNone)
+        setPickMode(PickNone);
+    applyProviderFromUI();
+    m_navInfo->setText(QString::fromUtf8("规划中…"));
+    m_banner->show();
+    setBanner(QString::fromUtf8("正在规划路线…"), QString(), kBannerNormal);
+    m_map->NavigateTo(m_dest);
 }
 
-void MainWindow::onFollowRouteClicked()
+void MainWindow::onStopNavClicked()
 {
-    if (m_routePts.size() < 2)
-        return;
     m_simulator->stop();
-    m_simulator->setUAV(ensureUAV());
-    m_simulator->setPathRoute(m_routePts, 100);
-    m_simulator->setSpeed(m_speedCombo->currentIndex() == 0 ? 5.0
-                          : m_speedCombo->currentIndex() == 1 ? 20.0 : 60.0);
-    m_simulator->start();
+    m_map->StopNavigation();
+    m_banner->hide();
+    m_navInfo->setText(QString::fromUtf8("已停止"));
+    statusBar()->showMessage(QString::fromUtf8("导航已停止"), 5000);
 }
 
-void MainWindow::onRouteReady(const opmap::Route &route)
+void MainWindow::onProviderChanged(int index)
 {
-    m_routePts = route.polyline;
-    m_routeMeters = route.totalDistanceMeters;
-    m_routeSeconds = route.totalDurationSeconds;
-    m_planBtn->setEnabled(true);
-    m_followRouteBtn->setEnabled(true);
-    m_routeInfo->setText(QString::fromUtf8("距离 %1 km，预计 %2 分钟（%3 点）")
-                         .arg(m_routeMeters / 1000.0, 0, 'f', 1)
-                         .arg(m_routeSeconds / 60).arg(m_routePts.size()));
-    statusBar()->showMessage(QString::fromUtf8("路径规划完成"), 5000);
-    rebuildRouteItems();
+    Q_UNUSED(index);
+    applyProviderFromUI();
 }
 
-void MainWindow::onRouteFailed(const QString &reason)
+void MainWindow::applyProviderFromUI()
 {
-    m_planBtn->setEnabled(true);
-    m_routeInfo->setText(QString::fromUtf8("规划失败"));
-    statusBar()->showMessage(QString::fromUtf8("路径规划失败: %1").arg(reason), 8000);
+    const bool wantAmap = (m_providerCombo->currentIndex() == 1);
+    // OSRM→OSRM 无需重建；其余情况重建（高德需每次刷新 key）
+    if (!wantAmap && !m_providerIsAmap)
+        return;
+    if (wantAmap) {
+        opmap::AmapRouteProvider *p = new opmap::AmapRouteProvider();
+        p->SetKey(m_amapKeyEdit->text().trimmed());
+        m_map->SetRouteProvider(p);
+    } else {
+        m_map->SetRouteProvider(new opmap::OsrmRouteProvider());
+    }
+    m_providerIsAmap = wantAmap;
 }
 
-// ————————————————— 导航模拟面板 —————————————————
+void MainWindow::onNavigationRouteReady(const opmap::Route &route)
+{
+    m_navRoute = route;
+    m_navInfo->setText(QString::fromUtf8("距离 %1 km，预计 %2 分钟（%3 点）")
+                       .arg(route.totalDistanceMeters / 1000.0, 0, 'f', 1)
+                       .arg(route.totalDurationSeconds / 60).arg(route.polyline.size()));
+    statusBar()->showMessage(QString::fromUtf8("导航开始"), 5000);
+}
+
+void MainWindow::onNavProgress(double remainingMeters, int remainingSeconds, const QString &instruction)
+{
+    const QString timeText = remainingSeconds >= 60
+            ? QString::fromUtf8("约 %1 分钟").arg((remainingSeconds + 59) / 60)
+            : QString::fromUtf8("不足 1 分钟");
+    setBanner(instruction,
+              QString::fromUtf8("剩余 %1 km · %2")
+              .arg(remainingMeters / 1000.0, 0, 'f', 1).arg(timeText),
+              kBannerNormal);
+    if (!m_banner->isVisible())
+        m_banner->show();
+}
+
+void MainWindow::onOffRouteDetected(const opmap::PointLatLng &pos, double deviationMeters)
+{
+    Q_UNUSED(pos);
+    setBanner(QString::fromUtf8("偏航，正在重新规划…"),
+              QString::fromUtf8("偏离路线 %1 米").arg(deviationMeters, 0, 'f', 0),
+              kBannerOffRoute);
+}
+
+void MainWindow::onRerouteReady(const opmap::Route &route)
+{
+    m_navRoute = route;
+    if (m_simulator->isRunning())
+        m_simulator->reroute(route.polyline);   // 模拟车从当前位置切入新路线
+    statusBar()->showMessage(QString::fromUtf8("已重新规划路线"), 5000);
+    // 横幅底色由下一次 progressUpdated 恢复为常态
+}
+
+void MainWindow::onNavigationArrived()
+{
+    m_simulator->stop();
+    setBanner(QString::fromUtf8("已到达目的地"), QString(), kBannerArrived);
+    m_navInfo->setText(QString::fromUtf8("已到达"));
+    QTimer::singleShot(4000, m_banner, SLOT(hide()));
+}
+
+void MainWindow::onNavigationFailed(const QString &reason)
+{
+    m_banner->hide();
+    m_navInfo->setText(QString::fromUtf8("导航失败：%1").arg(reason));
+    statusBar()->showMessage(QString::fromUtf8("导航失败：%1").arg(reason), 8000);
+}
+
+// ————————————————— 行车模拟面板 —————————————————
 
 void MainWindow::onSimStartClicked()
 {
-    const QMap<int, opmap::WayPointItem*> wpMap = m_map->WPAll();
-    if (wpMap.isEmpty()) {
+    if (m_navRoute.polyline.size() < 2) {
         QMessageBox::information(this, QString::fromUtf8("提示"),
-                                 QString::fromUtf8("请先在地图上添加航点（航点面板→地图点选添加），或使用路径规划后沿路线导航"));
+                                 QString::fromUtf8("请先开始导航，路线规划成功后再跟车模拟"));
         return;
     }
     if (m_pickMode != PickNone)
         setPickMode(PickNone);
 
-    m_simulator->stop();
-    m_simulator->setUAV(ensureUAV());
-    m_simulator->setWaypointRoute(wpMap.values());
+    ensureUAV();
     m_simulator->setSpeed(m_speedCombo->currentIndex() == 0 ? 5.0
                           : m_speedCombo->currentIndex() == 1 ? 20.0 : 60.0);
+    m_simulator->setPath(m_navRoute.polyline);
     m_simulator->start();
 }
 
@@ -437,6 +493,15 @@ void MainWindow::onSimPauseClicked()
 void MainWindow::onSimStopClicked()
 {
     m_simulator->stop();
+}
+
+void MainWindow::onYawClicked()
+{
+    if (!m_simulator->isRunning()) {
+        statusBar()->showMessage(QString::fromUtf8("跟车模拟未在运行，无法模拟偏航"), 5000);
+        return;
+    }
+    m_simulator->simulateYaw();
 }
 
 void MainWindow::onSpeedChanged(int index)
@@ -463,20 +528,12 @@ void MainWindow::onTrailToggled(bool on)
 
 void MainWindow::onSimStatus(int current, int total, const QString &message)
 {
-    m_simInfo->setText(QString::fromUtf8("%1（目标 %2/%3）").arg(message).arg(current + 1).arg(total));
-}
-
-void MainWindow::onWaypointReached(int index)
-{
-    statusBar()->showMessage(QString::fromUtf8("已到达航点 %1").arg(index + 1), 5000);
-    refreshWaypointList();
+    m_simInfo->setText(QString::fromUtf8("%1（进度 %2/%3）").arg(message).arg(current).arg(total));
 }
 
 void MainWindow::onSimFinished()
 {
-    QMessageBox::information(this, QString::fromUtf8("导航模拟"),
-                             QString::fromUtf8("全部目标飞行完成"));
-    refreshWaypointList();
+    statusBar()->showMessage(QString::fromUtf8("跟车模拟到达路线终点"), 5000);
 }
 
 // ————————————————— 离线下载 —————————————————
@@ -510,90 +567,60 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
         refreshWaypointList();
         break;
     }
-    case PickOrigin:
-        m_origin = p;
-        m_hasOrigin = true;
-        m_originLabel->setText(QString::fromUtf8("起点：lat %1, lng %2")
-                               .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
-        break;
     case PickDest:
         m_dest = p;
         m_hasDest = true;
-        m_destLabel->setText(QString::fromUtf8("终点：lat %1, lng %2")
+        m_destLabel->setText(QString::fromUtf8("目的地：lat %1, lng %2")
                              .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         break;
     default:
         break;
     }
-    rebuildRouteItems();
     setPickMode(PickNone);
-}
-
-void MainWindow::clearRouteItems()
-{
-    delete m_routeItem;
-    delete m_originMarker;
-    delete m_destMarker;
-    m_routeItem = 0;
-    m_originMarker = 0;
-    m_destMarker = 0;
-}
-
-void MainWindow::rebuildRouteItems()
-{
-    clearRouteItems();
-    if (!m_routePts.isEmpty()) {
-        QPainterPath path;
-        path.moveTo(m_map->GetFromLatLngToLocal(m_routePts.first()));
-        for (int i = 1; i < m_routePts.size(); ++i)
-            path.lineTo(m_map->GetFromLatLngToLocal(m_routePts.at(i)));
-        m_routeItem = m_map->scene()->addPath(path, QPen(QColor(0, 120, 255), 3));
-        m_routeItem->setZValue(1);
-    }
-    if (m_hasOrigin) {
-        const QPointF local = m_map->GetFromLatLngToLocal(m_origin);
-        m_originMarker = m_map->scene()->addEllipse(local.x() - 6, local.y() - 6, 12, 12,
-                                                    QPen(Qt::green, 2), QBrush(QColor(0, 180, 0, 120)));
-        m_originMarker->setZValue(2);
-    }
-    if (m_hasDest) {
-        const QPointF local = m_map->GetFromLatLngToLocal(m_dest);
-        m_destMarker = m_map->scene()->addEllipse(local.x() - 6, local.y() - 6, 12, 12,
-                                                  QPen(Qt::red, 2), QBrush(QColor(220, 0, 0, 120)));
-        m_destMarker->setZValue(2);
-    }
-}
-
-opmap::AbstractRouteProvider* MainWindow::ensureRouteProvider()
-{
-    const bool wantAmap = (m_providerCombo->currentIndex() == 1);
-    const bool haveAmap = qobject_cast<opmap::AmapRouteProvider*>(m_routeProvider) != 0;
-    if (!m_routeProvider || (wantAmap != haveAmap)) {
-        delete m_routeProvider;
-        m_routeProvider = wantAmap ? (opmap::AbstractRouteProvider*)new opmap::AmapRouteProvider(this)
-                                   : (opmap::AbstractRouteProvider*)new opmap::OsrmRouteProvider(this);
-        connect(m_routeProvider, SIGNAL(routeReady(opmap::Route)),
-                this, SLOT(onRouteReady(opmap::Route)));
-        connect(m_routeProvider, SIGNAL(routeFailed(QString)),
-                this, SLOT(onRouteFailed(QString)));
-    }
-    if (opmap::AmapRouteProvider *amap = qobject_cast<opmap::AmapRouteProvider*>(m_routeProvider))
-        amap->SetKey(m_amapKeyEdit->text().trimmed());
-    return m_routeProvider;
 }
 
 opmap::UAVItem* MainWindow::ensureUAV()
 {
+    // 只用 UAVS 表管理（AddUAV），避免 SetShowUAV 连带创建 GPSItem 与重复图标
     opmap::UAVItem *uav = m_map->GetUAV(0);
-    if (!uav) {
+    if (!uav)
         uav = m_map->AddUAV(0);
-        m_map->SetShowUAV(true);
-        uav->SetTrailType(opmap::UAVTrailType::ByTimeElapsed);
-        uav->SetTrailTime(3);
-        uav->SetShowTrail(m_trailCheck->isChecked());
-        uav->SetMapFollowType(m_followCheck->isChecked()
-                              ? opmap::UAVMapFollowType::CenterMap
-                              : opmap::UAVMapFollowType::None);
-    }
+    uav->SetTrailType(opmap::UAVTrailType::ByTimeElapsed);
+    uav->SetTrailTime(3);
+    uav->SetShowTrail(m_trailCheck->isChecked());
+    uav->SetMapFollowType(m_followCheck->isChecked()
+                          ? opmap::UAVMapFollowType::CenterMap
+                          : opmap::UAVMapFollowType::None);
     return uav;
+}
+
+void MainWindow::setBanner(const QString &headline, const QString &subText, const QString &bgColor)
+{
+    QString html = QString::fromUtf8(
+                "<div align='center' style='font-size:17px; font-weight:bold;'>%1</div>")
+            .arg(headline.toHtmlEscaped());
+    if (!subText.isEmpty())
+        html += QString::fromUtf8(
+                    "<div align='center' style='font-size:12px;'>%1</div>")
+                .arg(subText.toHtmlEscaped());
+    m_banner->setText(html);
+    m_banner->setStyleSheet(QString::fromUtf8(
+                "QLabel { background-color: %1; color: white; padding: 10px 24px;"
+                " border-radius: 8px; }").arg(bgColor));
+    m_banner->adjustSize();
+    repositionBanner();
+}
+
+void MainWindow::repositionBanner()
+{
+    const int x = qMax(0, (m_map->width() - m_banner->width()) / 2);
+    const int y = qMax(0, m_map->height() - m_banner->height() - 24);
+    m_banner->move(x, y);
+    m_banner->raise();
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+    repositionBanner();
 }

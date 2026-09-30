@@ -53,12 +53,16 @@
 #include "waypointlineitem.h"
 #include "mapripper.h"
 #include "uavtrailtype.h"
+#include "route.h"
 
 namespace opmap {
 
 class UAVItem;
 class GPSItem;
 class HomeItem;
+class AbstractRouteProvider;
+class NavigationEngine;
+class RouteItem;
 
 /**
     * @brief Collection of static functions to help dealing with various enums used
@@ -471,6 +475,17 @@ public:
     bool ShowHome()const{return showhome;}
     void SetShowDiagnostics(bool const& value);
 
+    // ———————— 车载导航 ————————
+    /**
+     * @brief 替换路由规划 provider（接管所有权），默认内置 OsrmRouteProvider
+     */
+    void SetRouteProvider(opmap::AbstractRouteProvider *provider);
+
+    void SetShowRoute(bool const& value);
+    bool ShowRoute() const;
+    opmap::Route CurrentNavigationRoute() const;
+    bool IsNavigating() const;
+
     QMap<int, UAVItem*> UAVS;
 
 private:
@@ -489,8 +504,15 @@ private:
     bool showDiag;
     QGraphicsTextItem *diagGraphItem;
 
+    opmap::AbstractRouteProvider *routeProvider;   ///< 路由规划服务（接管外部传入者）
+    opmap::NavigationEngine *navEngine;            ///< 导航状态机
+    opmap::RouteItem *routeItem;                   ///< 路线绘制项（随 map 析构）
+    opmap::PointLatLng vehiclePos;                 ///< 最近喂入的车位置
+    bool vehiclePosValid;
+
 private slots:
     void diagRefresh();
+    void onNavProgress(double traveledM, double remainingM, int remainingS, const QString &instruction);
     //   WayPointItem* item;//apagar
 
 protected:
@@ -627,11 +649,39 @@ signals:
      */
     void OnTilesStillToLoad(int number);
 
+    // ———————— 车载导航信号 ————————
+    /** @brief 导航路线规划完成（含重规划），route 为 WGS-84 折线+分步指令 */
+    void navigationRouteReady(opmap::Route route);
+    /** @brief 沿路进度：剩余距离（米）、剩余时间（秒）、当前中文转向指令 */
+    void navigationProgress(double remainingMeters, int remainingSeconds, QString instruction);
+    /** @brief 车辆偏离路线确认（pos 偏离 deviationMeters 米） */
+    void offRouteDetected(opmap::PointLatLng pos, double deviationMeters);
+    /** @brief 偏航后重规划成功，已切换新路线 */
+    void rerouteReady(opmap::Route route);
+    /** @brief 到达目的地 */
+    void navigationArrived();
+    /** @brief 导航失败（无路由服务、服务忙或初次规划失败） */
+    void navigationFailed(QString reason);
+
 public slots:
     /**
      * @brief Ripps the current selection to the DB
      */
     void RipMap();
+
+    /**
+     * @brief 发起导航：以最近喂入的车位置（否则地图中心）为起点规划到 dest，
+     *        成功后自动开始沿路指引
+     */
+    void NavigateTo(opmap::PointLatLng const& dest);
+
+    /**
+     * @brief 喂入车辆实时位置（WGS-84）：同步 UAV 图标并驱动导航进度/偏航/到达
+     */
+    void UpdateVehiclePosition(opmap::PointLatLng const& pos);
+
+    /// 停止导航并清除路线绘制
+    void StopNavigation();
 
     /**
      * @brief Sets the map zoom level

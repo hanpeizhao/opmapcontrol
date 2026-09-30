@@ -58,6 +58,7 @@ HEADERS += \
     ./src/providers/amaprouteprovider.h \
     ./src/engine/mapservice.h \
     ./src/engine/mapengine.h \
+    ./src/engine/navigationengine.h \
     ./src/engine/tile.h \
     ./src/engine/tilematrix.h \
     ./src/engine/loadtask.h \
@@ -71,6 +72,7 @@ HEADERS += \
     ./src/ui/mapripform.h \
     ./src/ui/mapripper.h \
     ./src/ui/opmapwidget.h \
+    ./src/ui/routeitem.h \
     ./src/ui/trailitem.h \
     ./src/ui/traillineitem.h \
     ./src/ui/uavitem.h \
@@ -106,6 +108,7 @@ SOURCES += \
     ./src/providers/amaprouteprovider.cpp \
     ./src/engine/mapservice.cpp \
     ./src/engine/mapengine.cpp \
+    ./src/engine/navigationengine.cpp \
     ./src/engine/tile.cpp \
     ./src/engine/tilematrix.cpp \
     ./src/engine/loadtask.cpp \
@@ -120,6 +123,7 @@ SOURCES += \
     ./src/ui/mapripform.cpp \
     ./src/ui/mapripper.cpp \
     ./src/ui/opmapwidget.cpp \
+    ./src/ui/routeitem.cpp \
     ./src/ui/trailitem.cpp \
     ./src/ui/traillineitem.cpp \
     ./src/ui/uavitem.cpp \
