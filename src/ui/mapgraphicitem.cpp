@@ -140,6 +140,7 @@ void MapGraphicItem::ConstructLastImage(int const& zoomdiff)
                 QImage::Format_ARGB32_Premultiplied);
     temp.fill(0);
     QPainter imagePainter(&temp);
+    imagePainter.setRenderHint(QPainter::SmoothPixmapTransform,true);
     imagePainter.translate(-boundingRect().topLeft());
     imagePainter.scale(2*zoomdiff,2*zoomdiff);
     paintImage(&imagePainter);
@@ -174,14 +175,16 @@ void MapGraphicItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *op
     Q_UNUSED(option);
     Q_UNUSED(widget);
 
+    // 旋转/数字缩放等有变换的绘制必须开平滑插值：缺省最近邻采样会让旋转后的
+    // 瓦片文字锯齿发虚；无变换(1:1)时该提示不起作用，无性能损失
+    painter->setRenderHint(QPainter::SmoothPixmapTransform,true);
+
     if(MapRenderTransform!=1)
     {
         QTransform transform;
         transform.translate(-((boundingRect().width()*MapRenderTransform)-(boundingRect().width()))/2,-((boundingRect().height()*MapRenderTransform)-(boundingRect().height()))/2);
         transform.scale(MapRenderTransform,MapRenderTransform);
-
         painter->setWorldTransform(transform);
-        painter->setRenderHint(QPainter::SmoothPixmapTransform,true);
         painter->setRenderHint(QPainter::HighQualityAntialiasing,true);
 
         {
