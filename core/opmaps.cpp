@@ -138,6 +138,8 @@ QByteArray OPMaps::GetImageFrom(const MapType::Types &type,const Point &pos,cons
             qheader.setUrl(QUrl(url));
             qheader.setRawHeader("User-Agent",UserAgent);
             qheader.setRawHeader("Accept","*/*");
+            // Qt5 默认不跟随重定向，http->https 301 会导致瓦片下载失败
+            qheader.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
             switch(type)
             {
             case MapType::GoogleMap:

@@ -203,20 +203,20 @@ QString UrlFactory::MakeImageUrl(const MapType::Types &type,const Point &pos,con
         QString sec1 = ""; // after &x=...
         QString sec2 = ""; // after &zoom=...
         GetSecGoogleWords(pos,  sec1,  sec2);
-        TryCorrectGoogleVersions();
 
-        return QString("https://%1%2.google.com/%3/lyrs=%4&hl=%5&x=%6%7&y=%8&z=%9&s=%10").arg(server).arg(GetServerNum(pos, 4)).arg(request).arg(VersionGoogleMap).arg(language).arg(pos.X()).arg(sec1).arg(pos.Y()).arg(zoom).arg(sec2);
+        // 现代接口不再需要 @version 后缀
+        return QString("https://%1%2.google.com/%3/lyrs=m&hl=%4&x=%5%6&y=%7&z=%8&s=%9").arg(server).arg(GetServerNum(pos, 4)).arg(request).arg(language).arg(pos.X()).arg(sec1).arg(pos.Y()).arg(zoom).arg(sec2);
     }
         break;
     case MapType::GoogleSatellite:
     {
-        QString server = "khm";
-        QString request = "kh";
+        // 卫星图同样走 mt/vt 的 lyrs=s 通道，避免依赖过期的 khm 版本号
+        QString server = "mt";
+        QString request = "vt";
         QString sec1 = ""; // after &x=...
         QString sec2 = ""; // after &zoom=...
         GetSecGoogleWords(pos,  sec1,  sec2);
-        TryCorrectGoogleVersions();
-        return QString("https://%1%2.google.com/%3/v=%4&hl=%5&x=%6%7&y=%8&z=%9&s=%10").arg(server).arg(GetServerNum(pos, 4)).arg(request).arg(VersionGoogleSatellite).arg(language).arg(pos.X()).arg(sec1).arg(pos.Y()).arg(zoom).arg(sec2);
+        return QString("https://%1%2.google.com/%3/lyrs=s&hl=%4&x=%5%6&y=%7&z=%8&s=%9").arg(server).arg(GetServerNum(pos, 4)).arg(request).arg(language).arg(pos.X()).arg(sec1).arg(pos.Y()).arg(zoom).arg(sec2);
     }
         break;
     case MapType::GoogleLabels:
@@ -226,9 +226,8 @@ QString UrlFactory::MakeImageUrl(const MapType::Types &type,const Point &pos,con
         QString sec1 = ""; // after &x=...
         QString sec2 = ""; // after &zoom=...
         GetSecGoogleWords(pos,  sec1,  sec2);
-        TryCorrectGoogleVersions();
 
-        return QString("https://%1%2.google.com/%3/lyrs=%4&hl=%5&x=%6%7&y=%8&z=%9&s=%10").arg(server).arg(GetServerNum(pos, 4)).arg(request).arg(VersionGoogleLabels).arg(language).arg(pos.X()).arg(sec1).arg(pos.Y()).arg(zoom).arg(sec2);
+        return QString("https://%1%2.google.com/%3/lyrs=h&hl=%4&x=%5%6&y=%7&z=%8&s=%9").arg(server).arg(GetServerNum(pos, 4)).arg(request).arg(language).arg(pos.X()).arg(sec1).arg(pos.Y()).arg(zoom).arg(sec2);
     }
         break;
     case MapType::GoogleTerrain:
@@ -238,8 +237,7 @@ QString UrlFactory::MakeImageUrl(const MapType::Types &type,const Point &pos,con
         QString sec1 = ""; // after &x=...
         QString sec2 = ""; // after &zoom=...
         GetSecGoogleWords(pos,  sec1,  sec2);
-        TryCorrectGoogleVersions();
-        return QString("https://%1%2.google.com/%3/v=%4&hl=%5&x=%6%7&y=%8&z=%9&s=%10").arg(server).arg(GetServerNum(pos, 4)).arg(request).arg(VersionGoogleTerrain).arg(language).arg(pos.X()).arg(sec1).arg(pos.Y()).arg(zoom).arg(sec2);
+        return QString("https://%1%2.google.com/%3/lyrs=p&hl=%4&x=%5%6&y=%7&z=%8&s=%9").arg(server).arg(GetServerNum(pos, 4)).arg(request).arg(language).arg(pos.X()).arg(sec1).arg(pos.Y()).arg(zoom).arg(sec2);
     }
         break;
     case MapType::GoogleMapChina:
@@ -351,8 +349,8 @@ QString UrlFactory::MakeImageUrl(const MapType::Types &type,const Point &pos,con
         break;
     case MapType::OpenStreetMap:
     {
-        char letter= "abc"[GetServerNum(pos, 3)];
-        return QString("http://%1.tile.openstreetmap.org/%2/%3/%4.png").arg(letter).arg(zoom).arg(pos.X()).arg(pos.Y());
+        // OSM 官方主域名，强制 https（http 会被 301 跳转）
+        return QString("https://tile.openstreetmap.org/%1/%2/%3.png").arg(zoom).arg(pos.X()).arg(pos.Y());
     }
         break;
     case MapType::OpenStreetOsm:
@@ -397,35 +395,37 @@ QString UrlFactory::MakeImageUrl(const MapType::Types &type,const Point &pos,con
     {
         // http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_StreetMap_World_2D/MapServer/tile/0/0/0.jpg
 
-        return QString("http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_StreetMap_World_2D/MapServer/tile/%1/%2/%3").arg(zoom).arg(pos.Y()).arg(pos.X());
+        // ESRI_StreetMap_World_2D 服务已下线，改用 World_Street_Map
+        return QString("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/%1/%2/%3").arg(zoom).arg(pos.Y()).arg(pos.X());
     }
         break;
     case MapType::ArcGIS_Satellite:
     {
         // http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_Imagery_World_2D/MapServer/tile/1/0/1.jpg
 
-        return QString("http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_Imagery_World_2D/MapServer/tile/%1/%2/%3").arg(zoom).arg(pos.Y()).arg(pos.X());
+        // ESRI_Imagery_World_2D 服务已下线，改用 World_Imagery
+        return QString("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/%1/%2/%3").arg(zoom).arg(pos.Y()).arg(pos.X());
     }
         break;
     case MapType::ArcGIS_ShadedRelief:
     {
         // http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_ShadedRelief_World_2D/MapServer/tile/1/0/1.jpg
 
-        return QString("http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_ShadedRelief_World_2D/MapServer/tile/%1/%2/%3").arg(zoom).arg(pos.Y()).arg(pos.X());
+        return QString("https://server.arcgisonline.com/ArcGIS/rest/services/ESRI_ShadedRelief_World_2D/MapServer/tile/%1/%2/%3").arg(zoom).arg(pos.Y()).arg(pos.X());
     }
         break;
     case MapType::ArcGIS_Terrain:
     {
         // http://server.arcgisonline.com/ArcGIS/rest/services/NGS_Topo_US_2D/MapServer/tile/4/3/15
 
-        return QString("http://server.arcgisonline.com/ArcGIS/rest/services/NGS_Topo_US_2D/MapServer/tile/%1/%2/%3").arg(zoom).arg(pos.Y()).arg(pos.X());
+        return QString("https://server.arcgisonline.com/ArcGIS/rest/services/NGS_Topo_US_2D/MapServer/tile/%1/%2/%3").arg(zoom).arg(pos.Y()).arg(pos.X());
     }
         break;
     case MapType::ArcGIS_WorldTopo:
     {
         // http://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/4/3/15
 
-        return QString("http://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/%1/%2/%3").arg(zoom).arg(pos.Y()).arg(pos.X());
+        return QString("https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/%1/%2/%3").arg(zoom).arg(pos.Y()).arg(pos.X());
     }
         break;
     case MapType::ArcGIS_MapsLT_OrtoFoto:
@@ -500,6 +500,24 @@ QString UrlFactory::MakeImageUrl(const MapType::Types &type,const Point &pos,con
     {
 
         return QString("http://opencache.statkart.no/gatekeeper/gk/gk.open_gmaps?layers=topo2&zoom=%1&x=%2&y=%3").arg(zoom).arg(pos.X()).arg(pos.Y());
+    }
+        break;
+    case MapType::AutoNaviRoad:
+    {
+        // 高德路网图，webrd01-04 四台负载
+        return QString("https://webrd0%1.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x=%2&y=%3&z=%4").arg(GetServerNum(pos, 4) + 1).arg(pos.X()).arg(pos.Y()).arg(zoom);
+    }
+        break;
+    case MapType::AutoNaviSatellite:
+    {
+        // 高德卫星影像，webst01-04
+        return QString("https://webst0%1.is.autonavi.com/appmaptile?style=6&x=%2&y=%3&z=%4").arg(GetServerNum(pos, 4) + 1).arg(pos.X()).arg(pos.Y()).arg(zoom);
+    }
+        break;
+    case MapType::AutoNaviLabels:
+    {
+        // 高德路网标注图层，叠加在卫星图上组成混合图
+        return QString("https://webst0%1.is.autonavi.com/appmaptile?style=8&x=%2&y=%3&z=%4").arg(GetServerNum(pos, 4) + 1).arg(pos.X()).arg(pos.Y()).arg(zoom);
     }
         break;
     default:

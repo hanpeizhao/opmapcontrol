@@ -103,8 +103,43 @@ public:
         GoogleHybridKorea=4005,
 
         YandexMapRu = 5000,
-        Statkart_Topo2 = 5500
+        Statkart_Topo2 = 5500,
+
+        // 高德地图（国内可达性好；瓦片为 GCJ-02 坐标，与 WGS-84 有数百米偏移）
+        AutoNaviRoad = 6000,
+        AutoNaviSatellite = 6001,
+        AutoNaviLabels = 6002,
+        AutoNaviHybrid = 6003
     };
+
+    /// <summary>
+    /// 瓦片数据基准坐标系：地图源声明自己的瓦片对齐到哪个坐标系，
+    /// 控件据此在用户坐标(WGS-84)与瓦片坐标之间自动纠偏
+    /// </summary>
+    enum TileDatum
+    {
+        DatumWGS84,     // WGS-84：OSM、ArcGIS、Google 国际版、Bing 等
+        DatumGCJ02      // GCJ-02：高德、谷歌中国等国内加密坐标
+    };
+
+    static TileDatum DatumByType(Types const& value)
+    {
+        switch(value)
+        {
+        case GoogleMapChina:
+        case GoogleSatelliteChina:
+        case GoogleLabelsChina:
+        case GoogleTerrainChina:
+        case GoogleHybridChina:
+        case AutoNaviRoad:
+        case AutoNaviSatellite:
+        case AutoNaviLabels:
+        case AutoNaviHybrid:
+            return DatumGCJ02;
+        default:
+            return DatumWGS84;
+        }
+    }
 
     static QString StrByType(Types const& value)
     {
