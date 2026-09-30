@@ -119,7 +119,6 @@ private slots:
     void refreshNavState();               ///< 导航状态行（IsNavigating / 路线摘要）
     void onInsertWaypointClicked();       ///< 前两航点中点插入（WPInsert 演示）
     void onRenumberClicked();             ///< 选中航点移至末尾（WPRenumber 演示）
-    void onWingmanTick();                 ///< 僚机绕飞动画（destPoint 几何演示）
 
 protected:
     void resizeEvent(QResizeEvent *event);
@@ -194,9 +193,6 @@ private:
     // 库能力示范
     QListWidget *m_eventLog;         ///< 库事件日志面板
     QLabel *m_navStateLabel;         ///< 导航状态行（导航中/路线摘要/请求状态）
-    QTimer *m_wingmanTimer;          ///< 僚机绕飞动画（多机 UAV 演示）
-    double m_wingmanAngle;           ///< 僚机当前方位角（度）
-    int m_wingmanId;                 ///< 僚机 UAV id
     int m_lastDlPct;                 ///< 下载日志节流（上个 10% 档位）
     QPushButton *m_fenceBtn;         ///< 多边形围栏三态按钮
     QList<opmap::PointLatLng> m_fencePts;   ///< 围栏取点缓存（取点过程中逐点更新）

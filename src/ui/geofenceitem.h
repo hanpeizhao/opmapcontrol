@@ -33,12 +33,16 @@ public:
     const QList<opmap::PointLatLng>& Vertices() const { return vertices; }
     void SetVertices(const QList<opmap::PointLatLng> &value);
 
+    /// 地图拖动/缩放时由 MapGraphicItem::ChildPosRefresh 统一驱动重算屏幕多边形
+    void RefreshPos();
+
     /// 射线法：point 是否在多边形内部（围栏允许区内）
     static bool Contains(const QList<opmap::PointLatLng> &polygon, const opmap::PointLatLng &point);
 
-private:
+private slots:
     void RefreshPolygon();
 
+private:
     MapGraphicItem *map;
     QList<opmap::PointLatLng> vertices;   ///< 围栏顶点（WGS-84）
     QPolygonF screenPolygon;              ///< 屏幕坐标多边形（随地图刷新）

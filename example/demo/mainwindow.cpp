@@ -83,9 +83,6 @@ MainWindow::MainWindow()
       m_tileLabel(new QLabel(tr("tiles: --"), this)),
       m_eventLog(0),
       m_navStateLabel(0),
-      m_wingmanTimer(0),
-      m_wingmanAngle(0),
-      m_wingmanId(2),
       m_lastDlPct(-1),
       m_fenceBtn(new QPushButton(QString::fromUtf8("绘制围栏"), this)),
       m_pickMode(PickNone),
@@ -484,56 +481,13 @@ void MainWindow::setupCapabilityDock()
         logEvent(QString::fromUtf8("缓存库增量导出 → %1").arg(dest));
     });
 
-    // —— 多机与几何 ——
-    QGroupBox *demoBox = new QGroupBox(QString::fromUtf8("多机与几何"), panel);
+    // —— 地理围栏 ——
+    QGroupBox *demoBox = new QGroupBox(QString::fromUtf8("地理围栏"), panel);
     QVBoxLayout *demoLayout = new QVBoxLayout(demoBox);
-    QPushButton *wingBtn = new QPushButton(QString::fromUtf8("添加僚机（多机演示）"), demoBox);
-    demoLayout->addWidget(wingBtn);
-    QPushButton *geoBtn = new QPushButton(QString::fromUtf8("几何换算演示"), demoBox);
-    demoLayout->addWidget(geoBtn);
-    demoLayout->addWidget(m_fenceBtn);   // 多边形地理围栏（取点 → 闭合 → 清除）
+    demoLayout->addWidget(m_fenceBtn);   // 多边形地理围栏（绘制 → 闭合 → 清除）
     connect(m_fenceBtn, &QPushButton::clicked, this, &MainWindow::onFenceClicked);
     layout->addWidget(demoBox);
     layout->addStretch(1);
-
-    connect(wingBtn, &QPushButton::clicked, [this, wingBtn]() {
-        if (!m_wingmanTimer) {   // 添加僚机：第二架 UAV 绕车辆/中心盘旋（演示 AddUAV/destPoint）
-            opmap::UAVItem *wing = m_map->AddUAV(m_wingmanId);
-            if (m_map->Home) {   // 打开 Home 安全圈（400m），僚机飞出即触发 UAVLeftSafetyBouble
-                m_map->Home->SetShowSafeArea(true);
-                m_map->Home->SetSafeArea(400);
-                m_map->Home->update();
-            }
-            wing->SetUAVPos(m_map->HasVehiclePosition() ? m_map->VehiclePosition()
-                                                        : m_map->CurrentPosition(), 100);
-            m_wingmanTimer = new QTimer(this);
-            connect(m_wingmanTimer, &QTimer::timeout, this, &MainWindow::onWingmanTick);
-            m_wingmanTimer->start(400);
-            wingBtn->setText(QString::fromUtf8("删除僚机"));
-            logEvent(QString::fromUtf8("已添加僚机 #%1（AddUAV），400ms 绕飞，安全圈 400m").arg(m_wingmanId));
-        } else {                 // 删除僚机
-            m_wingmanTimer->stop();
-            delete m_wingmanTimer;
-            m_wingmanTimer = 0;
-            m_map->DeleteUAV(m_wingmanId);
-            wingBtn->setText(QString::fromUtf8("添加僚机（多机演示）"));
-            logEvent(QString::fromUtf8("已删除僚机 #%1（DeleteUAV）").arg(m_wingmanId));
-        }
-    });
-    connect(geoBtn, &QPushButton::clicked, [this]() {
-        // 几何工具演示：bearing / haversineDistanceM / metersToPixels / destPoint
-        const opmap::PointLatLng center = m_map->CurrentPosition();
-        const opmap::PointLatLng to = m_map->HasVehiclePosition()
-                ? m_map->VehiclePosition()
-                : opmap::PointLatLng(center.Lat() + 0.01, center.Lng() + 0.01);
-        const double brg = m_map->bearing(center, to);
-        const double distM = opmap::geoutils::haversineDistanceM(center, to);
-        const double px = m_map->metersToPixels(100.0);
-        const opmap::PointLatLng probe = m_map->destPoint(center, 45.0, 1.0);   // 1 km（destPoint 距离单位为千米）
-        logEvent(QString::fromUtf8("几何：中心→车辆 方位%1° 距离%2m | 100m=%3px | 中心向45°1km → (%4,%5)")
-                 .arg(brg, 0, 'f', 1).arg(distM, 0, 'f', 0).arg(px, 0, 'f', 1)
-                 .arg(probe.Lat(), 0, 'f', 5).arg(probe.Lng(), 0, 'f', 5));
-    });
 
     // 左侧停靠 + 滚动区（面板内容较多，小窗口不挤爆）
     QScrollArea *scroll = new QScrollArea(this);
@@ -665,25 +619,6 @@ void MainWindow::refreshNavState()
     } else {
         m_navStateLabel->setText(QString::fromUtf8("状态：未导航（IsNavigating=false）"));
     }
-}
-
-/** 僚机绕飞：每拍方位角推进 30°，绕车辆位置（无则地图中心）300m 半径盘旋，
- *  同时演示 destPoint 几何换算与多机 UAV 同屏。 */
-void MainWindow::onWingmanTick()
-{
-    opmap::UAVItem *wing = m_map->GetUAV(m_wingmanId);
-    if (!wing)
-        return;
-    // 绕飞中心：优先跟随主机（护航盘旋效果），无主机时用车辆/当前中心
-    opmap::UAVItem *lead = m_map->GetUAV(0);
-    const opmap::PointLatLng base = (lead && lead->isVisible())
-            ? lead->UAVPos()
-            : (m_map->HasVehiclePosition() ? m_map->VehiclePosition()
-                                           : m_map->CurrentPosition());
-    m_wingmanAngle = fmod(m_wingmanAngle + 30.0, 360.0);
-    // destPoint 的距离单位为千米（历史语义），300m = 0.3km
-    wing->SetUAVPos(m_map->destPoint(base, m_wingmanAngle, 0.3), 100);
-    wing->SetUAVHeading(m_wingmanAngle);
 }
 
 /** WPInsert 演示：在前两个航点的中点插入新航点（后续编号自动连锁）。 */
@@ -894,6 +829,13 @@ void MainWindow::onMapMouseMove(QMouseEvent *)
     const opmap::PointLatLng p = m_map->currentMousePosition();
     m_posLabel->setText(QString::fromUtf8("lng: %1, lat: %2 (WGS-84)")
                         .arg(p.Lng(), 0, 'f', 6).arg(p.Lat(), 0, 'f', 6));
+
+    // 围栏橡皮筋预览：末段线实时跟随鼠标，点击地图即固化一个顶点
+    if (m_pickMode == PickFence && !m_fencePts.isEmpty()) {
+        QList<opmap::PointLatLng> preview = m_fencePts;
+        preview.append(p);
+        m_map->SetGeofence(preview);
+    }
 }
 
 void MainWindow::onZoomChanged(double, double, double)

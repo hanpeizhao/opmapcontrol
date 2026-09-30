@@ -21,8 +21,8 @@ GeofenceItem::GeofenceItem(MapGraphicItem *map, QGraphicsItem *parent)
 {
     setZValue(4);
     RefreshPolygon();
-    connect(map, SIGNAL(OnMapDrag()), this, SLOT(RefreshPolygon()));
-    connect(map, SIGNAL(OnMapZoomChanged()), this, SLOT(RefreshPolygon()));
+    // 拖动/缩放跟随由 MapGraphicItem::ChildPosRefresh 统一驱动（OnMapDrag 信号在 core 上，
+    // 不能直接 connect map），与航点/UAV/Home 子项机制一致
 }
 
 void GeofenceItem::SetVertices(const QList<opmap::PointLatLng> &value)
@@ -65,6 +65,12 @@ void GeofenceItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
     painter->setBrush(QBrush(QColor(220, 40, 40)));
     for (int i = 0; i < screenPolygon.size(); ++i)
         painter->drawEllipse(screenPolygon.at(i), 4, 4);
+}
+
+void GeofenceItem::RefreshPos()
+{
+    RefreshPolygon();
+    update();
 }
 
 void GeofenceItem::RefreshPolygon()

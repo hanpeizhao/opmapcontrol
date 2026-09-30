@@ -29,6 +29,7 @@
 #include "uavitem.h"
 #include "gpsitem.h"
 #include "homeitem.h"
+#include "geofenceitem.h"
 #include "mapgraphicitem.h"
 #include "waypointlineitem.h"
 #include <QGraphicsSceneMouseEvent>
@@ -104,6 +105,9 @@ void MapGraphicItem::Core_OnNeedInvalidation()
         GPSItem* wwww=qgraphicsitem_cast<GPSItem*>(i);
         if(wwww)
             wwww->RefreshPos();
+        GeofenceItem* gf=qgraphicsitem_cast<GeofenceItem*>(i);
+        if(gf)
+            gf->RefreshPos();
 
         emit mapChanged();
     }
@@ -125,6 +129,9 @@ void MapGraphicItem::ChildPosRefresh()
         GPSItem* wwww=qgraphicsitem_cast<GPSItem*>(i);
         if(wwww)
             wwww->RefreshPos();
+        GeofenceItem* gf=qgraphicsitem_cast<GeofenceItem*>(i);
+        if(gf)
+            gf->RefreshPos();
 
         emit mapChanged();
     }
