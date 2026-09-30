@@ -400,11 +400,38 @@ void MapEngine::StartSystem()
     }
 }
 
+namespace {
+/// floor 除法：C++ 整除向零截断，负的地图平面坐标换算瓦片号需向下取整
+int FloorDiv(int a, int b)
+{
+    int q = a / b;
+    if(a % b != 0 && ((a < 0) != (b < 0)))
+        --q;
+    return q;
+}
+}
+
 void MapEngine::UpdateCenterTileXYLocation()
 {
-    PointLatLng center = FromLocalToLatLng(Width/2, Height/2);
-    Point centerPixel = Projection()->FromLatLngToPixel(ToTileDatum(center), Zoom());
-    centerTileXYLocation = Projection()->FromPixelToTileXY(centerPixel);
+    // 中心点直接由 renderOffset 换算成地图平面坐标（screen = map + renderOffset），
+    // 不再走"经纬度 -> 像素"的钳制往返：旧算法在拖出 ±180° 后中心瓦片被钉死在边界，
+    // 而 renderOffset 随鼠标继续漂移，视口滑出覆盖窗口后只剩白屏。平面坐标算法
+    // 配合 WrapTileX 使中心瓦片持续回绕，实现无限水平循环
+    Size ts = Projection()->TileSize();
+    Point centerMapPx(Width/2 - renderOffset.X(), Height/2 - renderOffset.Y());
+    Point raw(FloorDiv(centerMapPx.X(), ts.Width()), FloorDiv(centerMapPx.Y(), ts.Height()));
+
+    // 中心瓦片折回 [0, maxOfTiles.Width]，renderOffset 同步平移整世界宽度：
+    // 瓦片在屏幕上的位置不变（视觉无跳变），覆盖窗口始终跟随视口
+    int period = Projection()->GetTileMatrixMaxXY(Zoom()).Width() + 1;
+    int wraps = FloorDiv(raw.X(), period);
+    if(wraps != 0)
+    {
+        raw.SetX(raw.X() - wraps * period);
+        renderOffset.SetX(renderOffset.X() + wraps * period * ts.Width());
+    }
+
+    centerTileXYLocation = raw;
 }
 
 void MapEngine::OnMapSizeChanged(int const& width, int const& height)
