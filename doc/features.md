@@ -1,6 +1,6 @@
 # 功能清单与 API 参考
 
-库的全部公开能力按模块整理。**example 一列**标注 `opmapcontrol_example` 是否演示了该能力——example 只覆盖了一小部分，多数能力需在自己的代码中直接调用 API 使用。
+库的全部公开能力按模块整理。**example 一列**标注 `opmapcontrol_example` 是否演示了该能力——example 以"库能力示范"面板 + 事件日志面板 + 各功能面板覆盖了绝大多数 API，其余多为样式定制类低频配置。
 
 ## 1. 地图控制（OPMapWidget）
 
@@ -8,15 +8,15 @@
 |------|:---:|:----:|
 | 切换地图源 | `SetMapType()` / `GetMapType()` | ✅ |
 | 缩放（double/float 级别） | `SetZoom()` / `ZoomReal()` / `ZoomDigi()` / `ZoomTotal()` | ✅ |
-| 最大/最小缩放限制 | `SetMaxZoom()` / `SetMinZoom()` | — |
-| 定位地图中心（WGS-84） | `SetCurrentPosition()` / `CurrentPosition()` | — |
-| 地图旋转 | `SetRotate()` / `Rotate()` | — |
-| 拖动开关 | `SetCanDragMap()` | — |
-| 瓦片网格线显示 | `SetShowTileGridLines()` | — |
+| 最大/最小缩放限制 | `SetMaxZoom()` / `SetMinZoom()` | ✅（库能力示范面板） |
+| 定位地图中心（WGS-84） | `SetCurrentPosition()` / `CurrentPosition()` | ✅ |
+| 地图旋转 | `SetRotate()` / `Rotate()` | ✅（旋转滑条） |
+| 拖动开关 | `SetCanDragMap()` | ✅ |
+| 瓦片网格线显示 | `SetShowTileGridLines()` | ✅ |
 | 指北针显示 | `SetShowCompass()` | ✅（默认显示） |
-| OpenGL 渲染开关 | `SetUseOpenGL()` | — |
-| 强制重载地图 | `ReloadMap()` | — |
-| 鼠标跟随模式 | `SetFollowMouse()` | — |
+| OpenGL 渲染开关 | `SetUseOpenGL()` | ✅ |
+| 强制重载地图 | `ReloadMap()` | ✅ |
+| 鼠标跟随模式 | `SetFollowMouse()` | ✅ |
 
 ## 2. 坐标与几何工具
 
@@ -24,19 +24,19 @@
 |------|:---:|:----:|
 | 当前鼠标位置（WGS-84） | `currentMousePosition()` | ✅ |
 | 屏幕像素 → 经纬度 | `GetFromLocalToLatLng(QPointF)` | — |
-| 米 → 像素换算 | `metersToPixels(double)` | — |
-| 两点方位角（度） | `bearing(from, to)` | — |
-| 源点+方位+距离 → 目标点 | `destPoint(source, bearing, dist)` | — |
+| 米 → 像素换算 | `metersToPixels(double)` | ✅（几何演示） |
+| 两点方位角（度） | `bearing(from, to)` | ✅（几何演示） |
+| 源点+方位+距离 → 目标点 | `destPoint(source, bearing, dist)` | ✅（几何演示，dist 单位千米） |
 
 ## 3. 航点管理（WayPointItem）
 
 | 功能 | API | example |
 |------|:---:|:----:|
 | 创建航点（坐标/高度/描述，5 种重载） | `WPCreate()` | ✅ |
-| 指定位置插入航点 | `WPInsert()` | — |
+| 指定位置插入航点 | `WPInsert()` | ✅（中点插入按钮） |
 | 删除单个/全部航点 | `WPDelete()` / `WPDeleteAll()` | ✅ |
 | 查询全部/选中的航点 | `WPAll()` / `WPSelected()` | ✅ |
-| 重新编号（自动连锁） | `WPRenumber()` | — |
+| 重新编号（自动连锁） | `WPRenumber()` | ✅（选中移至末尾按钮） |
 | 航点可拖拽编辑、显示高度 | `WayPointItem`（QGraphicsItem） | 部分 |
 | 航点间连线 | `waypointLines` / `WayPointLineItem` | — |
 
@@ -46,15 +46,15 @@
 
 | 功能 | API | example |
 |------|:---:|:----:|
-| 添加/删除多 UAV（多机同时显示） | `AddUAV(id)` / `DeleteUAV(id)` / `GetUAV()` / `GetUAVS()` | ✅（单机） |
-| UAV 位置/航向/轨迹更新 | `UAVItem::SetUAVPos()` / `SetUAVHeading()` / 轨迹类型 `UAVTrailType` | ✅（位置） |
+| 添加/删除多 UAV（多机同时显示） | `AddUAV(id)` / `DeleteUAV(id)` / `GetUAV()` / `GetUAVS()` | ✅（僚机绕飞演示） |
+| UAV 位置/航向/轨迹更新 | `UAVItem::SetUAVPos()` / `SetUAVHeading()` / 轨迹类型 `UAVTrailType` | ✅（位置+航向+轨迹） |
 | UAV 图标自定义 | `SetUAVPic(路径)` | — |
 | UAV 显示开关 | `SetShowUAV()` | ✅ |
 | Home 点显示开关 | `SetShowHome()` | ✅ |
-| 安全圈报警（飞出安全范围信号） | 信号 `UAVLeftSafetyBouble()` | — |
-| 到达航点事件 | 信号 `UAVReachedWayPoint()` | — |
+| 安全圈报警（飞出安全范围信号） | 信号 `UAVLeftSafetyBouble()` | ✅（僚机 + Home 安全圈 400m） |
+| 到达航点事件 | 信号 `UAVReachedWayPoint()` | ✅（事件日志订阅） |
 | GPS 轨迹元素 | `GPSItem` | — |
-| 诊断信息叠显（线程/缓存状态） | `SetShowDiagnostics()` | — |
+| 诊断信息叠显（线程/缓存状态） | `SetShowDiagnostics()` | ✅ |
 
 ## 5. 离线地图下载
 
@@ -62,18 +62,18 @@
 |------|:---:|:----:|
 | 框选区域 | `SelectedArea()` / `SetSelectedArea()`（WGS-84 矩形） | ✅ |
 | 抓取框选区域瓦片入库 | 槽 `RipMap()` | ✅ |
-| 下载进度/完成事件 | `MapRipper` 信号 | — |
+| 下载进度/完成事件 | `mapDownloadProgress/Tiles/Finished` 信号（库转发自 MapRipper） | ✅（事件日志） |
 
 ## 6. 缓存与访问控制（Configuration）
 
 | 功能 | API | example |
 |------|:---:|:----:|
-| 访问模式（仅缓存 / 仅网络 / 网络+缓存） | `SetAccessMode(AccessMode::Types)` | — |
-| 内存缓存开关与容量 | `SetUseMemoryCache()` / `SetTileMemorySize(MB)` | — |
-| 当前内存占用查询 | `TileMemoryUsed()` | — |
-| 缓存目录自定义 | `SetCacheLocation(路径)` | — |
-| 删除 N 天前的旧瓦片 | `DeleteTilesOlderThan(天数)` | — |
-| 两个缓存库间增量导出 | `ExportMapDataToDB(源库, 目标库)` | — |
+| 访问模式（仅缓存 / 仅网络 / 网络+缓存） | `SetAccessMode(AccessMode::Types)` | ✅（访问模式下拉） |
+| 内存缓存开关与容量 | `SetUseMemoryCache()` / `SetTileMemorySize(MB)` | ✅（容量调节） |
+| 当前内存占用查询 | `TileMemoryUsed()` | ✅ |
+| 缓存目录自定义 | `SetCacheLocation(路径)` | —（目录展示已有） |
+| 删除 N 天前的旧瓦片 | `DeleteTilesOlderThan(天数)` | ✅（清理按钮） |
+| 两个缓存库间增量导出 | `ExportMapDataToDB(源库, 目标库)` | ✅（导出按钮） |
 | 空瓦片样式（画刷/边框/文字/字体） | `EmptytileBrush` / `EmptyTileBorders` / `EmptyTileText` / `MissingDataFont` | — |
 | 选择框/比例尺画笔 | `SelectionPen` / `ScalePen` | — |
 | 拖动按键定义 | `DragButton` | — |
@@ -86,12 +86,12 @@
 |------|----------|:----:|
 | `mouseMove` / `mousePress` / `mouseRelease` | 鼠标事件转发 | ✅ |
 | `zoomChanged` | 缩放变化 | ✅ |
-| `OnCurrentPositionChanged` | 地图中心移动 | — |
-| `OnMapDrag` / `OnMapZoomChanged` / `OnMapTypeChanged` | 拖动/缩放/源切换 | — |
-| `OnTileLoadStart` / `OnTileLoadComplete` / `OnTilesStillToLoad(n)` | 瓦片加载生命周期 | — |
-| `OnEmptyTileError` | 瓦片加载失败 | — |
-| `WPInserted` / `WPDeleted` / `WPNumberChanged` / `WPValuesChanged` / `WPReached` | 航点增删/改号/改值/到达 | — |
-| `UAVReachedWayPoint` / `UAVLeftSafetyBouble` | UAV 到点/出安全圈 | — |
+| `OnCurrentPositionChanged` | 地图中心移动 | —（高频，日志未订阅） |
+| `OnMapDrag` / `OnMapZoomChanged` / `OnMapTypeChanged` | 拖动/缩放/源切换 | ✅（缩放/切源入日志） |
+| `OnTileLoadStart` / `OnTileLoadComplete` / `OnTilesStillToLoad(n)` | 瓦片加载生命周期 | ✅（事件日志/状态栏） |
+| `OnEmptyTileError` | 瓦片加载失败 | ✅（事件日志） |
+| `WPInserted` / `WPDeleted` / `WPNumberChanged` / `WPValuesChanged` / `WPReached` | 航点增删/改号/改值/到达 | ✅（事件日志） |
+| `UAVReachedWayPoint` / `UAVLeftSafetyBouble` | UAV 到点/出安全圈 | ✅（事件日志） |
 
 ## 8. 车载导航（路径规划 / NavigationEngine / RouteItem）
 
@@ -105,9 +105,10 @@
 | 喂入车辆实时位置（同步 UAV 图标 + 驱动引擎） | 槽 `UpdateVehiclePosition(PointLatLng)` | ✅ |
 | 停止导航 | 槽 `StopNavigation()` | ✅ |
 | 查询车辆当前位置（最近一次喂入，非地图中心） | `HasVehiclePosition()` / `VehiclePosition()` | ✅ |
-| 是否导航中 | `IsNavigating()` | — |
-| 当前导航路线 | `CurrentNavigationRoute()` | — |
-| 路线显示开关（默认导航时自动显示） | `SetShowRoute(bool)` / `ShowRoute()` | — |
+| 是否导航中 | `IsNavigating()` | ✅（导航状态行） |
+| 当前导航路线 | `CurrentNavigationRoute()` | ✅（导航状态行） |
+| 路线显示开关（默认导航时自动显示） | `SetShowRoute(bool)` / `ShowRoute()` | ✅ |
+| 导航引擎参数调整 | `GetNavigationEngine()` → `SetOffRouteThresholdM` 等 | ✅（偏航/到达阈值调节） |
 
 导航信号：
 
@@ -134,7 +135,7 @@
 | 功能 | API | example |
 |------|:---:|:----:|
 | 发起一次 IP 定位（在途时重复调用被忽略） | 槽 `RequestIpLocation()` | ✅ |
-| 查询是否有请求在途 | `IsIpLocationBusy()` | — |
+| 查询是否有请求在途 | `IsIpLocationBusy()` | ✅（轮询日志） |
 
 IP 定位信号：
 
@@ -151,13 +152,12 @@ IP 定位信号：
 
 ## 10. example 未覆盖的能力汇总
 
-example 已覆盖主要链路（切源、缩放、框选下载、航点增删/导入导出、车载导航全流程、行车模拟与模拟偏航、系统 GPS 与 IP 定位位置源）。以下能力为库完整提供但 example 未使用：
+example 以三块组合覆盖库的绝大多数能力：**各功能面板**（地图/航点/导航/行车模拟）、**库能力示范面板**（左侧：视图控制 / 缓存与访问 / 多机与几何）、**事件日志面板**（底部：库信号实时流）。以下为仍未演示的少数项，多为样式定制或预留能力：
 
-- 地图旋转、OpenGL 渲染、缩放级别限制、访问模式控制
-- 多机 UAV 同时显示、安全圈报警、到点事件
-- 航点插入/重编号、连线、值变化信号
-- 缓存目录/容量管理、旧瓦片清理、缓存库间导出
-- 全部瓦片加载生命周期信号与几何换算工具
-- 导航状态查询（`IsNavigating`/`CurrentNavigationRoute`）、路线显示开关、引擎参数调整
+- `GetFromLocalToLatLng`（像素→经纬度；内部逻辑已由鼠标读数覆盖）
+- 航点间连线 `waypointLines` / `WayPointLineItem`（库预留半成品，仅建组不填线）
+- `GPSItem` GPS 轨迹元素、`SetUAVPic` UAV 图标自定义
+- `SetCacheLocation` 缓存目录设置（运行中切换目录需重载）
+- 空瓦片样式、选择框/比例尺画笔、拖动按键等外观定制（`EmptytileBrush` / `SelectionPen` / `ScalePen` / `DragButton` 等）
 
 如需这些能力，直接包含 `src/opmapcontrol.h` 调用对应 API 即可，无需改动库代码。

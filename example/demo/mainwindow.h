@@ -104,6 +104,16 @@ private slots:
     // 离线下载
     void onRipMapClicked();
 
+    // —— 库能力示范（控件回调统一 lambda 连接，故不占 slots 区）——
+    void setupCapabilityDock();     ///< 库能力演示面板：视图控制 / 缓存与访问 / 多机与几何
+    void setupEventLogDock();       ///< 事件日志面板：订阅库信号
+    void connectEventLog();         ///< 库信号 → 日志面板（高频信号除外）
+    void logEvent(const QString &text);   ///< 日志统一入口（时间戳 + 限长）
+    void refreshNavState();               ///< 导航状态行（IsNavigating / 路线摘要）
+    void onInsertWaypointClicked();       ///< 前两航点中点插入（WPInsert 演示）
+    void onRenumberClicked();             ///< 选中航点移至末尾（WPRenumber 演示）
+    void onWingmanTick();                 ///< 僚机绕飞动画（destPoint 几何演示）
+
 protected:
     void resizeEvent(QResizeEvent *event);
 
@@ -168,6 +178,14 @@ private:
     // 状态栏
     QLabel *m_posLabel;
     QLabel *m_tileLabel;
+
+    // 库能力示范
+    QListWidget *m_eventLog;         ///< 库事件日志面板
+    QLabel *m_navStateLabel;         ///< 导航状态行（导航中/路线摘要/请求状态）
+    QTimer *m_wingmanTimer;          ///< 僚机绕飞动画（多机 UAV 演示）
+    double m_wingmanAngle;           ///< 僚机当前方位角（度）
+    int m_wingmanId;                 ///< 僚机 UAV id
+    int m_lastDlPct;                 ///< 下载日志节流（上个 10% 档位）
 
     PickMode m_pickMode;
     opmap::PointLatLng m_origin;     ///< 点选的起点（缺省用当前位置）

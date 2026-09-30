@@ -302,6 +302,11 @@ bool OPMapWidget::IsIpLocationBusy() const
     return ipLocator ? ipLocator->isBusy() : false;
 }
 
+opmap::NavigationEngine *OPMapWidget::GetNavigationEngine() const
+{
+    return navEngine;
+}
+
 void OPMapWidget::SetShowRoute(bool const& value)
 {
     routeItem->setVisible(value);
@@ -632,7 +637,11 @@ void OPMapWidget::SetRotate(qreal const& value)
 
 void OPMapWidget::RipMap()
 {
-    new MapRipper(core, map->SelectedArea());
+    // MapRipper 线程结束自删（deleteLater），连接随对象销毁自动断开，无需持有指针
+    MapRipper *ripper = new MapRipper(core, map->SelectedArea());
+    connect(ripper, SIGNAL(percentageChanged(int)), this, SIGNAL(mapDownloadProgress(int)));
+    connect(ripper, SIGNAL(numberOfTilesChanged(int,int)), this, SIGNAL(mapDownloadTiles(int,int)));
+    connect(ripper, SIGNAL(finish()), this, SIGNAL(mapDownloadFinished()));
 }
 
 
@@ -643,6 +652,12 @@ void OPMapWidget::RipMap()
 double OPMapWidget::bearing(opmap::PointLatLng from, opmap::PointLatLng to)
 {
     return geoutils::bearingDeg(from, to);
+}
+
+/// 米 → 当前缩放级别下的屏幕像素数（在指定纬度处的地面分辨率换算）
+float OPMapWidget::metersToPixels(double meters)
+{
+    return map->metersToPixels(meters, CurrentPosition());
 }
 
 // return a destination lat/lon point given a source lat/lon point and the bearing and distance from the source point

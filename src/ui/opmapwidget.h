@@ -687,6 +687,14 @@ signals:
     /** @brief IP 定位失败（双源均不可用或返回异常） */
     void ipLocationFailed(QString reason);
 
+    // ———————— 离线下载进度信号（转发自 MapRipper）————————
+    /** @brief 抓取进度百分比（0-100） */
+    void mapDownloadProgress(int percent);
+    /** @brief 抓取进度（总瓦片数 / 已完成数） */
+    void mapDownloadTiles(int total, int actual);
+    /** @brief 本轮抓取结束（完成或取消） */
+    void mapDownloadFinished();
+
 public slots:
     /**
      * @brief Ripps the current selection to the DB
@@ -715,6 +723,9 @@ public slots:
 
     /// 是否有 IP 定位请求在途
     bool IsIpLocationBusy() const;
+
+    /// 导航引擎访问器（调整偏航阈值/到达阈值/重规划参数等引擎默认行为）
+    opmap::NavigationEngine *GetNavigationEngine() const;
 
     /**
      * @brief Sets the map zoom level

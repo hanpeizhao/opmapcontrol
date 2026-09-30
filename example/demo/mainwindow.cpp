@@ -18,6 +18,11 @@
 #include <QtWidgets/QHBoxLayout>
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QFileDialog>
+#include <QtWidgets/QGroupBox>
+#include <QtWidgets/QSlider>
+#include <QtWidgets/QSpinBox>
+#include <QtWidgets/QScrollArea>
+#include <QtCore/QTime>
 #include <QtCore/QTimer>
 #include <QtCore/QDebug>
 #include <QtGui/QResizeEvent>
@@ -27,6 +32,8 @@
 #include "waypoint_store.h"
 #include "navigation_simulator.h"
 #include "uavitem.h"
+#include "homeitem.h"
+#include "waypointitem.h"
 
 namespace {
 
@@ -69,6 +76,12 @@ MainWindow::MainWindow()
       m_banner(new QLabel(m_map)),
       m_posLabel(new QLabel(tr("lng: --, lat: --"), this)),
       m_tileLabel(new QLabel(tr("tiles: --"), this)),
+      m_eventLog(0),
+      m_navStateLabel(0),
+      m_wingmanTimer(0),
+      m_wingmanAngle(0),
+      m_wingmanId(2),
+      m_lastDlPct(-1),
       m_pickMode(PickNone),
       m_origin(0, 0),
       m_dest(0, 0),
@@ -199,6 +212,13 @@ void MainWindow::setupDocks()
     wpBtnRow2->addWidget(importBtn);
     wpBtnRow2->addWidget(exportBtn);
     wpLayout->addLayout(wpBtnRow2);
+    // 库 WPInsert/WPRenumber 演示：中点插入与选中移至末尾
+    QPushButton *insertWpBtn = new QPushButton(QString::fromUtf8("中点插入航点"), wpPanel);
+    QPushButton *renumWpBtn = new QPushButton(QString::fromUtf8("选中移至末尾"), wpPanel);
+    QHBoxLayout *wpBtnRow3 = new QHBoxLayout();
+    wpBtnRow3->addWidget(insertWpBtn);
+    wpBtnRow3->addWidget(renumWpBtn);
+    wpLayout->addLayout(wpBtnRow3);
     wpLayout->addWidget(m_wpList);
     connect(m_addWpBtn, SIGNAL(clicked()), this, SLOT(onAddWaypointClicked()));
     connect(m_delWpBtn, SIGNAL(clicked()), this, SLOT(onDeleteWaypointClicked()));
@@ -207,6 +227,8 @@ void MainWindow::setupDocks()
     connect(exportBtn, SIGNAL(clicked()), this, SLOT(onExportWaypointsClicked()));
     connect(m_wpList, SIGNAL(itemClicked(QListWidgetItem*)),
             this, SLOT(onWaypointListItemClicked(QListWidgetItem*)));
+    connect(insertWpBtn, &QPushButton::clicked, this, &MainWindow::onInsertWaypointClicked);
+    connect(renumWpBtn, &QPushButton::clicked, this, &MainWindow::onRenumberClicked);
 
     // —— 车载导航面板 ——
     QWidget *navPanel = new QWidget(this);
@@ -235,7 +257,31 @@ void MainWindow::setupDocks()
     navBtnRow->addWidget(m_stopNavBtn);
     navLayout->addLayout(navBtnRow);
     navLayout->addWidget(m_navInfo);
+    // —— 导航状态查询 / 路线显示开关 / 引擎参数（库能力示范）——
+    m_navStateLabel = new QLabel(navPanel);
+    m_navStateLabel->setWordWrap(true);
+    navLayout->addWidget(m_navStateLabel);
+    QCheckBox *showRouteCheck = new QCheckBox(QString::fromUtf8("显示路线绘制"), navPanel);
+    showRouteCheck->setChecked(true);
+    navLayout->addWidget(showRouteCheck);
+    QHBoxLayout *engineRow = new QHBoxLayout();
+    engineRow->addWidget(new QLabel(QString::fromUtf8("偏航m"), navPanel));
+    QSpinBox *offRouteSpin = new QSpinBox(navPanel);
+    offRouteSpin->setRange(10, 500);
+    offRouteSpin->setValue(50);
+    engineRow->addWidget(offRouteSpin);
+    engineRow->addWidget(new QLabel(QString::fromUtf8("到达m"), navPanel));
+    QSpinBox *arriveSpin = new QSpinBox(navPanel);
+    arriveSpin->setRange(10, 200);
+    arriveSpin->setValue(30);
+    engineRow->addWidget(arriveSpin);
+    navLayout->addLayout(engineRow);
     navLayout->addStretch(1);
+    connect(showRouteCheck, &QCheckBox::toggled, m_map, &opmap::OPMapWidget::SetShowRoute);
+    connect(offRouteSpin, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+            [this](int v) { if (m_map->GetNavigationEngine()) m_map->GetNavigationEngine()->SetOffRouteThresholdM(v); });
+    connect(arriveSpin, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+            [this](int v) { if (m_map->GetNavigationEngine()) m_map->GetNavigationEngine()->SetArrivalThresholdM(v); });
     connect(m_planBtn, SIGNAL(clicked()), this, SLOT(onPlanClicked()));
     connect(m_navBtn, SIGNAL(clicked()), this, SLOT(onNavigateClicked()));
     connect(m_stopNavBtn, SIGNAL(clicked()), this, SLOT(onStopNavClicked()));
@@ -296,6 +342,338 @@ void MainWindow::setupDocks()
     tabifyDockWidget(wpDock, navDock);
     tabifyDockWidget(navDock, simDock);
     wpDock->raise();
+
+    // —— 库能力示范面板（左侧）与事件日志（底部）——
+    setupCapabilityDock();
+    setupEventLogDock();
+    connectEventLog();
+    refreshNavState();
+}
+
+/** 库能力示范面板：把 features.md 中未演示的地图控制/缓存管理/多机/几何 API
+ *  以可交互控件的形式全部摆出来，作为各 API 的活文档。 */
+void MainWindow::setupCapabilityDock()
+{
+    QWidget *panel = new QWidget(this);
+    QVBoxLayout *layout = new QVBoxLayout(panel);
+    layout->setSpacing(6);
+
+    // —— 视图控制 ——
+    QGroupBox *viewBox = new QGroupBox(QString::fromUtf8("视图控制"), panel);
+    QVBoxLayout *viewLayout = new QVBoxLayout(viewBox);
+    QCheckBox *gridCheck = new QCheckBox(QString::fromUtf8("瓦片网格线"), viewBox);
+    QCheckBox *dragCheck = new QCheckBox(QString::fromUtf8("允许拖动地图"), viewBox);
+    dragCheck->setChecked(true);
+    QCheckBox *glCheck = new QCheckBox(QString::fromUtf8("OpenGL 渲染"), viewBox);
+    QCheckBox *followMouseCheck = new QCheckBox(QString::fromUtf8("鼠标跟随"), viewBox);
+    QCheckBox *diagCheck = new QCheckBox(QString::fromUtf8("诊断信息叠显"), viewBox);
+    viewLayout->addWidget(gridCheck);
+    viewLayout->addWidget(dragCheck);
+    viewLayout->addWidget(glCheck);
+    viewLayout->addWidget(followMouseCheck);
+    viewLayout->addWidget(diagCheck);
+    QHBoxLayout *rotateRow = new QHBoxLayout();
+    rotateRow->addWidget(new QLabel(QString::fromUtf8("旋转"), viewBox));
+    QSlider *rotateSlider = new QSlider(Qt::Horizontal, viewBox);
+    rotateSlider->setRange(-180, 180);
+    rotateRow->addWidget(rotateSlider);
+    QPushButton *rotResetBtn = new QPushButton(QString::fromUtf8("复位"), viewBox);
+    rotateRow->addWidget(rotResetBtn);
+    viewLayout->addLayout(rotateRow);
+    QHBoxLayout *zoomRow = new QHBoxLayout();
+    zoomRow->addWidget(new QLabel(QString::fromUtf8("缩放下限"), viewBox));
+    QSpinBox *minZoomSpin = new QSpinBox(viewBox);
+    minZoomSpin->setRange(0, 20);
+    minZoomSpin->setValue(m_map->MinZoom());
+    zoomRow->addWidget(minZoomSpin);
+    zoomRow->addWidget(new QLabel(QString::fromUtf8("上限"), viewBox));
+    QSpinBox *maxZoomSpin = new QSpinBox(viewBox);
+    maxZoomSpin->setRange(1, 21);
+    maxZoomSpin->setValue(m_map->MaxZoom());
+    zoomRow->addWidget(maxZoomSpin);
+    viewLayout->addLayout(zoomRow);
+    QPushButton *reloadBtn = new QPushButton(QString::fromUtf8("强制重载地图"), viewBox);
+    viewLayout->addWidget(reloadBtn);
+    layout->addWidget(viewBox);
+
+    connect(gridCheck, &QCheckBox::toggled, m_map, &opmap::OPMapWidget::SetShowTileGridLines);
+    connect(dragCheck, &QCheckBox::toggled, m_map, &opmap::OPMapWidget::SetCanDragMap);
+    connect(glCheck, &QCheckBox::toggled, m_map, &opmap::OPMapWidget::SetUseOpenGL);
+    connect(followMouseCheck, &QCheckBox::toggled, m_map, &opmap::OPMapWidget::SetFollowMouse);
+    connect(diagCheck, &QCheckBox::toggled, m_map, &opmap::OPMapWidget::SetShowDiagnostics);
+    connect(rotateSlider, &QSlider::valueChanged, m_map, &opmap::OPMapWidget::SetRotate);
+    connect(rotResetBtn, &QPushButton::clicked, [rotateSlider]() { rotateSlider->setValue(0); });
+    connect(minZoomSpin, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+            [this](int v) { m_map->SetMinZoom(v); });
+    connect(maxZoomSpin, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+            [this](int v) { m_map->SetMaxZoom(v); });
+    connect(reloadBtn, &QPushButton::clicked, [this]() {
+        m_map->ReloadMap();
+        logEvent(QString::fromUtf8("已强制重载地图（ReloadMap）"));
+    });
+
+    // —— 缓存与访问 ——
+    QGroupBox *cacheBox = new QGroupBox(QString::fromUtf8("缓存与访问"), panel);
+    QVBoxLayout *cacheLayout = new QVBoxLayout(cacheBox);
+    QHBoxLayout *modeRow = new QHBoxLayout();
+    modeRow->addWidget(new QLabel(QString::fromUtf8("访问模式"), cacheBox));
+    QComboBox *modeCombo = new QComboBox(cacheBox);
+    modeCombo->addItem(QString::fromUtf8("仅网络"));
+    modeCombo->addItem(QString::fromUtf8("网络+缓存"));
+    modeCombo->addItem(QString::fromUtf8("仅缓存"));
+    modeCombo->setCurrentIndex(1);
+    modeRow->addWidget(modeCombo);
+    cacheLayout->addLayout(modeRow);
+    QHBoxLayout *memRow = new QHBoxLayout();
+    memRow->addWidget(new QLabel(QString::fromUtf8("内存缓存MB"), cacheBox));
+    QSpinBox *memSpin = new QSpinBox(cacheBox);
+    memSpin->setRange(8, 1024);
+    memSpin->setValue(64);
+    memRow->addWidget(memSpin);
+    QPushButton *memUseBtn = new QPushButton(QString::fromUtf8("占用?"), cacheBox);
+    memRow->addWidget(memUseBtn);
+    cacheLayout->addLayout(memRow);
+    QPushButton *cleanBtn = new QPushButton(QString::fromUtf8("清理 7 天前旧瓦片"), cacheBox);
+    cacheLayout->addWidget(cleanBtn);
+    QPushButton *exportBtn = new QPushButton(QString::fromUtf8("导出缓存库到…"), cacheBox);
+    cacheLayout->addWidget(exportBtn);
+    QLabel *cacheDirLabel = new QLabel(m_map->configuration->CacheLocation(), cacheBox);
+    cacheDirLabel->setWordWrap(true);
+    cacheLayout->addWidget(cacheDirLabel);
+    layout->addWidget(cacheBox);
+
+    connect(modeCombo, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            [this](int index) {
+                const opmap::AccessMode::Types mode = (opmap::AccessMode::Types)index;
+                m_map->configuration->SetAccessMode(mode);
+                logEvent(QString::fromUtf8("访问模式 → %1").arg(opmap::AccessMode::StrByType(mode)));
+            });
+    connect(memSpin, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged),
+            [this](int mb) { m_map->configuration->SetTileMemorySize(mb); });
+    connect(memUseBtn, &QPushButton::clicked, [this]() {
+        logEvent(QString::fromUtf8("内存缓存占用 %1 MB").arg(m_map->configuration->TileMemoryUsed(), 0, 'f', 1));
+    });
+    connect(cleanBtn, &QPushButton::clicked, [this]() {
+        m_map->configuration->DeleteTilesOlderThan(7);
+        logEvent(QString::fromUtf8("已清理 7 天前的旧瓦片（DeleteTilesOlderThan）"));
+    });
+    connect(exportBtn, &QPushButton::clicked, [this]() {
+        const QString dest = QFileDialog::getSaveFileName(
+                    this, QString::fromUtf8("导出缓存到新库"), QString::fromUtf8("exported.qmdb"),
+                    QString::fromUtf8("瓦片缓存库 (*.qmdb);;所有文件 (*.*)"));
+        if (dest.isEmpty())
+            return;
+        m_map->configuration->ExportMapDataToDB(m_map->configuration->CacheLocation(), dest);
+        logEvent(QString::fromUtf8("缓存库增量导出 → %1").arg(dest));
+    });
+
+    // —— 多机与几何 ——
+    QGroupBox *demoBox = new QGroupBox(QString::fromUtf8("多机与几何"), panel);
+    QVBoxLayout *demoLayout = new QVBoxLayout(demoBox);
+    QPushButton *wingBtn = new QPushButton(QString::fromUtf8("添加僚机（多机演示）"), demoBox);
+    demoLayout->addWidget(wingBtn);
+    QPushButton *geoBtn = new QPushButton(QString::fromUtf8("几何换算演示"), demoBox);
+    demoLayout->addWidget(geoBtn);
+    layout->addWidget(demoBox);
+    layout->addStretch(1);
+
+    connect(wingBtn, &QPushButton::clicked, [this, wingBtn]() {
+        if (!m_wingmanTimer) {   // 添加僚机：第二架 UAV 绕车辆/中心盘旋（演示 AddUAV/destPoint）
+            opmap::UAVItem *wing = m_map->AddUAV(m_wingmanId);
+            if (m_map->Home) {   // 打开 Home 安全圈（400m），僚机飞出即触发 UAVLeftSafetyBouble
+                m_map->Home->SetShowSafeArea(true);
+                m_map->Home->SetSafeArea(400);
+                m_map->Home->update();
+            }
+            wing->SetUAVPos(m_map->HasVehiclePosition() ? m_map->VehiclePosition()
+                                                        : m_map->CurrentPosition(), 100);
+            m_wingmanTimer = new QTimer(this);
+            connect(m_wingmanTimer, &QTimer::timeout, this, &MainWindow::onWingmanTick);
+            m_wingmanTimer->start(400);
+            wingBtn->setText(QString::fromUtf8("删除僚机"));
+            logEvent(QString::fromUtf8("已添加僚机 #%1（AddUAV），400ms 绕飞，安全圈 400m").arg(m_wingmanId));
+        } else {                 // 删除僚机
+            m_wingmanTimer->stop();
+            delete m_wingmanTimer;
+            m_wingmanTimer = 0;
+            m_map->DeleteUAV(m_wingmanId);
+            wingBtn->setText(QString::fromUtf8("添加僚机（多机演示）"));
+            logEvent(QString::fromUtf8("已删除僚机 #%1（DeleteUAV）").arg(m_wingmanId));
+        }
+    });
+    connect(geoBtn, &QPushButton::clicked, [this]() {
+        // 几何工具演示：bearing / haversineDistanceM / metersToPixels / destPoint
+        const opmap::PointLatLng center = m_map->CurrentPosition();
+        const opmap::PointLatLng to = m_map->HasVehiclePosition()
+                ? m_map->VehiclePosition()
+                : opmap::PointLatLng(center.Lat() + 0.01, center.Lng() + 0.01);
+        const double brg = m_map->bearing(center, to);
+        const double distM = opmap::geoutils::haversineDistanceM(center, to);
+        const double px = m_map->metersToPixels(100.0);
+        const opmap::PointLatLng probe = m_map->destPoint(center, 45.0, 1.0);   // 1 km（destPoint 距离单位为千米）
+        logEvent(QString::fromUtf8("几何：中心→车辆 方位%1° 距离%2m | 100m=%3px | 中心向45°1km → (%4,%5)")
+                 .arg(brg, 0, 'f', 1).arg(distM, 0, 'f', 0).arg(px, 0, 'f', 1)
+                 .arg(probe.Lat(), 0, 'f', 5).arg(probe.Lng(), 0, 'f', 5));
+    });
+
+    // 左侧停靠 + 滚动区（面板内容较多，小窗口不挤爆）
+    QScrollArea *scroll = new QScrollArea(this);
+    scroll->setWidgetResizable(true);
+    scroll->setWidget(panel);
+    QDockWidget *capDock = new QDockWidget(QString::fromUtf8("库能力示范"), this);
+    capDock->setWidget(scroll);
+    addDockWidget(Qt::LeftDockWidgetArea, capDock);
+}
+
+/** 事件日志面板：底部停靠，实时展示库的事件流（信号驱动，零侵入）。 */
+void MainWindow::setupEventLogDock()
+{
+    m_eventLog = new QListWidget(this);
+    m_eventLog->setSelectionMode(QAbstractItemView::NoSelection);
+    QDockWidget *logDock = new QDockWidget(QString::fromUtf8("事件日志（库信号）"), this);
+    logDock->setWidget(m_eventLog);
+    addDockWidget(Qt::BottomDockWidgetArea, logDock);
+}
+
+/** 库信号 → 日志。OnMapDrag / OnCurrentPositionChanged / OnTilesStillToLoad 等
+ *  高频信号不进日志（状态栏 posLabel/tileLabel 已实时显示），避免刷屏。 */
+void MainWindow::connectEventLog()
+{
+    // —— 瓦片加载生命周期 ——
+    connect(m_map, &opmap::OPMapWidget::OnTileLoadStart,
+            [this]() { logEvent(QString::fromUtf8("瓦片加载开始")); });
+    connect(m_map, &opmap::OPMapWidget::OnTileLoadComplete,
+            [this]() { logEvent(QString::fromUtf8("瓦片加载完成")); });
+    connect(m_map, &opmap::OPMapWidget::OnEmptyTileError,
+            [this](int zoom, opmap::Point pos) {
+                logEvent(QString::fromUtf8("空瓦片错误 z%1 @(%2,%3)").arg(zoom).arg(pos.X()).arg(pos.Y()));
+            });
+
+    // —— 地图状态 ——
+    connect(m_map, &opmap::OPMapWidget::OnMapZoomChanged,
+            [this]() { logEvent(QString::fromUtf8("缩放变化 → %1").arg(m_map->ZoomTotal(), 0, 'f', 1)); });
+    connect(m_map, &opmap::OPMapWidget::OnMapTypeChanged,
+            [this](opmap::MapType::Types type) {
+                logEvent(QString::fromUtf8("地图源 → %1").arg(opmap::MapType::StrByType(type)));
+            });
+
+    // —— 航点生命周期 ——
+    connect(m_map, &opmap::OPMapWidget::WPInserted,
+            [this](int number, opmap::WayPointItem *wp) {
+                logEvent(QString::fromUtf8("航点 #%1 添加 %2").arg(number).arg(wp ? wp->Description() : QString()));
+            });
+    connect(m_map, &opmap::OPMapWidget::WPDeleted,
+            [this](int number) { logEvent(QString::fromUtf8("航点 #%1 删除").arg(number)); });
+    connect(m_map, &opmap::OPMapWidget::WPNumberChanged,
+            [this](int oldn, int newn, opmap::WayPointItem *wp) {
+                Q_UNUSED(wp);
+                logEvent(QString::fromUtf8("航点 #%1 → #%2（重新编号）").arg(oldn).arg(newn));
+            });
+    connect(m_map, &opmap::OPMapWidget::WPValuesChanged,
+            [this](opmap::WayPointItem *wp) {
+                if (wp)
+                    logEvent(QString::fromUtf8("航点 #%1 值变化（%2）").arg(wp->Number()).arg(wp->Description()));
+            });
+    connect(m_map, &opmap::OPMapWidget::WPReached,
+            [this](opmap::WayPointItem *wp) {
+                if (wp)
+                    logEvent(QString::fromUtf8("到达航点 #%1").arg(wp->Number()));
+            });
+
+    // —— UAV 事件 ——
+    connect(m_map, &opmap::OPMapWidget::UAVReachedWayPoint,
+            [this](int number, opmap::WayPointItem *wp) {
+                Q_UNUSED(wp);
+                logEvent(QString::fromUtf8("UAV 到达航点 #%1").arg(number));
+            });
+    connect(m_map, &opmap::OPMapWidget::UAVLeftSafetyBouble,
+            [this](const opmap::PointLatLng &pos) {
+                logEvent(QString::fromUtf8("警告：飞出安全圈 @ (%1, %2)")
+                         .arg(pos.Lat(), 0, 'f', 5).arg(pos.Lng(), 0, 'f', 5));
+            });
+
+    // —— 离线下载进度（percent 按 10% 档节流）——
+    connect(m_map, &opmap::OPMapWidget::mapDownloadProgress,
+            [this](int percent) {
+                if (percent / 10 != m_lastDlPct) {
+                    m_lastDlPct = percent / 10;
+                    logEvent(QString::fromUtf8("离线下载 %1%").arg(percent));
+                }
+            });
+    connect(m_map, &opmap::OPMapWidget::mapDownloadFinished,
+            [this]() { m_lastDlPct = -1; logEvent(QString::fromUtf8("离线下载结束")); });
+
+    // —— 导航状态行刷新（停止导航无库信号，onStopNavClicked 内手动刷新）——
+    connect(m_map, &opmap::OPMapWidget::navigationRouteReady, this, &MainWindow::refreshNavState);
+    connect(m_map, &opmap::OPMapWidget::rerouteReady, this, &MainWindow::refreshNavState);
+    connect(m_map, &opmap::OPMapWidget::navigationProgress, this, &MainWindow::refreshNavState);
+    connect(m_map, &opmap::OPMapWidget::navigationArrived, this, &MainWindow::refreshNavState);
+    connect(m_map, &opmap::OPMapWidget::navigationFailed, this, &MainWindow::refreshNavState);
+}
+
+void MainWindow::logEvent(const QString &text)
+{
+    if (!m_eventLog)
+        return;
+    m_eventLog->addItem(QString::fromUtf8("[%1] %2")
+                        .arg(QTime::currentTime().toString(QString::fromUtf8("HH:mm:ss")), text));
+    while (m_eventLog->count() > 200)          // 限长，避免长跑涨内存
+        delete m_eventLog->takeItem(0);
+    m_eventLog->scrollToBottom();
+}
+
+void MainWindow::refreshNavState()
+{
+    if (!m_navStateLabel)
+        return;
+    if (m_map->IsNavigating()) {
+        const opmap::Route r = m_map->CurrentNavigationRoute();
+        m_navStateLabel->setText(QString::fromUtf8("状态：导航中 · %1 段 / %2 km（CurrentNavigationRoute）")
+                                 .arg(r.polyline.size())
+                                 .arg(r.totalDistanceMeters / 1000.0, 0, 'f', 1));
+    } else {
+        m_navStateLabel->setText(QString::fromUtf8("状态：未导航（IsNavigating=false）"));
+    }
+}
+
+/** 僚机绕飞：每拍方位角推进 30°，绕车辆位置（无则地图中心）300m 半径盘旋，
+ *  同时演示 destPoint 几何换算与多机 UAV 同屏。 */
+void MainWindow::onWingmanTick()
+{
+    opmap::UAVItem *wing = m_map->GetUAV(m_wingmanId);
+    if (!wing)
+        return;
+    const opmap::PointLatLng base = m_map->HasVehiclePosition() ? m_map->VehiclePosition()
+                                                                : m_map->CurrentPosition();
+    m_wingmanAngle = fmod(m_wingmanAngle + 30.0, 360.0);
+    // destPoint 的距离单位为千米（历史语义），300m = 0.3km
+    wing->SetUAVPos(m_map->destPoint(base, m_wingmanAngle, 0.3), 100);
+    wing->SetUAVHeading(m_wingmanAngle);
+}
+
+/** WPInsert 演示：在前两个航点的中点插入新航点（后续编号自动连锁）。 */
+void MainWindow::onInsertWaypointClicked()
+{
+    const QMap<int, opmap::WayPointItem*> all = m_map->WPAll();
+    if (all.size() < 2) {
+        statusBar()->showMessage(QString::fromUtf8("中点插入需先有两个航点"), 5000);
+        return;
+    }
+    const opmap::PointLatLng a = all.value(1)->Coord();
+    const opmap::PointLatLng b = all.value(2)->Coord();
+    const opmap::PointLatLng mid((a.Lat() + b.Lat()) / 2.0, (a.Lng() + b.Lng()) / 2.0);
+    m_map->WPInsert(mid, 100, 2);
+}
+
+/** WPRenumber 演示：把选中航点移到末尾编号（其余航点自动连锁重排）。 */
+void MainWindow::onRenumberClicked()
+{
+    const QList<opmap::WayPointItem*> sel = m_map->WPSelected();
+    if (sel.isEmpty()) {
+        statusBar()->showMessage(QString::fromUtf8("请先在地图或列表中选中一个航点"), 5000);
+        return;
+    }
+    m_map->WPRenumber(sel.first(), m_map->WPAll().size() + 1);
 }
 
 void MainWindow::setupStatusBar()
@@ -510,6 +888,7 @@ void MainWindow::onStopNavClicked()
     m_map->StopNavigation();
     m_banner->hide();
     m_navInfo->setText(QString::fromUtf8("已停止"));
+    refreshNavState();
     statusBar()->showMessage(QString::fromUtf8("导航已停止"), 5000);
 }
 
@@ -744,6 +1123,8 @@ void MainWindow::onIpPollTimeout()
 {
     // 位置源选"IP 定位"时每 60s 触发一次；请求/双源回退/超时全在库内
     m_map->RequestIpLocation();
+    logEvent(QString::fromUtf8("IP 定位轮询触发（IsIpLocationBusy=%1）")
+             .arg(m_map->IsIpLocationBusy() ? "true" : "false"));
 }
 
 void MainWindow::onIpLocationReady(opmap::PointLatLng pos, QString city)
