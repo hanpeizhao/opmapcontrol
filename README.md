@@ -24,6 +24,11 @@ src/
 
 依赖方向自上而下单向传递：`ui → engine → providers + cache → platform`。外部程序只需包含 `src/opmapcontrol.h`。
 
+## 文档
+
+- [实现原理](doc/architecture.md) — 分层架构、瓦片加载流程、三级缓存、坐标系纠偏、投影与离线下载原理、扩展指南
+- [功能清单与 API 参考](doc/features.md) — 库全部公开能力按模块整理，并标注 demo 是否演示
+
 ## 构建
 
 依赖：Qt 5.12（需 core gui widgets network sql svg opengl 模块）、MinGW（Windows）或 GCC（Linux）。地图瓦片下载使用 HTTPS，Windows 下需要 OpenSSL 运行库（demo 目录已附带 `libssl-1_1-x64.dll` / `libcrypto-1_1-x64.dll`）。
