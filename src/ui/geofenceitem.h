@@ -31,6 +31,7 @@ public:
 
     QRectF boundingRect() const;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+    int type() const;   ///< 返回 Type；缺失重写时 qgraphicsitem_cast 运行期取基类 type()=1，分派永不命中
 
     const QList<opmap::PointLatLng>& Vertices() const { return vertices; }
     void SetVertices(const QList<opmap::PointLatLng> &value);

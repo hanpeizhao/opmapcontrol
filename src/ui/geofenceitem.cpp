@@ -37,6 +37,11 @@ QRectF GeofenceItem::boundingRect() const
     return screenPolygon.boundingRect().adjusted(-8, -8, 8, 8);
 }
 
+int GeofenceItem::type() const
+{
+    return Type;
+}
+
 void GeofenceItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
 {
     Q_UNUSED(option);
