@@ -1191,6 +1191,10 @@ void MainWindow::onMockPosClicked()
     const double lat = c.Lat() + (QRandomGenerator::global()->bounded(41) - 20) / 1000.0;
     const double lng = c.Lng() + (QRandomGenerator::global()->bounded(41) - 20) / 1000.0;
     const opmap::PointLatLng pos(lat, lng);
+    // 手动喂点是瞬移定位不是运动：先清旧轨迹，避免随机点之间连出满屏乱线
+    // （轨迹留给连续运动流：跟车模拟/GPS/MAVLink/航点飞行）
+    if (opmap::UAVItem *u = m_map->GetUAV(0))
+        u->DeleteTrail();
     m_map->UpdateVehiclePosition(pos);
     const QString text = QString::fromUtf8("已喂入模拟位置 (%1, %2)")
                          .arg(lat, 0, 'f', 4).arg(lng, 0, 'f', 4);
