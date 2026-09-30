@@ -29,7 +29,7 @@ class WayPointItem;
 * - 路线模式：目标为规划路线折线点序列（PathMode），逐段推进
 *
 * 纯逻辑类：仅持有 UAVItem 指针更新位置，不依赖任何界面组件。
-* 位置推进使用标准球面几何（haversine / 方位角 / 目标点公式）。
+* 位置推进使用库内 opmap::geoutils 球面几何（haversine / 方位角 / 目标点公式）。
 */
 class NavigationSimulator : public QObject
 {

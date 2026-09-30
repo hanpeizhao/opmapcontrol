@@ -37,6 +37,7 @@ HEADERS += \
     ./src/platform/sizelatlng.h \
     ./src/platform/rectangle.h \
     ./src/platform/coordtransform.h \
+    ./src/platform/geoutils.h \
     ./src/platform/diagnostics.h \
     ./src/platform/mousewheelzoomtype.h \
     ./src/platform/debugheader.h \
@@ -51,6 +52,10 @@ HEADERS += \
     ./src/providers/urlfactory.h \
     ./src/providers/providerstrings.h \
     ./src/providers/languagetype.h \
+    ./src/providers/route.h \
+    ./src/providers/abstractrouteprovider.h \
+    ./src/providers/osrmrouteprovider.h \
+    ./src/providers/amaprouteprovider.h \
     ./src/engine/mapservice.h \
     ./src/engine/mapengine.h \
     ./src/engine/tile.h \
@@ -84,6 +89,7 @@ SOURCES += \
     ./src/platform/sizelatlng.cpp \
     ./src/platform/rectangle.cpp \
     ./src/platform/coordtransform.cpp \
+    ./src/platform/geoutils.cpp \
     ./src/platform/diagnostics.cpp \
     ./src/platform/mousewheelzoomtype.cpp \
     ./src/cache/tilekey.cpp \
@@ -95,6 +101,9 @@ SOURCES += \
     ./src/providers/urlfactory.cpp \
     ./src/providers/providerstrings.cpp \
     ./src/providers/languagetype.cpp \
+    ./src/providers/abstractrouteprovider.cpp \
+    ./src/providers/osrmrouteprovider.cpp \
+    ./src/providers/amaprouteprovider.cpp \
     ./src/engine/mapservice.cpp \
     ./src/engine/mapengine.cpp \
     ./src/engine/tile.cpp \

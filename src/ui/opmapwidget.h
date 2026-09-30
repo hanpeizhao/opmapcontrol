@@ -332,7 +332,7 @@ public:
     /** @brief Return the bearing from one point to another .. in degrees */
     double bearing(opmap::PointLatLng from, opmap::PointLatLng to);
 
-    /** @brief Return a destination lat/lon point given a source lat/lon point and the bearing and distance from the source point */
+    /** @brief Return a destination lat/lon point given a source lat/lon point and the bearing and distance(KILOMETERS) from the source point */
     opmap::PointLatLng destPoint(opmap::PointLatLng source, double bear, double dist);
 
     /**

@@ -23,7 +23,6 @@
 #include "opmapcontrol.h"
 
 class WaypointStore;
-class RouteService;
 class NavigationSimulator;
 class QGraphicsPathItem;
 class QGraphicsEllipseItem;
@@ -64,7 +63,7 @@ private slots:
     void onSetDestClicked();
     void onPlanClicked();
     void onFollowRouteClicked();
-    void onRouteReady(const QList<opmap::PointLatLng> &pts, double meters, int seconds);
+    void onRouteReady(const opmap::Route &route);
     void onRouteFailed(const QString &reason);
 
     // 导航模拟面板
@@ -98,10 +97,11 @@ private:
     void refreshWaypointList();
     void clearRouteItems();
     opmap::UAVItem* ensureUAV();
+    opmap::AbstractRouteProvider* ensureRouteProvider();   ///< 按面板选择创建/复用路由 provider
 
     opmap::OPMapWidget *m_map;
     WaypointStore *m_store;
-    RouteService *m_routeService;
+    opmap::AbstractRouteProvider *m_routeProvider;
     NavigationSimulator *m_simulator;
 
     // 航点面板

@@ -30,6 +30,7 @@
 #include <QtGui>
 #include <QMetaObject>
 #include "waypointitem.h"
+#include "geoutils.h"
 
 namespace opmap {
 
@@ -510,51 +511,20 @@ void OPMapWidget::RipMap()
 }
 
 
-#define deg_to_rad          ((double)M_PI / 180.0)
-#define rad_to_deg          (180.0 / (double)M_PI)
-#define earth_mean_radius   6371    // kilometers
-
 // *************************************************************************************
-// return the bearing from one point to another .. in degrees
+// 球面几何委托 platform 层 geoutils（保持既有公有 API 签名不变）
 
+// return the bearing from one point to another .. in degrees
 double OPMapWidget::bearing(opmap::PointLatLng from, opmap::PointLatLng to)
 {
-    double lat1 = from.Lat() * deg_to_rad;
-    double lon1 = from.Lng() * deg_to_rad;
-
-    double lat2 = to.Lat() * deg_to_rad;
-    double lon2 = to.Lng() * deg_to_rad;
-
-    //double delta_lat = lat2 - lat1;
-    double delta_lon = lon2 - lon1;
-
-    double y = sin(delta_lon) * cos(lat2);
-    double x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(delta_lon);
-    double bear = atan2(y, x) * rad_to_deg;
-
-    bear += 360;
-    while (bear < 0) bear += 360;
-    while (bear >= 360) bear -= 360;
-
-    return bear;
+    return geoutils::bearingDeg(from, to);
 }
 
-// *************************************************************************************
 // return a destination lat/lon point given a source lat/lon point and the bearing and distance from the source point
-
+// 注意：本 API 沿用历史语义，dist 单位为千米（geoutils::destPoint 为米，此处换算）
 opmap::PointLatLng OPMapWidget::destPoint(opmap::PointLatLng source, double bear, double dist)
 {
-    double lat1 = source.Lat() * deg_to_rad;
-    double lon1 = source.Lng() * deg_to_rad;
-
-    bear *= deg_to_rad;
-
-    double ad = dist / earth_mean_radius;
-
-    double lat2 = asin(sin(lat1) * cos(ad) + cos(lat1) * sin(ad) * cos(bear));
-    double lon2 = lon1 + atan2(sin(bear) * sin(ad) * cos(lat1), cos(ad) - sin(lat1) * sin(lat2));
-
-    return opmap::PointLatLng(lat2 * rad_to_deg, lon2 * rad_to_deg);
+    return geoutils::destPoint(source, bear, dist * 1000.0);
 }
 
 } // end namespace opmap

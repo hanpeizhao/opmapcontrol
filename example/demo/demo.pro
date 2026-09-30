@@ -19,7 +19,6 @@ OBJECTS_DIR  = ./build
 HEADERS += \
     mainwindow.h \
     waypoint_store.h \
-    route_service.h \
     navigation_simulator.h \
     uas_types.h
 
@@ -27,7 +26,6 @@ SOURCES += \
     main.cpp \
     mainwindow.cpp \
     waypoint_store.cpp \
-    route_service.cpp \
     navigation_simulator.cpp \
     uas_types.cpp
 

@@ -25,7 +25,6 @@
 #include <QtGui/QBrush>
 
 #include "waypoint_store.h"
-#include "route_service.h"
 #include "navigation_simulator.h"
 #include "uavitem.h"
 
@@ -39,7 +38,7 @@ const double kHomeZoom = 12.0;
 MainWindow::MainWindow()
     : m_map(new opmap::OPMapWidget(this)),
       m_store(new WaypointStore(m_map)),
-      m_routeService(new RouteService(this)),
+      m_routeProvider(0),
       m_simulator(new NavigationSimulator(this)),
       m_wpList(new QListWidget(this)),
       m_addWpBtn(new QPushButton(QString::fromUtf8("地图点选添加"), this)),
@@ -86,11 +85,6 @@ MainWindow::MainWindow()
     connect(m_map, SIGNAL(OnMapDrag()), this, SLOT(rebuildRouteItems()));
     connect(m_map, SIGNAL(OnMapZoomChanged()), this, SLOT(rebuildRouteItems()));
     connect(m_map, SIGNAL(OnCurrentPositionChanged(opmap::PointLatLng)), this, SLOT(rebuildRouteItems()));
-
-    // 路由服务
-    connect(m_routeService, SIGNAL(routeReady(QList<opmap::PointLatLng>,double,int)),
-            this, SLOT(onRouteReady(QList<opmap::PointLatLng>,double,int)));
-    connect(m_routeService, SIGNAL(routeFailed(QString)), this, SLOT(onRouteFailed(QString)));
 
     // 模拟器
     connect(m_simulator, SIGNAL(statusUpdated(int,int,QString)),
@@ -375,12 +369,10 @@ void MainWindow::onPlanClicked()
         QMessageBox::information(this, QString::fromUtf8("提示"), QString::fromUtf8("请先在地图上点选起点与终点"));
         return;
     }
-    const RouteService::Provider provider = (m_providerCombo->currentIndex() == 0)
-            ? RouteService::Osrm : RouteService::Amap;
     m_planBtn->setEnabled(false);
     m_routeInfo->setText(QString::fromUtf8("规划中…"));
     statusBar()->showMessage(QString::fromUtf8("正在请求路径规划（需联网）…"));
-    m_routeService->planRoute(m_origin, m_dest, provider, m_amapKeyEdit->text().trimmed());
+    ensureRouteProvider()->requestRoute(m_origin, m_dest);
 }
 
 void MainWindow::onFollowRouteClicked()
@@ -395,16 +387,16 @@ void MainWindow::onFollowRouteClicked()
     m_simulator->start();
 }
 
-void MainWindow::onRouteReady(const QList<opmap::PointLatLng> &pts, double meters, int seconds)
+void MainWindow::onRouteReady(const opmap::Route &route)
 {
-    m_routePts = pts;
-    m_routeMeters = meters;
-    m_routeSeconds = seconds;
+    m_routePts = route.polyline;
+    m_routeMeters = route.totalDistanceMeters;
+    m_routeSeconds = route.totalDurationSeconds;
     m_planBtn->setEnabled(true);
     m_followRouteBtn->setEnabled(true);
     m_routeInfo->setText(QString::fromUtf8("距离 %1 km，预计 %2 分钟（%3 点）")
-                         .arg(meters / 1000.0, 0, 'f', 1)
-                         .arg(seconds / 60).arg(pts.size()));
+                         .arg(m_routeMeters / 1000.0, 0, 'f', 1)
+                         .arg(m_routeSeconds / 60).arg(m_routePts.size()));
     statusBar()->showMessage(QString::fromUtf8("路径规划完成"), 5000);
     rebuildRouteItems();
 }
@@ -570,6 +562,24 @@ void MainWindow::rebuildRouteItems()
                                                   QPen(Qt::red, 2), QBrush(QColor(220, 0, 0, 120)));
         m_destMarker->setZValue(2);
     }
+}
+
+opmap::AbstractRouteProvider* MainWindow::ensureRouteProvider()
+{
+    const bool wantAmap = (m_providerCombo->currentIndex() == 1);
+    const bool haveAmap = qobject_cast<opmap::AmapRouteProvider*>(m_routeProvider) != 0;
+    if (!m_routeProvider || (wantAmap != haveAmap)) {
+        delete m_routeProvider;
+        m_routeProvider = wantAmap ? (opmap::AbstractRouteProvider*)new opmap::AmapRouteProvider(this)
+                                   : (opmap::AbstractRouteProvider*)new opmap::OsrmRouteProvider(this);
+        connect(m_routeProvider, SIGNAL(routeReady(opmap::Route)),
+                this, SLOT(onRouteReady(opmap::Route)));
+        connect(m_routeProvider, SIGNAL(routeFailed(QString)),
+                this, SLOT(onRouteFailed(QString)));
+    }
+    if (opmap::AmapRouteProvider *amap = qobject_cast<opmap::AmapRouteProvider*>(m_routeProvider))
+        amap->SetKey(m_amapKeyEdit->text().trimmed());
+    return m_routeProvider;
 }
 
 opmap::UAVItem* MainWindow::ensureUAV()

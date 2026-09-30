@@ -12,56 +12,14 @@
 
 #include "uavitem.h"
 #include "waypointitem.h"
+#include "geoutils.h"
 
 #include <QtMath>
 
 namespace {
 
-const double kEarthRadiusM = 6371000.0;   ///< 地球平均半径（米）
-const double kPi = 3.14159265358979323846;
 const double kArriveThresholdM = 30.0;    ///< 到达判定距离（米）
 const int kTickMs = 100;                  ///< 推进周期（毫秒）
-
-double degToRad(double d) { return d * kPi / 180.0; }
-double radToDeg(double r) { return r * 180.0 / kPi; }
-
-/// 两点球面距离（米）
-double haversineM(const opmap::PointLatLng &a, const opmap::PointLatLng &b)
-{
-    const double lat1 = degToRad(a.Lat());
-    const double lat2 = degToRad(b.Lat());
-    const double dLat = degToRad(b.Lat() - a.Lat());
-    const double dLng = degToRad(b.Lng() - a.Lng());
-    const double h = qSin(dLat / 2) * qSin(dLat / 2)
-            + qCos(lat1) * qCos(lat2) * qSin(dLng / 2) * qSin(dLng / 2);
-    return 2 * kEarthRadiusM * qAsin(qSqrt(h));
-}
-
-/// 从 a 看向 b 的方位角（度，正北为 0 顺时针）
-double bearingDeg(const opmap::PointLatLng &a, const opmap::PointLatLng &b)
-{
-    const double lat1 = degToRad(a.Lat());
-    const double lat2 = degToRad(b.Lat());
-    const double dLng = degToRad(b.Lng() - a.Lng());
-    const double y = qSin(dLng) * qCos(lat2);
-    const double x = qCos(lat1) * qSin(lat2) - qSin(lat1) * qCos(lat2) * qCos(dLng);
-    return radToDeg(qAtan2(y, x));
-}
-
-/// 由源点 + 方位角 + 距离求目标点（球面）
-opmap::PointLatLng destPoint(const opmap::PointLatLng &src, double bearing, double distM)
-{
-    const double lat1 = degToRad(src.Lat());
-    const double lng1 = degToRad(src.Lng());
-    const double theta = degToRad(bearing);
-    const double delta = distM / kEarthRadiusM;
-
-    const double lat2 = qAsin(qSin(lat1) * qCos(delta)
-                              + qCos(lat1) * qSin(delta) * qCos(theta));
-    const double lng2 = lng1 + qAtan2(qSin(theta) * qSin(delta) * qCos(lat1),
-                                      qCos(delta) - qSin(lat1) * qSin(lat2));
-    return opmap::PointLatLng(radToDeg(lat2), radToDeg(lng2));
-}
 
 } // anonymous namespace
 
@@ -174,7 +132,7 @@ void NavigationSimulator::onTick()
     }
 
     const double step = m_speed * kTickMs / 1000.0;
-    double dist = haversineM(m_currentPos, target);
+    double dist = opmap::geoutils::haversineDistanceM(m_currentPos, target);
 
     // 到达判定：距离不足一步，或已跨过目标点
     while (dist <= kArriveThresholdM || dist <= step) {
@@ -196,11 +154,11 @@ void NavigationSimulator::onTick()
             altitude = (int)m_waypoints.at(m_index)->Altitude();
         }
 
-        dist = haversineM(m_currentPos, target);
+        dist = opmap::geoutils::haversineDistanceM(m_currentPos, target);
     }
 
-    const double heading = bearingDeg(m_currentPos, target);
-    m_currentPos = destPoint(m_currentPos, heading, step);
+    const double heading = opmap::geoutils::bearingDeg(m_currentPos, target);
+    m_currentPos = opmap::geoutils::destPoint(m_currentPos, heading, step);
 
     m_uav->SetUAVPos(m_currentPos, altitude);
     m_uav->SetUAVHeading(heading);
