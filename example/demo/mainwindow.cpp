@@ -697,6 +697,7 @@ void MainWindow::onFlightClicked()
     uav->SetAutoSetDistance(15);
     uav->SetUAVPos(start, 120);
     uav->SetUAVHeading(0);
+    m_map->SetCurrentPosition(start);   // 地图跳到起飞点（Home 图标处），起飞位置一目了然
 
     if (!m_flightSim) {
         m_flightSim = new WaypointFlightSimulator(this);
@@ -727,8 +728,8 @@ void MainWindow::onFlightClicked()
         });
     }
 
-    m_flightSim->start(start, coords, hoverSecs, 25.0);
-    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点（拍照 %2、悬停 %3），从 Home 位置起飞，巡航 25 m/s，安全围栏 3000 m")
+    m_flightSim->start(start, coords, hoverSecs, 80.0);
+    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点（拍照 %2、悬停 %3），从 Home 图标处起飞，巡航 80 m/s，安全围栏 3000 m")
              .arg(coords.size()).arg(photoCount).arg(hoverCount));
 }
 
@@ -1366,8 +1367,9 @@ opmap::UAVItem* MainWindow::ensureUAV()
         logEvent(QString::fromUtf8("无人机图标已出现：它代表当前遥测位置（由位置源喂点驱动），"
                                    "出现即说明有位置源/飞行模拟在工作"));
     uav->SetTrailType(opmap::UAVTrailType::ByTimeElapsed);
-    uav->SetTrailTime(3);
+    uav->SetTrailTime(1);   // 每 1 秒记录一个轨迹点，飞行轨迹清晰可见
     uav->SetShowTrail(m_trailCheck->isChecked());
+    uav->SetShowTrailLine(true);   // 轨迹连线：飞过的路径连成实线，比孤立点直观
     uav->SetMapFollowType(m_followCheck->isChecked()
                           ? opmap::UAVMapFollowType::CenterMap
                           : opmap::UAVMapFollowType::None);
