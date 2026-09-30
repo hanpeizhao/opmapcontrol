@@ -205,6 +205,10 @@ public:
 
     void FindTilesAround(QList<opmap::Point> &list);
 
+    /// 水平回绕：把瓦片 x 折回 [0, maxOfTiles.Width]，形成经度 360° 环绕
+    /// 周期 = maxOfTiles.Width + 1（Mercator 为 2^z，PlateCarree 为 2^(z+1)）；纬度方向两极有界不回绕
+    opmap::Point WrapTileX(const opmap::Point &p);
+
     void UpdateGroundResolution();
 
     TileMatrix Matrix;

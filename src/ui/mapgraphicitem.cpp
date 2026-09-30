@@ -379,7 +379,9 @@ void MapGraphicItem::DrawMap2D(QPainter *painter)
             core->SettilePoint (core->GetcenterTileXYLocation());
             core->SettilePoint(Point(core->GettilePoint().X()+ i,core->GettilePoint().Y()+j));
             {
-                opmap::Tile* t = core->Matrix.TileAt(core->GettilePoint());
+                // Matrix 以回绕后的 x 为 key（FindTilesAround 已做水平回绕），查询前先折回；
+                // 屏幕定位仍用未回绕的 tilePoint，保证跨界瓦片画在正确的位置（西侧接东端）
+                opmap::Tile* t = core->Matrix.TileAt(core->WrapTileX(core->GettilePoint()));
                 if(true)
                 {
                     core->tileRect.SetX(core->GettilePoint().X()*core->tileRect.Width());

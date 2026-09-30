@@ -692,6 +692,16 @@ void MapEngine::UpdateBounds()
     UpdateGroundResolution();
 }
 
+Point MapEngine::WrapTileX(const Point &p)
+{
+    // 水平回绕：经度是 360° 环绕的，x 越界时折回另一端（周期 = maxOfTiles.Width + 1，
+    // Mercator 为 2^z，PlateCarree 为 2^(z+1)）；纬度方向两极有界，不回绕
+    int period = Projection()->GetTileMatrixMaxXY(Zoom()).Width() + 1;
+    Point ret = p;
+    ret.SetX(((p.X() % period) + period) % period);
+    return ret;
+}
+
 void MapEngine::FindTilesAround(QList<Point> &list)
 {
     list.clear();;
@@ -703,15 +713,8 @@ void MapEngine::FindTilesAround(QList<Point> &list)
             p.SetX(p.X() + i);
             p.SetY(p.Y() + j);
 
-            //if(p.X < minOfTiles.Width)
-            //{
-            //   p.X += (maxOfTiles.Width + 1);
-            //}
-
-            //if(p.X > maxOfTiles.Width)
-            //{
-            //   p.X -= (maxOfTiles.Width + 1);
-            //}
+            // 恢复水平循环：x 越界折回另一端，跨界瓦片照常请求与绘制
+            p = WrapTileX(p);
 
             if(p.X() >= minOfTiles.Width() && p.Y() >= minOfTiles.Height() && p.X() <= maxOfTiles.Width() && p.Y() <= maxOfTiles.Height())
             {
