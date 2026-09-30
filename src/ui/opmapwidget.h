@@ -468,6 +468,8 @@ public:
     void DeleteUAV(int id);
     UAVItem* GetUAV(int id);
     const QList<UAVItem*> GetUAVS();
+    /** @brief 内部地图画布访问器：供上层直接挂载自定义地理锚定图元（WayPointItem 等） */
+    MapGraphicItem* GetMap() const { return map; }
     QGraphicsItemGroup* waypointLine(int id);
     void SetShowUAV(bool const& value);
     bool ShowUAV()const{return showuav;}
@@ -690,6 +692,7 @@ signals:
     /** @brief IP 定位失败（双源均不可用或返回异常） */
     void ipLocationFailed(QString reason);
     void geofenceBreach(opmap::PointLatLng position);   ///< UAV 飞出多边形围栏
+    void geofenceEntered(opmap::PointLatLng position);  ///< UAV 回到多边形围栏内
 
     // ———————— 离线下载进度信号（转发自 MapRipper）————————
     /** @brief 抓取进度百分比（0-100） */

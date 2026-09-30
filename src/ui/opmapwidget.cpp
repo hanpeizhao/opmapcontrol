@@ -359,6 +359,7 @@ void OPMapWidget::CheckGeofence(opmap::PointLatLng const& position)
     else if (inside && geofenceBreached)
     {
         geofenceBreached = false;
+        emit geofenceEntered(position);   // 回到围栏内也通知上层（进入/退出成对事件）
     }
 }
 

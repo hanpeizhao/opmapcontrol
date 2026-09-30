@@ -204,13 +204,16 @@ void UAVItem::SetShowTrailLine(const bool &value)
     trailLine->setVisible(value);
 }
 
-void UAVItem::DeleteTrail() const
+void UAVItem::DeleteTrail()
 {
     foreach(QGraphicsItem* i,trail->childItems())
         delete i;
 
     foreach(QGraphicsItem* i,trailLine->childItems())
         delete i;
+
+    // 复位轨迹线起点记忆：否则清空后首喂点会从旧终点拉出一条幽灵连线
+    lasttrailline=coord;
 }
 
 double UAVItem::Distance3D(const opmap::PointLatLng &coord, const int &altitude)

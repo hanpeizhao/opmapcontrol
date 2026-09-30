@@ -197,6 +197,8 @@ private:
     int m_lastDlPct;                 ///< 下载日志节流（上个 10% 档位）
     QPushButton *m_fenceBtn;         ///< 多边形围栏三态按钮
     QList<opmap::PointLatLng> m_fencePts;   ///< 围栏取点缓存（取点过程中逐点更新）
+    opmap::WayPointItem *m_originMarker;    ///< 导航起点标记（地理锚定，选中时立即显示）
+    opmap::WayPointItem *m_destMarker;      ///< 导航目的地标记
     QPoint m_pressScreenPos;         ///< 左键按下屏幕位置（选点防抖：抬起时位移小才算点）
     int m_flightSpeedMps;            ///< 航点飞行巡航速度（m/s，右键菜单可调）
 

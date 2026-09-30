@@ -86,6 +86,8 @@ MainWindow::MainWindow()
       m_navStateLabel(0),
       m_lastDlPct(-1),
       m_fenceBtn(new QPushButton(QString::fromUtf8("绘制围栏"), this)),
+      m_originMarker(0),
+      m_destMarker(0),
       m_pressScreenPos(),
       m_flightSpeedMps(80),
       m_pickMode(PickNone),
@@ -582,6 +584,14 @@ void MainWindow::connectEventLog()
                 QTimer::singleShot(5000, m_banner, &QLabel::hide);
             });
 
+    // —— 回到围栏内：日志 + 状态栏提示（与越界成对）——
+    connect(m_map, &opmap::OPMapWidget::geofenceEntered,
+            [this](const opmap::PointLatLng &pos) {
+                logEvent(QString::fromUtf8("提示：已进入地理围栏 @ (%1, %2)")
+                         .arg(pos.Lat(), 0, 'f', 5).arg(pos.Lng(), 0, 'f', 5));
+                statusBar()->showMessage(QString::fromUtf8("已进入地理围栏区域"), 8000);
+            });
+
     // —— 离线下载进度（percent 按 10% 档节流）——
     connect(m_map, &opmap::OPMapWidget::mapDownloadProgress,
             [this](int percent) {
@@ -1037,6 +1047,9 @@ void MainWindow::onNavigateClicked()
     if (m_pickMode != PickNone)
         setPickMode(PickNone);
     applyProviderFromUI();
+    // 新导航任务：清空旧轨迹，从头记录（否则起点瞬移会与旧轨迹终点拉出连线）
+    if (opmap::UAVItem *u = m_map->GetUAV(0))
+        u->DeleteTrail();
     if (m_hasOrigin) {
         // 指定点选起点出发：先把车辆位置喂到起点（图标同步 + 作为规划起点）
         m_map->UpdateVehiclePosition(m_origin);
@@ -1146,6 +1159,8 @@ void MainWindow::onSimStartClicked()
         setPickMode(PickNone);
 
     ensureUAV();
+    if (opmap::UAVItem *u = m_map->GetUAV(0))
+        u->DeleteTrail();   // 跟车从头记录轨迹
     m_simulator->setSpeed(m_speedCombo->currentIndex() == 0 ? 5.0
                           : m_speedCombo->currentIndex() == 1 ? 20.0 : 60.0);
     m_simulator->setPath(m_navRoute.polyline);
@@ -1404,18 +1419,35 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
         refreshWaypointList();
         break;
     }
-    case PickOrigin:
+    case PickOrigin: {
         m_origin = p;
         m_hasOrigin = true;
+        // 起点/目的地即时标记：地理锚定（走航点刷新链），不进 WPAll 不影响飞行序列
+        if (!m_originMarker) {
+            m_originMarker = new opmap::WayPointItem(p, 0, QString::fromUtf8("起点"), m_map->GetMap());
+            m_originMarker->setFlag(QGraphicsItem::ItemIsMovable, false);
+            m_originMarker->setFlag(QGraphicsItem::ItemIsSelectable, false);
+        } else {
+            m_originMarker->SetCoord(p);
+        }
         m_originLabel->setText(QString::fromUtf8("起点：lat %1, lng %2")
                                .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         break;
-    case PickDest:
+    }
+    case PickDest: {
         m_dest = p;
         m_hasDest = true;
+        if (!m_destMarker) {
+            m_destMarker = new opmap::WayPointItem(p, 0, QString::fromUtf8("目的地"), m_map->GetMap());
+            m_destMarker->setFlag(QGraphicsItem::ItemIsMovable, false);
+            m_destMarker->setFlag(QGraphicsItem::ItemIsSelectable, false);
+        } else {
+            m_destMarker->SetCoord(p);
+        }
         m_destLabel->setText(QString::fromUtf8("目的地：lat %1, lng %2")
-                               .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
+                             .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         break;
+    }
     case PickFence:
         // 围栏取点：逐点加入并实时预览（1 点=顶点圆点，2 点=连线，≥3 点闭合生效），模式保持不退出
         m_fencePts.append(p);
