@@ -67,6 +67,11 @@ QVector<MapType::Types> AllLayersOfType::GetAllLayersOfType(const MapType::Types
             types.append(MapType::ArcGIS_MapsLT_Map_Labels);
             break;
 
+        case MapType::AutoNaviHybrid:
+            types.append(MapType::AutoNaviSatellite);
+            types.append(MapType::AutoNaviLabels);
+            break;
+
         default:
             types.append(type);
             break;
