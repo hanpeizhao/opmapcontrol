@@ -155,14 +155,17 @@ void MainWindow::setupMenus()
     });
     QAction *locateAct = toolBar->addAction(QString::fromUtf8("定位当前位置"));
     connect(locateAct, &QAction::triggered, [this]() {
-        if (m_map->HasVehiclePosition()) {
-            m_map->SetCurrentPosition(m_map->VehiclePosition());
-            if (m_map->ZoomTotal() < 15.0)
-                m_map->SetZoom(15.0);       // 定位时切到街区级缩放
-            statusBar()->showMessage(QString::fromUtf8("已定位到车辆当前位置"), 3000);
-        } else {
-            statusBar()->showMessage(QString::fromUtf8("尚无车辆位置：先开始导航/跟车模拟，或位置源切到系统 GPS"), 6000);
+        if (!m_map->HasVehiclePosition()) {
+            QMessageBox::information(this, QString::fromUtf8("尚无车辆位置"),
+                    QString::fromUtf8("还没有任何位置源喂入车辆位置（桌面 PC 默认无 GPS），可：\n\n"
+                                      "· 点开始导航后，用行车模拟喂点\n"
+                                      "· 行车模拟面板把位置源切到系统 GPS"));
+            return;
         }
+        m_map->SetCurrentPosition(m_map->VehiclePosition());
+        if (m_map->ZoomTotal() < 15.0)
+            m_map->SetZoom(15.0);       // 定位时切到街区级缩放
+        statusBar()->showMessage(QString::fromUtf8("已定位到车辆当前位置"), 3000);
     });
 }
 
