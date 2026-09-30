@@ -5,7 +5,7 @@
 #include <QtGui>
 #include <QtWidgets>
 
-#include "MapWidget_TestWindow.h"
+#include "mapwidget_testwindow.h"
 
 int main(int argc, char *argv[])
 {

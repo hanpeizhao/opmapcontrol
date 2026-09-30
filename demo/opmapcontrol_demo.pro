@@ -15,14 +15,14 @@ OBJECTS_DIR  = ./build
 
 
 HEADERS += \
-    MapWidget.h \
-    UAS_types.h \
-    MapWidget_TestWindow.h
+    mapwidget.h \
+    uas_types.h \
+    mapwidget_testwindow.h
 
 SOURCES += \
-    MapWidget.cpp \
-    UAS_types.cpp \
-    MapWidget_TestWindow.cpp \
+    mapwidget.cpp \
+    uas_types.cpp \
+    mapwidget_testwindow.cpp \
     opmapcontrol_demo.cpp
 
 

@@ -44,7 +44,7 @@
 #include "maptype.h"
 #include "languagetype.h"
 #include "diagnostics.h"
-#include "omapconfiguration.h"
+#include "configuration.h"
 #include "waypointitem.h"
 #include "QtSvg/QGraphicsSvgItem"
 #include "uavitem.h"

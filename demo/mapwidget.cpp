@@ -4,8 +4,8 @@
 #include <QtWidgets>
 #include <QMenu>
 
-#include "UAS_types.h"
-#include "MapWidget.h"
+#include "uas_types.h"
+#include "mapwidget.h"
 
 using namespace opmap;
 
@@ -1006,4 +1006,3 @@ void MapWidget::actHome_ShowHide(void)
     // write configure
     syncConf();
 }
-

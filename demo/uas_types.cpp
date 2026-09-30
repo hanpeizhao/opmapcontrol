@@ -5,7 +5,7 @@
 
 #include <string>
 
-#include "UAS_types.h"
+#include "uas_types.h"
 
 
 using namespace std;
@@ -381,7 +381,7 @@ int AP_ParamArray::save(std::string fname)
 
     // output waypoints
     fprintf(fp, "#AP parameter number\n");
-    fprintf(fp, "%d\n", m_lstAll.size());
+    fprintf(fp, "%d\n", (int)m_lstAll.size());
 
     fprintf(fp, "#parameter list\n");
     fprintf(fp, "# index    ID/name    type   value\n");
@@ -729,7 +729,7 @@ int AP_WPArray::save(std::string fname)
 
     // output waypoints
     fprintf(fp, "#waypoint number\n");
-    fprintf(fp, "%d\n", m_arrWP.size());
+    fprintf(fp, "%d\n", (int)m_arrWP.size());
 
     fprintf(fp, "#waypoints list\n");
     fprintf(fp, "# idx              lat                   lng                  alt         heading\n");

@@ -6,7 +6,7 @@
 #include <QComboBox>
 
 #include <opmapwidget.h>
-#include "MapWidget.h"
+#include "mapwidget.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////

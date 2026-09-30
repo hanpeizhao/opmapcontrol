@@ -33,7 +33,7 @@
 #include "mapengine.h"
 //#include "point.h"
 #include "diagnostics.h"
-#include "omapconfiguration.h"
+#include "configuration.h"
 #include <QtGui>
 #include <QTransform>
 #include <QWidget>

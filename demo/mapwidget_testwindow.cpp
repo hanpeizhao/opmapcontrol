@@ -2,7 +2,7 @@
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 
-#include "MapWidget_TestWindow.h"
+#include "mapwidget_testwindow.h"
 
 QTestWin::QTestWin(QWidget *parent) :
     QWidget(parent)

@@ -7,7 +7,7 @@
 
 #include <opmapwidget.h>
 
-#include "UAS_types.h"
+#include "uas_types.h"
 
 using namespace opmap;
 

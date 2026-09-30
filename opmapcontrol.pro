@@ -72,7 +72,7 @@ HEADERS += \
     ./src/ui/uavtrailtype.h \
     ./src/ui/waypointitem.h \
     ./src/ui/waypointlineitem.h \
-    ./src/ui/omapconfiguration.h \
+    ./src/ui/configuration.h \
 
 
 SOURCES += \
