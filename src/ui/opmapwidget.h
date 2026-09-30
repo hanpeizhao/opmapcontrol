@@ -320,6 +320,12 @@ public:
 
     opmap::PointLatLng GetFromLocalToLatLng(QPointF p) {return map->FromLocalToLatLng(p.x(),p.y());}
 
+    /** @brief Convert lat/lon to local scene point (inverse of GetFromLocalToLatLng) */
+    QPointF GetFromLatLngToLocal(opmap::PointLatLng const& latlng) {
+        opmap::Point p=map->FromLatLngToLocal(latlng);
+        return QPointF(p.X(),p.Y());
+    }
+
     /** @brief Convert meters to pixels */
     float metersToPixels(double meters);
 

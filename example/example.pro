@@ -17,15 +17,19 @@ OBJECTS_DIR  = ./build
 
 
 HEADERS += \
-    mapwidget.h \
-    uas_types.h \
-    mapwidget_testwindow.h
+    mainwindow.h \
+    waypoint_store.h \
+    route_service.h \
+    navigation_simulator.h \
+    uas_types.h
 
 SOURCES += \
-    mapwidget.cpp \
-    uas_types.cpp \
-    mapwidget_testwindow.cpp \
-    opmapcontrol_demo.cpp
+    main.cpp \
+    mainwindow.cpp \
+    waypoint_store.cpp \
+    route_service.cpp \
+    navigation_simulator.cpp \
+    uas_types.cpp
 
 
 ################################################################################
