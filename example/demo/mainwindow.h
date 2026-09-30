@@ -28,6 +28,8 @@ class QGeoPositionInfoSource;
 class QGeoPositionInfo;
 class QTimer;
 class QNetworkAccessManager;
+class QNetworkReply;
+class QAction;
 
 /**
 * @brief 示例程序主窗口（车载导航式调用库）
@@ -90,10 +92,15 @@ private slots:
     void onGpsPositionUpdated(const QGeoPositionInfo &info);
     // IP 定位源（城市级兜底，桌面无 GPS 时仍能拿到大概位置）
     void onIpFetchTimeout();
+    void onIpTimeout();             ///< IP 请求 8 秒超时兜底（Qt 5.12 QNAM 无内建超时）
     void onIpReplyFinished();
     // 工具栏定位：优先用已喂入的车辆位置，否则自动走一次 IP 兜底
     void onLocateClicked();
     void CenterOnVehicle();
+
+    // 地图右键菜单：切换地图源 / 航点增删
+    void onMapContextMenu(const QPoint &pos);
+    void SyncMapTypeActions();   ///< 菜单栏与右键菜单的地图源勾选状态同步
 
     // 离线下载
     void onRipMapClicked();
@@ -123,6 +130,7 @@ private:
     void repositionBanner();
 
     opmap::OPMapWidget *m_map;
+    QList<QAction*> m_mapTypeActions;   ///< 地图源菜单动作（右键菜单与菜单栏共用）
     WaypointStore *m_store;
     NavigationSimulator *m_simulator;
 
@@ -150,7 +158,9 @@ private:
     QComboBox *m_posSourceCombo;     ///< 位置源：模拟 / 系统 GPS / IP 定位
     QGeoPositionInfoSource *m_gpsSource;   ///< 系统 GPS 源（惰性创建，可能为空）
     QTimer *m_ipTimer;                     ///< IP 定位轮询定时器
+    QTimer *m_ipTimeout;                   ///< 单次 IP 请求超时定时器
     QNetworkAccessManager *m_ipNam;        ///< IP 定位请求
+    QNetworkReply *m_ipReply;              ///< 当前在途的 IP 请求（挂死时超时 abort）
     bool m_locatePending;                  ///< 定位按钮触发的 IP 兜底进行中
     QCheckBox *m_followCheck;
     QCheckBox *m_trailCheck;

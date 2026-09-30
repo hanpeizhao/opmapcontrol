@@ -19,6 +19,7 @@
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QFileDialog>
 #include <QtCore/QTimer>
+#include <QtCore/QDebug>
 #include <QtGui/QResizeEvent>
 #include <QtPositioning/QGeoPositionInfoSource>
 #include <QtPositioning/QGeoPositionInfo>
@@ -64,6 +65,11 @@ MainWindow::MainWindow()
       m_speedCombo(new QComboBox(this)),
       m_posSourceCombo(new QComboBox(this)),
       m_gpsSource(0),
+      m_ipTimer(new QTimer(this)),
+      m_ipTimeout(new QTimer(this)),
+      m_ipNam(new QNetworkAccessManager(this)),
+      m_ipReply(0),
+      m_locatePending(false),
       m_followCheck(new QCheckBox(QString::fromUtf8("地图跟随车辆"), this)),
       m_trailCheck(new QCheckBox(QString::fromUtf8("显示行车轨迹"), this)),
       m_simInfo(new QLabel(QString::fromUtf8("空闲"), this)),
@@ -75,9 +81,6 @@ MainWindow::MainWindow()
       m_dest(0, 0),
       m_hasOrigin(false),
       m_hasDest(false),
-      m_ipTimer(new QTimer(this)),
-      m_ipNam(new QNetworkAccessManager(this)),
-      m_locatePending(false),
       m_providerIsAmap(false)
 {
     setWindowTitle(QString::fromUtf8("opmapcontrol 示例 — 地图/航点/车载导航"));
@@ -122,6 +125,20 @@ MainWindow::MainWindow()
     m_banner->setTextFormat(Qt::RichText);
     m_banner->setAlignment(Qt::AlignCenter);
     m_banner->hide();
+    qDebug("[app] MainWindow constructed, build=%s", __TIMESTAMP__);
+}
+
+// 菜单栏与右键菜单共用的地图源列表
+namespace {
+struct MapSourceEntry { opmap::MapType::Types type; const char *name; };
+const MapSourceEntry kMapSources[] = {
+    { opmap::MapType::AutoNaviRoad,      "高德路网" },
+    { opmap::MapType::AutoNaviSatellite, "高德卫星" },
+    { opmap::MapType::OpenStreetMap,     "OpenStreetMap" },
+    { opmap::MapType::ArcGIS_Map,        "ArcGIS 地图" },
+    { opmap::MapType::GoogleMap,         "Google 地图" },
+};
+const int kMapSourceCount = (int)(sizeof(kMapSources) / sizeof(kMapSources[0]));
 }
 
 void MainWindow::setupMenus()
@@ -129,25 +146,24 @@ void MainWindow::setupMenus()
     // 地图源菜单
     QMenu *mapMenu = menuBar()->addMenu(QString::fromUtf8("地图(&M)"));
     QActionGroup *group = new QActionGroup(this);
-    struct { opmap::MapType::Types type; const char *name; } sources[] = {
-        { opmap::MapType::AutoNaviRoad,      "高德路网" },
-        { opmap::MapType::AutoNaviSatellite, "高德卫星" },
-        { opmap::MapType::OpenStreetMap,     "OpenStreetMap" },
-        { opmap::MapType::ArcGIS_Map,        "ArcGIS 地图" },
-        { opmap::MapType::GoogleMap,         "Google 地图" },
-    };
-    for (int i = 0; i < (int)(sizeof(sources) / sizeof(sources[0])); ++i) {
-        QAction *act = mapMenu->addAction(QString::fromUtf8(sources[i].name));
+    for (int i = 0; i < kMapSourceCount; ++i) {
+        QAction *act = mapMenu->addAction(QString::fromUtf8(kMapSources[i].name));
         act->setCheckable(true);
-        act->setData((int)sources[i].type);
-        if (sources[i].type == opmap::MapType::AutoNaviRoad)
+        act->setData((int)kMapSources[i].type);
+        if (kMapSources[i].type == opmap::MapType::AutoNaviRoad)
             act->setChecked(true);
         group->addAction(act);
+        m_mapTypeActions.append(act);
         connect(act, SIGNAL(triggered()), this, SLOT(onMapSourceTriggered()));
     }
     mapMenu->addSeparator();
     QAction *ripAct = mapMenu->addAction(QString::fromUtf8("下载框选区域离线瓦片…"));
     connect(ripAct, SIGNAL(triggered()), this, SLOT(onRipMapClicked()));
+
+    // 右键菜单：切换地图源 / 航点增删（与旧版示例一致）
+    m_map->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_map, SIGNAL(customContextMenuRequested(QPoint)),
+            this, SLOT(onMapContextMenu(QPoint)));
 
     // 工具栏（缩放与定位）
     QToolBar *toolBar = addToolBar(QString::fromUtf8("视图"));
@@ -161,6 +177,7 @@ void MainWindow::setupMenus()
         m_map->SetZoom(kHomeZoom);
     });
     QAction *locateAct = toolBar->addAction(QString::fromUtf8("定位当前位置"));
+    locateAct->setShortcut(QKeySequence(QString::fromUtf8("Ctrl+L")));
     connect(locateAct, SIGNAL(triggered()), this, SLOT(onLocateClicked()));
 }
 
@@ -258,7 +275,7 @@ void MainWindow::setupDocks()
     connect(m_speedCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onSpeedChanged(int)));
     connect(m_posSourceCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onPosSourceChanged(int)));
     connect(m_ipTimer, SIGNAL(timeout()), this, SLOT(onIpFetchTimeout()));
-    connect(m_ipNam, SIGNAL(finished(QNetworkReply*)), this, SLOT(onIpReplyFinished()));
+    connect(m_ipTimeout, SIGNAL(timeout()), this, SLOT(onIpTimeout()));
     connect(m_followCheck, SIGNAL(toggled(bool)), this, SLOT(onFollowToggled(bool)));
     connect(m_trailCheck, SIGNAL(toggled(bool)), this, SLOT(onTrailToggled(bool)));
 
@@ -290,6 +307,42 @@ void MainWindow::onMapSourceTriggered()
     if (!act)
         return;
     m_map->SetMapType((opmap::MapType::Types)act->data().toInt());
+    SyncMapTypeActions();
+}
+
+void MainWindow::SyncMapTypeActions()
+{
+    // 菜单栏与右键菜单可能各自触发，统一按当前地图源同步勾选态
+    const opmap::MapType::Types cur = m_map->GetMapType();
+    for (int i = 0; i < m_mapTypeActions.count(); ++i)
+        m_mapTypeActions.at(i)->setChecked(m_mapTypeActions.at(i)->data().toInt() == (int)cur);
+}
+
+void MainWindow::onMapContextMenu(const QPoint &pos)
+{
+    QMenu menu(this);
+    QMenu *typeMenu = menu.addMenu(QString::fromUtf8("切换地图类型"));
+    for (int i = 0; i < kMapSourceCount; ++i) {
+        QAction *act = typeMenu->addAction(QString::fromUtf8(kMapSources[i].name));
+        act->setData((int)kMapSources[i].type);
+        act->setCheckable(true);
+        act->setChecked(kMapSources[i].type == m_map->GetMapType());
+        connect(act, SIGNAL(triggered()), this, SLOT(onMapSourceTriggered()));
+    }
+    menu.addSeparator();
+    QAction *addWp = menu.addAction(QString::fromUtf8("在此处添加航点"));
+    QAction *delWp = menu.addAction(QString::fromUtf8("删除选中航点"));
+    delWp->setEnabled(!m_map->WPSelected().isEmpty());
+
+    QAction *chosen = menu.exec(m_map->mapToGlobal(pos));
+    if (chosen == addWp) {
+        const opmap::PointLatLng p = m_map->currentMousePosition();
+        m_map->WPCreate(p, 0, QString::fromUtf8("航点 %1").arg(m_map->WPAll().count() + 1));
+    } else if (chosen == delWp) {
+        QList<opmap::WayPointItem*> sel = m_map->WPSelected();
+        for (int i = 0; i < sel.count(); ++i)
+            m_map->WPDelete(sel.at(i));
+    }
 }
 
 void MainWindow::onMapMousePress(QMouseEvent *)
@@ -661,6 +714,7 @@ void MainWindow::stopGps()
 
 void MainWindow::onLocateClicked()
 {
+    qDebug("[locate] onLocateClicked fired, hasVehicle=%d", (int)m_map->HasVehiclePosition());
     if (m_map->HasVehiclePosition()) {
         CenterOnVehicle();
         return;
@@ -673,6 +727,8 @@ void MainWindow::onLocateClicked()
 
 void MainWindow::CenterOnVehicle()
 {
+    qDebug("[locate] CenterOnVehicle %.4f,%.4f curZoom=%.1f",
+           m_map->VehiclePosition().Lat(), m_map->VehiclePosition().Lng(), m_map->ZoomTotal());
     m_map->SetCurrentPosition(m_map->VehiclePosition());
     if (m_map->ZoomTotal() < 15.0)
         m_map->SetZoom(15.0);       // 定位时切到街区级缩放
@@ -681,16 +737,38 @@ void MainWindow::CenterOnVehicle()
 
 void MainWindow::onIpFetchTimeout()
 {
-    // ip-api.com 免费无 key，返回 WGS-84 城市级坐标
-    m_ipNam->get(QNetworkRequest(QUrl(QLatin1String("http://ip-api.com/json/?fields=status,lat,lon,city"))));
+    if (m_ipReply)          // 上一请求还在途（可能正被超时兜底），跳过本轮
+        return;
+    // ipwho.is 免费无 key，HTTPS 直连，返回 WGS-84 城市级坐标（latitude/longitude/city）
+    qDebug("[locate] fetching ipwho.is ...");
+    m_ipReply = m_ipNam->get(QNetworkRequest(QUrl(QLatin1String("https://ipwho.is/"))));
+    // 注意：必须连 reply 自己的 finished()。若连 QNAM 的 finished(QNetworkReply*)，
+    // 槽内 sender() 是 QNAM 而非 reply，qobject_cast 恒为 null，结果永远无人处理
+    connect(m_ipReply, SIGNAL(finished()), this, SLOT(onIpReplyFinished()));
+    m_ipTimeout->start(8000);
+}
+
+void MainWindow::onIpTimeout()
+{
+    if (!m_ipReply)
+        return;
+    qDebug("[locate] request timeout, abort");
+    statusBar()->showMessage(QString::fromUtf8("IP 定位超时，请检查网络后重试"), 6000);
+    m_locatePending = false;
+    QNetworkReply *r = m_ipReply;
+    m_ipReply = 0;          // 先清指针再 abort，避免重入 onIpReplyFinished 弹窗
+    r->abort();
 }
 
 void MainWindow::onIpReplyFinished()
 {
     QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
-    if (!reply)
+    if (!reply || reply != m_ipReply)
         return;
+    m_ipTimeout->stop();
+    m_ipReply = 0;
     reply->deleteLater();
+    qDebug("[locate] reply error=%d pending=%d", (int)reply->error(), (int)m_locatePending);
     if (reply->error() != QNetworkReply::NoError) {
         if (m_locatePending) {
             m_locatePending = false;
@@ -701,7 +779,7 @@ void MainWindow::onIpReplyFinished()
         return;
     }
     QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
-    if (obj.value(QLatin1String("status")).toString() != QLatin1String("success")) {
+    if (!obj.value(QLatin1String("success")).toBool()) {
         statusBar()->showMessage(QString::fromUtf8("IP 定位失败：服务返回异常"), 8000);
         if (m_locatePending) {
             m_locatePending = false;
@@ -710,8 +788,8 @@ void MainWindow::onIpReplyFinished()
         }
         return;
     }
-    const double lat = obj.value(QLatin1String("lat")).toDouble();
-    const double lon = obj.value(QLatin1String("lon")).toDouble();
+    const double lat = obj.value(QLatin1String("latitude")).toDouble();
+    const double lon = obj.value(QLatin1String("longitude")).toDouble();
     const QString city = obj.value(QLatin1String("city")).toString();
     ensureUAV();
     m_map->UpdateVehiclePosition(opmap::PointLatLng(lat, lon));

@@ -107,7 +107,9 @@ void UrlFactory::TryCorrectGoogleVersions()
         qheader.setRawHeader("User-Agent",UserAgent);
         reply=network.get(qheader);
         tT.start(Timeout);
-        q.exec();
+        // 连接复用后回复可能在事件循环启动前就完成，quit() 会丢失导致空等
+        if (!reply->isFinished())
+            q.exec();
         if(!tT.isActive())
             return;
         tT.stop();

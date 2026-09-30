@@ -154,7 +154,10 @@ QByteArray MapService::GetImageFrom(const MapType::Types &type, const Point &pos
             }
             reply = network.get(qheader);
             tT.start(urlFactory.Timeout);
-            q.exec();
+            // 连接复用后回复可能在事件循环启动前就完成，此时 quit() 会丢失，
+            // exec() 将空等到超时；已完成则直接跳过等待
+            if (!reply->isFinished())
+                q.exec();
 
             if(!tT.isActive()){
                 errorvars.lock();
