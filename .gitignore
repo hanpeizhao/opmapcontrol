@@ -16,7 +16,7 @@ ui_*.h
 object_script.*
 
 # ===== 编译输出 =====
-# 库与 demo 的输出目录（DESTDIR 副本）
+# 库与 example 的输出目录（DESTDIR 副本）
 build/
 release/
 debug/
@@ -25,7 +25,7 @@ debug/
 build-*/
 
 # 可执行文件
-opmapcontrol_demo.exe
+opmapcontrol_example.exe
 
 # ===== IDE / 编辑器 =====
 # Qt Creator 用户本地配置（含本机 kit 路径，不应入库）

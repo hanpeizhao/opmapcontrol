@@ -1,10 +1,10 @@
 # 功能清单与 API 参考
 
-库的全部公开能力按模块整理。**demo 一列**标注 `opmapcontrol_demo` 是否演示了该能力——demo 只覆盖了一小部分，多数能力需在自己的代码中直接调用 API 使用。
+库的全部公开能力按模块整理。**example 一列**标注 `opmapcontrol_example` 是否演示了该能力——example 只覆盖了一小部分，多数能力需在自己的代码中直接调用 API 使用。
 
 ## 1. 地图控制（OPMapWidget）
 
-| 功能 | API | demo |
+| 功能 | API | example |
 |------|:---:|:----:|
 | 切换地图源 | `SetMapType()` / `GetMapType()` | ✅ |
 | 缩放（double/float 级别） | `SetZoom()` / `ZoomReal()` / `ZoomDigi()` / `ZoomTotal()` | ✅ |
@@ -20,7 +20,7 @@
 
 ## 2. 坐标与几何工具
 
-| 功能 | API | demo |
+| 功能 | API | example |
 |------|:---:|:----:|
 | 当前鼠标位置（WGS-84） | `currentMousePosition()` | ✅ |
 | 屏幕像素 → 经纬度 | `GetFromLocalToLatLng(QPointF)` | — |
@@ -30,7 +30,7 @@
 
 ## 3. 航点管理（WayPointItem）
 
-| 功能 | API | demo |
+| 功能 | API | example |
 |------|:---:|:----:|
 | 创建航点（坐标/高度/描述，5 种重载） | `WPCreate()` | ✅ |
 | 指定位置插入航点 | `WPInsert()` | — |
@@ -44,7 +44,7 @@
 
 ## 4. UAV / Home / GPS 元素
 
-| 功能 | API | demo |
+| 功能 | API | example |
 |------|:---:|:----:|
 | 添加/删除多 UAV（多机同时显示） | `AddUAV(id)` / `DeleteUAV(id)` / `GetUAV()` / `GetUAVS()` | ✅（单机） |
 | UAV 位置/航向/轨迹更新 | `UAVItem::SetUAVPos()` / `SetUAVHeading()` / 轨迹类型 `UAVTrailType` | ✅（位置） |
@@ -58,7 +58,7 @@
 
 ## 5. 离线地图下载
 
-| 功能 | API | demo |
+| 功能 | API | example |
 |------|:---:|:----:|
 | 框选区域 | `SelectedArea()` / `SetSelectedArea()`（WGS-84 矩形） | ✅ |
 | 抓取框选区域瓦片入库 | 槽 `RipMap()` | ✅ |
@@ -66,7 +66,7 @@
 
 ## 6. 缓存与访问控制（Configuration）
 
-| 功能 | API | demo |
+| 功能 | API | example |
 |------|:---:|:----:|
 | 访问模式（仅缓存 / 仅网络 / 网络+缓存） | `SetAccessMode(AccessMode::Types)` | — |
 | 内存缓存开关与容量 | `SetUseMemoryCache()` / `SetTileMemorySize(MB)` | — |
@@ -82,7 +82,7 @@
 
 界面无关的飞行/业务逻辑通过 Qt 信号对接，无需侵入控件：
 
-| 信号 | 触发时机 | demo |
+| 信号 | 触发时机 | example |
 |------|----------|:----:|
 | `mouseMove` / `mousePress` / `mouseRelease` | 鼠标事件转发 | ✅ |
 | `zoomChanged` | 缩放变化 | ✅ |
@@ -93,9 +93,9 @@
 | `WPInserted` / `WPDeleted` / `WPNumberChanged` / `WPValuesChanged` / `WPReached` | 航点增删/改号/改值/到达 | — |
 | `UAVReachedWayPoint` / `UAVLeftSafetyBouble` | UAV 到点/出安全圈 | — |
 
-## 8. demo 未覆盖的能力汇总
+## 8. example 未覆盖的能力汇总
 
-demo 是原作者的测试窗口，仅演示了基础链路（切源、缩放、框选下载、单 UAV 位置、航点增删）。以下能力为库完整提供但 demo 未使用：
+example 是原作者的测试窗口，仅演示了基础链路（切源、缩放、框选下载、单 UAV 位置、航点增删）。以下能力为库完整提供但 example 未使用：
 
 - 地图旋转、OpenGL 渲染、缩放级别限制、访问模式控制
 - 多机 UAV 同时显示、轨迹样式、安全圈报警、到点事件

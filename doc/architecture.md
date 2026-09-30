@@ -62,7 +62,7 @@ OPMapWidget (QGraphicsView)
 
 写入路径独立于读取：磁盘写入由 `TileCacheQueue`（独立 `QThread`）异步完成——下载完成的瓦片先进入内存缓存立即可用，写库请求排入队列由后台线程批量落库，避免磁盘 IO 阻塞 UI。
 
-缓存位置默认 `QDir::homePath() + "/mapscache/"`，demo 配置为 `demo/data/OPMaps.qmdb`。缓存键中包含**地图类型枚举数值**，因此 `MapType::Types` 的数值一旦改变，历史缓存即无法命中。
+缓存位置默认 `QDir::homePath() + "/mapscache/"`，example 配置为 `example/data/OPMaps.qmdb`。缓存键中包含**地图类型枚举数值**，因此 `MapType::Types` 的数值一旦改变，历史缓存即无法命中。
 
 ## 4. 坐标系纠偏
 
