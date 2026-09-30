@@ -37,6 +37,13 @@ public:
      */
     void NavigateTo(const opmap::PointLatLng &from, const opmap::PointLatLng &dest);
 
+    /**
+     * @brief 仅规划并显示 from→dest 路线，不进入导航（选点预览用）
+     *
+     * 结果同样经 routePlanned 发出并绘制；不喂位置、不判偏航/到达
+     */
+    void PlanRoute(const opmap::PointLatLng &from, const opmap::PointLatLng &dest);
+
     /// 直接以已有路线开始导航（重规划结果复用同一入口）
     void StartRoute(const opmap::Route &route);
 
@@ -95,6 +102,7 @@ private:
 
     AbstractRouteProvider *m_provider;
     NavState m_state;
+    bool m_planOnly;               ///< 规划预览标记（PlanRoute 置位，成功后回 Idle）
 
     opmap::Route m_route;
     QList<double> m_cumDist;       ///< 折线累计距离（米），size == polyline.size()

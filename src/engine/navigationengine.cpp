@@ -24,6 +24,7 @@ NavigationEngine::NavigationEngine(QObject *parent)
     : QObject(parent),
       m_provider(0),
       m_state(Idle),
+      m_planOnly(false),
       m_lastPos(0, 0),
       m_hasLastPos(false),
       m_lastSegIdx(0),
@@ -62,6 +63,27 @@ void NavigationEngine::NavigateTo(const opmap::PointLatLng &from, const opmap::P
         emit navigationFailed(QString::fromUtf8("路由服务正忙，请稍后重试"));
         return;
     }
+    m_planOnly = false;
+    m_destination = dest;
+    m_route = opmap::Route();
+    m_cumDist.clear();
+    m_lastSegIdx = 0;
+    m_offRouteCount = 0;
+    m_state = Planning;
+    m_provider->requestRoute(from, dest);
+}
+
+void NavigationEngine::PlanRoute(const opmap::PointLatLng &from, const opmap::PointLatLng &dest)
+{
+    if (!m_provider) {
+        emit navigationFailed(QString::fromUtf8("未设置路由服务"));
+        return;
+    }
+    if (m_provider->isBusy()) {
+        emit navigationFailed(QString::fromUtf8("路由服务正忙，请稍后重试"));
+        return;
+    }
+    m_planOnly = true;
     m_destination = dest;
     m_route = opmap::Route();
     m_cumDist.clear();
@@ -112,6 +134,7 @@ void NavigationEngine::UpdatePosition(const opmap::PointLatLng &pos)
 void NavigationEngine::Stop()
 {
     m_state = Idle;
+    m_planOnly = false;
     m_route = opmap::Route();
     m_cumDist.clear();
     m_lastSegIdx = 0;
@@ -126,7 +149,13 @@ void NavigationEngine::onRouteReady(const opmap::Route &route)
     }
     if (m_state == Planning) {
         installRoute(route);
-        m_state = Navigating;
+        if (m_planOnly) {
+            // 预览模式：只绘制路线，不进入导航状态机
+            m_planOnly = false;
+            m_state = Idle;
+        } else {
+            m_state = Navigating;
+        }
         emit routePlanned(route);
     } else if (m_state == Rerouting) {
         installRoute(route);

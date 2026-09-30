@@ -45,9 +45,11 @@ MainWindow::MainWindow()
       m_wpList(new QListWidget(this)),
       m_addWpBtn(new QPushButton(QString::fromUtf8("地图点选添加"), this)),
       m_delWpBtn(new QPushButton(QString::fromUtf8("删除选中"), this)),
+      m_originLabel(new QLabel(QString::fromUtf8("起点：未设置（导航缺省用当前位置）"), this)),
       m_destLabel(new QLabel(QString::fromUtf8("目的地：未设置"), this)),
       m_providerCombo(new QComboBox(this)),
       m_amapKeyEdit(new QLineEdit(this)),
+      m_planBtn(new QPushButton(QString::fromUtf8("规划路线"), this)),
       m_navBtn(new QPushButton(QString::fromUtf8("开始导航"), this)),
       m_stopNavBtn(new QPushButton(QString::fromUtf8("停止导航"), this)),
       m_navInfo(new QLabel(QString::fromUtf8("空闲"), this)),
@@ -65,6 +67,9 @@ MainWindow::MainWindow()
       m_posLabel(new QLabel(tr("lng: --, lat: --"), this)),
       m_tileLabel(new QLabel(tr("tiles: --"), this)),
       m_pickMode(PickNone),
+      m_origin(0, 0),
+      m_dest(0, 0),
+      m_hasOrigin(false),
       m_hasDest(false),
       m_providerIsAmap(false)
 {
@@ -179,9 +184,15 @@ void MainWindow::setupDocks()
     // —— 车载导航面板 ——
     QWidget *navPanel = new QWidget(this);
     QVBoxLayout *navLayout = new QVBoxLayout(navPanel);
-    QPushButton *pickDestBtn = new QPushButton(QString::fromUtf8("① 在地图上点选目的地"), navPanel);
+    QHBoxLayout *pickBtnRow = new QHBoxLayout();
+    QPushButton *pickOriginBtn = new QPushButton(QString::fromUtf8("①点选起点"), navPanel);
+    QPushButton *pickDestBtn = new QPushButton(QString::fromUtf8("②点选目的地"), navPanel);
+    connect(pickOriginBtn, SIGNAL(clicked()), this, SLOT(onPickOriginClicked()));
     connect(pickDestBtn, SIGNAL(clicked()), this, SLOT(onPickDestClicked()));
-    navLayout->addWidget(pickDestBtn);
+    pickBtnRow->addWidget(pickOriginBtn);
+    pickBtnRow->addWidget(pickDestBtn);
+    navLayout->addLayout(pickBtnRow);
+    navLayout->addWidget(m_originLabel);
     navLayout->addWidget(m_destLabel);
     QHBoxLayout *providerRow = new QHBoxLayout();
     providerRow->addWidget(new QLabel(QString::fromUtf8("服务："), navPanel));
@@ -192,11 +203,13 @@ void MainWindow::setupDocks()
     m_amapKeyEdit->setPlaceholderText(QString::fromUtf8("高德 Web 服务 key（选高德时填写）"));
     navLayout->addWidget(m_amapKeyEdit);
     QHBoxLayout *navBtnRow = new QHBoxLayout();
+    navBtnRow->addWidget(m_planBtn);
     navBtnRow->addWidget(m_navBtn);
     navBtnRow->addWidget(m_stopNavBtn);
     navLayout->addLayout(navBtnRow);
     navLayout->addWidget(m_navInfo);
     navLayout->addStretch(1);
+    connect(m_planBtn, SIGNAL(clicked()), this, SLOT(onPlanClicked()));
     connect(m_navBtn, SIGNAL(clicked()), this, SLOT(onNavigateClicked()));
     connect(m_stopNavBtn, SIGNAL(clicked()), this, SLOT(onStopNavClicked()));
     connect(m_providerCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onProviderChanged(int)));
@@ -370,10 +383,35 @@ void MainWindow::refreshWaypointList()
 
 // ————————————————— 车载导航面板 —————————————————
 
+void MainWindow::onPickOriginClicked()
+{
+    setPickMode(PickOrigin);
+    statusBar()->showMessage(QString::fromUtf8("在地图上点击设置起点"), 5000);
+}
+
 void MainWindow::onPickDestClicked()
 {
     setPickMode(PickDest);
     statusBar()->showMessage(QString::fromUtf8("在地图上点击设置目的地"), 5000);
+}
+
+void MainWindow::onPlanClicked()
+{
+    if (!m_hasOrigin || !m_hasDest) {
+        QMessageBox::information(this, QString::fromUtf8("提示"),
+                                 QString::fromUtf8("请先点选起点和目的地，再规划路线"));
+        return;
+    }
+    if (m_map->IsNavigating()) {
+        QMessageBox::information(this, QString::fromUtf8("提示"),
+                                 QString::fromUtf8("正在导航中，请先停止导航再规划预览"));
+        return;
+    }
+    if (m_pickMode != PickNone)
+        setPickMode(PickNone);
+    applyProviderFromUI();
+    m_navInfo->setText(QString::fromUtf8("规划中…"));
+    m_map->PlanRoute(m_origin, m_dest);
 }
 
 void MainWindow::onNavigateClicked()
@@ -386,6 +424,10 @@ void MainWindow::onNavigateClicked()
     if (m_pickMode != PickNone)
         setPickMode(PickNone);
     applyProviderFromUI();
+    if (m_hasOrigin) {
+        // 指定点选起点出发：先把车辆位置喂到起点（图标同步 + 作为规划起点）
+        m_map->UpdateVehiclePosition(m_origin);
+    }
     m_navInfo->setText(QString::fromUtf8("规划中…"));
     m_banner->show();
     setBanner(QString::fromUtf8("正在规划路线…"), QString(), kBannerNormal);
@@ -624,6 +666,12 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
         refreshWaypointList();
         break;
     }
+    case PickOrigin:
+        m_origin = p;
+        m_hasOrigin = true;
+        m_originLabel->setText(QString::fromUtf8("起点：lat %1, lng %2")
+                               .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
+        break;
     case PickDest:
         m_dest = p;
         m_hasDest = true;

@@ -481,6 +481,11 @@ public:
      */
     void SetRouteProvider(opmap::AbstractRouteProvider *provider);
 
+    /**
+     * @brief 仅规划并显示 from→to 路线，不进入导航（选点预览用）
+     */
+    void PlanRoute(opmap::PointLatLng const& from, opmap::PointLatLng const& to);
+
     void SetShowRoute(bool const& value);
     bool ShowRoute() const;
     opmap::Route CurrentNavigationRoute() const;

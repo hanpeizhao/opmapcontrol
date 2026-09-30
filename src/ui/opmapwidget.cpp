@@ -256,6 +256,12 @@ void OPMapWidget::NavigateTo(opmap::PointLatLng const& dest)
     navEngine->NavigateTo(from, dest);
 }
 
+void OPMapWidget::PlanRoute(opmap::PointLatLng const& from, opmap::PointLatLng const& to)
+{
+    navEngine->PlanRoute(from, to);
+    routeItem->setVisible(true);   // 预览结果经 routePlanned 回来时绘制
+}
+
 void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
 {
     // UAV 图标同步（直接用 AddUAV，避免 SetShowUAV 连带创建 GPSItem）

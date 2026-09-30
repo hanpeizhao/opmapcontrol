@@ -59,7 +59,9 @@ private slots:
     void onWaypointListItemClicked(QListWidgetItem *item);
 
     // 导航面板
+    void onPickOriginClicked();
     void onPickDestClicked();
+    void onPlanClicked();
     void onNavigateClicked();
     void onStopNavClicked();
     void onProviderChanged(int index);
@@ -96,6 +98,7 @@ private:
     {
         PickNone,
         PickWaypoint,
+        PickOrigin,
         PickDest
     };
 
@@ -121,9 +124,11 @@ private:
     QPushButton *m_delWpBtn;
 
     // 导航面板
+    QLabel *m_originLabel;
     QLabel *m_destLabel;
     QComboBox *m_providerCombo;
     QLineEdit *m_amapKeyEdit;
+    QPushButton *m_planBtn;
     QPushButton *m_navBtn;
     QPushButton *m_stopNavBtn;
     QLabel *m_navInfo;
@@ -148,7 +153,9 @@ private:
     QLabel *m_tileLabel;
 
     PickMode m_pickMode;
+    opmap::PointLatLng m_origin;     ///< 点选的起点（缺省用当前位置）
     opmap::PointLatLng m_dest;
+    bool m_hasOrigin;
     bool m_hasDest;
     bool m_providerIsAmap;       ///< 当前库内 provider 是否为高德
     opmap::Route m_navRoute;     ///< 最近一次导航路线（喂跟车模拟器）

@@ -100,6 +100,7 @@
 | 功能 | API | example |
 |------|:---:|:----:|
 | 更换路径规划源（OSRM/高德，可自定义扩展） | `SetRouteProvider(AbstractRouteProvider*)` | ✅ |
+| 选点预览路线（起→终点画线，不导航） | `PlanRoute(起点, 终点)` | ✅ |
 | 规划并开始导航（起点缺省为当前车辆位置） | 槽 `NavigateTo(目的地)` | ✅ |
 | 喂入车辆实时位置（同步 UAV 图标 + 驱动引擎） | 槽 `UpdateVehiclePosition(PointLatLng)` | ✅ |
 | 停止导航 | 槽 `StopNavigation()` | ✅ |
