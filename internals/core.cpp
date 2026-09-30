@@ -27,6 +27,7 @@
 */
 
 #include "core.h"
+#include "../core/coordtransform.h"
 
 #ifdef DEBUG_CORE
 qlonglong internals::Core::debugcounter=0;
@@ -254,7 +255,7 @@ void Core::SetZoom(const int &value)
         zoom=value;
         minOfTiles=Projection()->GetTileMatrixMinXY(value);
         maxOfTiles=Projection()->GetTileMatrixMaxXY(value);
-        currentPositionPixel=Projection()->FromLatLngToPixel(currentPosition,value);
+        currentPositionPixel=Projection()->FromLatLngToPixel(ToTileDatum(currentPosition),value);
         if(started)
         {
             MtileLoadQueue.lock();
@@ -278,7 +279,7 @@ void Core::SetCurrentPosition(const PointLatLng &value)
     if(!IsDragging())
     {
         currentPosition = value;
-        SetCurrentPositionGPixel(Projection()->FromLatLngToPixel(value, Zoom()));
+        SetCurrentPositionGPixel(Projection()->FromLatLngToPixel(ToTileDatum(value), Zoom()));
 
         if(started)
         {
@@ -289,7 +290,7 @@ void Core::SetCurrentPosition(const PointLatLng &value)
     else
     {
         currentPosition = value;
-        SetCurrentPositionGPixel(Projection()->FromLatLngToPixel(value, Zoom()));
+        SetCurrentPositionGPixel(Projection()->FromLatLngToPixel(ToTileDatum(value), Zoom()));
 
         if(started)
         {
@@ -368,7 +369,7 @@ void Core::SetMapType(const MapType::Types &value)
 
         minOfTiles = Projection()->GetTileMatrixMinXY(Zoom());
         maxOfTiles = Projection()->GetTileMatrixMaxXY(Zoom());
-        SetCurrentPositionGPixel(Projection()->FromLatLngToPixel(CurrentPosition(), Zoom()));
+        SetCurrentPositionGPixel(Projection()->FromLatLngToPixel(ToTileDatum(CurrentPosition()), Zoom()));
 
         if(started)
         {
@@ -397,7 +398,7 @@ void Core::StartSystem()
 void Core::UpdateCenterTileXYLocation()
 {
     PointLatLng center = FromLocalToLatLng(Width/2, Height/2);
-    Point centerPixel = Projection()->FromLatLngToPixel(center, Zoom());
+    Point centerPixel = Projection()->FromLatLngToPixel(ToTileDatum(center), Zoom());
     centerTileXYLocation = Projection()->FromPixelToTileXY(centerPixel);
 }
 
@@ -450,22 +451,39 @@ GeoCoderStatusCode::Types Core::SetCurrentPositionByKeywords(QString const& keys
 
 RectLatLng Core::CurrentViewArea()
 {
-    PointLatLng p = Projection()->FromPixelToLatLng(-renderOffset.X(), -renderOffset.Y(), Zoom());
-    double rlng = Projection()->FromPixelToLatLng(-renderOffset.X() + Width, -renderOffset.Y(), Zoom()).Lng();
-    double blat = Projection()->FromPixelToLatLng(-renderOffset.X(), -renderOffset.Y() + Height, Zoom()).Lat();
+    // 视野边界用用户坐标(WGS-84)表示
+    PointLatLng p = FromTileDatum(Projection()->FromPixelToLatLng(-renderOffset.X(), -renderOffset.Y(), Zoom()));
+    double rlng = FromTileDatum(Projection()->FromPixelToLatLng(-renderOffset.X() + Width, -renderOffset.Y(), Zoom())).Lng();
+    double blat = FromTileDatum(Projection()->FromPixelToLatLng(-renderOffset.X(), -renderOffset.Y() + Height, Zoom())).Lat();
     return RectLatLng::FromLTRB(p.Lng(), p.Lat(), rlng, blat);
 
 }
 
+PointLatLng Core::ToTileDatum(PointLatLng const& pt) const
+{
+    if(MapType::DatumByType(mapType) == MapType::DatumGCJ02)
+        return coordtransform::WGS84ToGCJ02(pt);
+    return pt;
+}
+
+PointLatLng Core::FromTileDatum(PointLatLng const& pt) const
+{
+    if(MapType::DatumByType(mapType) == MapType::DatumGCJ02)
+        return coordtransform::GCJ02ToWGS84(pt);
+    return pt;
+}
+
 PointLatLng Core::FromLocalToLatLng(int const& x, int const& y)
 {
-    return Projection()->FromPixelToLatLng(Point(x - renderOffset.X(), y - renderOffset.Y()), Zoom());
+    // 屏幕像素 -> 瓦片坐标系经纬度 -> 用户坐标(WGS-84)
+    return FromTileDatum(Projection()->FromPixelToLatLng(Point(x - renderOffset.X(), y - renderOffset.Y()), Zoom()));
 }
 
 
 Point Core::FromLatLngToLocal(PointLatLng const& latlng)
 {
-    Point pLocal = Projection()->FromLatLngToPixel(latlng, Zoom());
+    // 用户坐标(WGS-84) -> 瓦片坐标系经纬度 -> 屏幕像素
+    Point pLocal = Projection()->FromLatLngToPixel(ToTileDatum(latlng), Zoom());
     pLocal.Offset(renderOffset);
     return pLocal;
 }
@@ -476,8 +494,9 @@ int Core::GetMaxZoomToFitRect(RectLatLng const& rect)
 
     for(int i = 1; i <= MaxZoom(); i++)
     {
-        Point p1 = Projection()->FromLatLngToPixel(rect.LocationTopLeft(), i);
-        Point p2 = Projection()->FromLatLngToPixel(rect.Bottom(), rect.Right(), i);
+        Point p1 = Projection()->FromLatLngToPixel(ToTileDatum(rect.LocationTopLeft()), i);
+        PointLatLng br = ToTileDatum(PointLatLng(rect.Bottom(), rect.Right()));
+        Point p2 = Projection()->FromLatLngToPixel(br.Lat(), br.Lng(), i);
 
         if(((p2.X() - p1.X()) <= Width+10) && (p2.Y() - p1.Y()) <= Height+10)
         {

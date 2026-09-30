@@ -174,6 +174,18 @@ public:
 
     Point FromLatLngToLocal(PointLatLng const& latlng);
 
+    /// <summary>
+    /// 用户坐标(WGS-84) -> 当前地图源的瓦片坐标系（如高德/谷歌中国为 GCJ-02）
+    /// 在所有 latlng -> 像素/瓦片 的投影计算前调用
+    /// </summary>
+    PointLatLng ToTileDatum(PointLatLng const& pt) const;
+
+    /// <summary>
+    /// 当前地图源的瓦片坐标系 -> 用户坐标(WGS-84)
+    /// 在所有 像素/瓦片 -> latlng 的反投影后调用
+    /// </summary>
+    PointLatLng FromTileDatum(PointLatLng const& pt) const;
+
     int GetMaxZoomToFitRect(RectLatLng const& rect);
 
     void BeginDrag(core::Point const& pt);

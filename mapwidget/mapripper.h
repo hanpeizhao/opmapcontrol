@@ -53,7 +53,8 @@ private:
     int zoom;
     core::MapType::Types type;
     int sleep;
-    internals::RectLatLng area;
+    internals::RectLatLng area;         // 用户坐标(WGS-84)下的下载区域
+    internals::RectLatLng tileArea;     // 瓦片坐标系下的下载区域（GCJ-02 地图源已纠偏）
 
     bool cancel;
     MapRipForm * progressForm;

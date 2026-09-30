@@ -37,9 +37,13 @@ MapRipper::MapRipper(internals::Core * core, const internals::RectLatLng & rect)
         type=core->GetMapType();
         progressForm=new MapRipForm;
         area=rect;
+        // 下载区域转换到当前地图源的瓦片坐标系（GCJ-02 源自动纠偏）
+        internals::PointLatLng tl = core->ToTileDatum(rect.LocationTopLeft());
+        internals::PointLatLng br = core->ToTileDatum(internals::PointLatLng(rect.Bottom(), rect.Right()));
+        tileArea = internals::RectLatLng::FromLTRB(tl.Lng(), tl.Lat(), br.Lng(), br.Lat());
         zoom=core->Zoom();
         maxzoom=core->MaxZoom();
-        points=core->Projection()->GetAreaTileList(area,zoom,0);
+        points=core->Projection()->GetAreaTileList(tileArea,zoom,0);
         this->start();
         progressForm->show();
         progressForm->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -85,7 +89,7 @@ void MapRipper::finish()
         */
 
         points.clear();
-        points = core->Projection()->GetAreaTileList(area, zoom, 0);
+        points = core->Projection()->GetAreaTileList(tileArea, zoom, 0);
         this->start();
     } else {
         progressForm->close();
