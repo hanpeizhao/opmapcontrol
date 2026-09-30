@@ -26,6 +26,8 @@ class WaypointStore;
 class NavigationSimulator;
 class QGeoPositionInfoSource;
 class QGeoPositionInfo;
+class QTimer;
+class QNetworkAccessManager;
 
 /**
 * @brief 示例程序主窗口（车载导航式调用库）
@@ -86,6 +88,9 @@ private slots:
     // 位置源（模拟 / 系统 GPS）
     void onPosSourceChanged(int index);
     void onGpsPositionUpdated(const QGeoPositionInfo &info);
+    // IP 定位源（城市级兜底，桌面无 GPS 时仍能拿到大概位置）
+    void onIpFetchTimeout();
+    void onIpReplyFinished();
 
     // 离线下载
     void onRipMapClicked();
@@ -139,8 +144,10 @@ private:
     QPushButton *m_simStopBtn;
     QPushButton *m_yawBtn;
     QComboBox *m_speedCombo;
-    QComboBox *m_posSourceCombo;     ///< 位置源：模拟 / 系统 GPS
+    QComboBox *m_posSourceCombo;     ///< 位置源：模拟 / 系统 GPS / IP 定位
     QGeoPositionInfoSource *m_gpsSource;   ///< 系统 GPS 源（惰性创建，可能为空）
+    QTimer *m_ipTimer;                     ///< IP 定位轮询定时器
+    QNetworkAccessManager *m_ipNam;        ///< IP 定位请求
     QCheckBox *m_followCheck;
     QCheckBox *m_trailCheck;
     QLabel *m_simInfo;

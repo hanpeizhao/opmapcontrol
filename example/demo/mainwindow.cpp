@@ -22,6 +22,10 @@
 #include <QtGui/QResizeEvent>
 #include <QtPositioning/QGeoPositionInfoSource>
 #include <QtPositioning/QGeoPositionInfo>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include "waypoint_store.h"
 #include "navigation_simulator.h"
@@ -71,6 +75,8 @@ MainWindow::MainWindow()
       m_dest(0, 0),
       m_hasOrigin(false),
       m_hasDest(false),
+      m_ipTimer(new QTimer(this)),
+      m_ipNam(new QNetworkAccessManager(this)),
       m_providerIsAmap(false)
 {
     setWindowTitle(QString::fromUtf8("opmapcontrol 示例 — 地图/航点/车载导航"));
@@ -240,6 +246,7 @@ void MainWindow::setupDocks()
     posSourceRow->addWidget(new QLabel(QString::fromUtf8("位置源："), simPanel));
     m_posSourceCombo->addItem(QString::fromUtf8("行车模拟"));
     m_posSourceCombo->addItem(QString::fromUtf8("系统 GPS"));
+    m_posSourceCombo->addItem(QString::fromUtf8("IP 定位（城市级）"));
     posSourceRow->addWidget(m_posSourceCombo);
     simLayout->addLayout(posSourceRow);
     QHBoxLayout *speedRow = new QHBoxLayout();
@@ -261,6 +268,8 @@ void MainWindow::setupDocks()
     connect(m_yawBtn, SIGNAL(clicked()), this, SLOT(onYawClicked()));
     connect(m_speedCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onSpeedChanged(int)));
     connect(m_posSourceCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onPosSourceChanged(int)));
+    connect(m_ipTimer, SIGNAL(timeout()), this, SLOT(onIpFetchTimeout()));
+    connect(m_ipNam, SIGNAL(finished(QNetworkReply*)), this, SLOT(onIpReplyFinished()));
     connect(m_followCheck, SIGNAL(toggled(bool)), this, SLOT(onFollowToggled(bool)));
     connect(m_trailCheck, SIGNAL(toggled(bool)), this, SLOT(onTrailToggled(bool)));
 
@@ -607,13 +616,23 @@ void MainWindow::onSimFinished()
 
 void MainWindow::onPosSourceChanged(int index)
 {
-    if (index == 0) {           // 行车模拟：停 GPS，喂点交还模拟器
+    if (index == 0) {           // 行车模拟：停 GPS / IP，喂点交还模拟器
         stopGps();
+        m_ipTimer->stop();
         return;
     }
 
-    // 系统 GPS：先停模拟器，避免双源同时喂点
+    // 系统 GPS / IP 定位：先停模拟器，避免双源同时喂点
     m_simulator->stop();
+
+    if (index == 2) {           // IP 定位（城市级兜底）
+        stopGps();
+        onIpFetchTimeout();     // 立即取一次，之后每 60s 轮询
+        m_ipTimer->start(60000);
+        return;
+    }
+
+    m_ipTimer->stop();
 
     if (!m_gpsSource) {
         // Windows 桌面默认 serialnmea 后端，无可用 GPS 时返回空指针
@@ -647,6 +666,38 @@ void MainWindow::stopGps()
 {
     if (m_gpsSource)
         m_gpsSource->stopUpdates();
+}
+
+// ————————————————— IP 定位源（城市级兜底） —————————————————
+
+void MainWindow::onIpFetchTimeout()
+{
+    // ip-api.com 免费无 key，返回 WGS-84 城市级坐标
+    m_ipNam->get(QNetworkRequest(QUrl(QLatin1String("http://ip-api.com/json/?fields=status,lat,lon,city"))));
+}
+
+void MainWindow::onIpReplyFinished()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply)
+        return;
+    reply->deleteLater();
+    if (reply->error() != QNetworkReply::NoError) {
+        statusBar()->showMessage(QString::fromUtf8("IP 定位失败：%1").arg(reply->errorString()), 8000);
+        return;
+    }
+    QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
+    if (obj.value(QLatin1String("status")).toString() != QLatin1String("success")) {
+        statusBar()->showMessage(QString::fromUtf8("IP 定位失败：服务返回异常"), 8000);
+        return;
+    }
+    const double lat = obj.value(QLatin1String("lat")).toDouble();
+    const double lon = obj.value(QLatin1String("lon")).toDouble();
+    const QString city = obj.value(QLatin1String("city")).toString();
+    ensureUAV();
+    m_map->UpdateVehiclePosition(opmap::PointLatLng(lat, lon));
+    statusBar()->showMessage(QString::fromUtf8("IP 定位（城市级，精度约数公里）：%1 (%2, %3)")
+                             .arg(city).arg(lat, 0, 'f', 4).arg(lon, 0, 'f', 4), 10000);
 }
 
 // ————————————————— 离线下载 —————————————————
