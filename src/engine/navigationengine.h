@@ -57,6 +57,11 @@ public:
     opmap::Route CurrentRoute() const { return m_route; }
     opmap::PointLatLng Destination() const { return m_destination; }
 
+    /// 是否已有车辆位置（曾通过 UpdatePosition 喂入）
+    bool HasPosition() const { return m_hasLastPos; }
+    /// 最近一次喂入的车辆位置（WGS-84；先用 HasPosition 判断有效性）
+    opmap::PointLatLng LastPosition() const { return m_lastPos; }
+
     // —— 可调参数 ——
     void SetAutoReroute(bool on) { m_autoReroute = on; }
     void SetOffRouteThresholdM(double meters) { m_offRouteThresholdM = meters; }

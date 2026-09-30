@@ -491,6 +491,17 @@ public:
     opmap::Route CurrentNavigationRoute() const;
     bool IsNavigating() const;
 
+    /**
+     * @brief 是否有车辆位置（曾通过 UpdateVehiclePosition 喂入）
+     */
+    bool HasVehiclePosition() const { return vehiclePosValid; }
+
+    /**
+     * @brief 最近一次喂入的车辆位置（WGS-84，非地图中心；
+     *        未喂过时无意义，先用 HasVehiclePosition 判断）
+     */
+    opmap::PointLatLng VehiclePosition() const { return vehiclePos; }
+
     QMap<int, UAVItem*> UAVS;
 
 private:

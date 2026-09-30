@@ -153,6 +153,17 @@ void MainWindow::setupMenus()
         m_map->SetCurrentPosition(kHomePos);
         m_map->SetZoom(kHomeZoom);
     });
+    QAction *locateAct = toolBar->addAction(QString::fromUtf8("定位当前位置"));
+    connect(locateAct, &QAction::triggered, [this]() {
+        if (m_map->HasVehiclePosition()) {
+            m_map->SetCurrentPosition(m_map->VehiclePosition());
+            if (m_map->ZoomTotal() < 15.0)
+                m_map->SetZoom(15.0);       // 定位时切到街区级缩放
+            statusBar()->showMessage(QString::fromUtf8("已定位到车辆当前位置"), 3000);
+        } else {
+            statusBar()->showMessage(QString::fromUtf8("尚无车辆位置：先开始导航/跟车模拟，或位置源切到系统 GPS"), 6000);
+        }
+    });
 }
 
 void MainWindow::setupDocks()

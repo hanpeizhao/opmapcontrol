@@ -104,6 +104,7 @@
 | 规划并开始导航（起点缺省为当前车辆位置） | 槽 `NavigateTo(目的地)` | ✅ |
 | 喂入车辆实时位置（同步 UAV 图标 + 驱动引擎） | 槽 `UpdateVehiclePosition(PointLatLng)` | ✅ |
 | 停止导航 | 槽 `StopNavigation()` | ✅ |
+| 查询车辆当前位置（最近一次喂入，非地图中心） | `HasVehiclePosition()` / `VehiclePosition()` | ✅ |
 | 是否导航中 | `IsNavigating()` | — |
 | 当前导航路线 | `CurrentNavigationRoute()` | — |
 | 路线显示开关（默认导航时自动显示） | `SetShowRoute(bool)` / `ShowRoute()` | — |
