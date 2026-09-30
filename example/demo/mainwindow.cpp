@@ -102,6 +102,7 @@ MainWindow::MainWindow()
     m_map->SetMapType(opmap::MapType::AutoNaviRoad);
     m_map->SetCurrentPosition(kHomePos);
     m_map->SetZoom(kHomeZoom);
+    m_map->SetShowHome(true);   // 打开 Home 返航点图标（惰性创建，默认不显示）
 
     // 地图信号 → 本窗口
     connect(m_map, SIGNAL(mousePress(QMouseEvent*)), this, SLOT(onMapMousePress(QMouseEvent*)));

@@ -44,4 +44,6 @@ INCLUDEPATH +=  $$OPMAPCONTROL_DIR/src \
                 $$OPMAPCONTROL_DIR/src/engine/projections \
                 $$OPMAPCONTROL_DIR/src/ui
 LIBS += $$OPMAPCONTROL_DIR/libopmapwidget.a
+# 强依赖：库更新后自动重链 demo（否则 Makefile 不感知 .a 变化，跑的还是旧库）
+PRE_TARGETDEPS += $$OPMAPCONTROL_DIR/libopmapwidget.a
 RESOURCES   += $$OPMAPCONTROL_DIR/src/ui/mapresources.qrc
