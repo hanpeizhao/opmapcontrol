@@ -235,6 +235,21 @@ void OPMapWidget::SetShowUAV(const bool &value)
     }
 }
 
+void OPMapWidget::SetShowGPS(const bool &value)
+{
+    if(value && GPS==0 ) {
+        GPS=new GPSItem(map,this);
+        GPS->setParentItem(map);
+    } else if(!value) {
+        if(GPS!=0) {
+            GPS->DeleteTrail();
+
+            delete GPS;
+            GPS=0;
+        }
+    }
+}
+
 void OPMapWidget::SetShowHome(const bool &value)
 {
     if(value && Home==0)  {

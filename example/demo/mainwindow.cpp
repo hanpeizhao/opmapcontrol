@@ -1329,6 +1329,16 @@ void MainWindow::onMavLinkTimeout()
 
 // ————————————————— IP 定位源（城市级兜底） —————————————————
 
+void MainWindow::showRealPosMarker(const opmap::PointLatLng &pos)
+{
+    // "我的真实位置"用独立 GPS 标记显示：绝不喂 vehiclePos（导航车）——
+    // IP 兜底是城市级粗位置，喂进导航会搅乱进度与路线着色
+    m_map->SetShowGPS(true);
+    if (m_map->GPS)
+        m_map->GPS->SetUAVPos(pos, 0);
+    m_map->SetCurrentPosition(pos);
+}
+
 void MainWindow::onLocateClicked()
 {
     qDebug("[locate] onLocateClicked fired, hasVehicle=%d realPos=%d",
@@ -1342,10 +1352,9 @@ void MainWindow::onLocateClicked()
         return;
     }
     if (m_hasRealPos) {
-        // 图标与窗口中心都回到真实位置：图标此前可能停在导航起点（假想位置）；
-        // 若正在导航，真实位置偏离路线会触发库内偏航自动重规划（正确的接管语义）
-        m_map->UpdateVehiclePosition(m_lastRealPos);
-        m_map->SetCurrentPosition(m_lastRealPos);
+        // 真实位置用独立 GPS 标记显示：图标与中心一起回到真实位置，
+        // 不喂 vehiclePos（导航车）——导航中的路线/进度不被粗位置干扰
+        showRealPosMarker(m_lastRealPos);
         return;
     }
     statusBar()->showMessage(QString::fromUtf8("无实时位置源，正在通过 IP 定位兜底…"), 10000);
@@ -1375,16 +1384,12 @@ void MainWindow::onIpLocationReady(opmap::PointLatLng pos, QString city)
 {
     m_lastRealPos = pos;    // IP 兜底结果也计入真实位置记录（城市级精度）
     m_hasRealPos = true;
-    ensureUAV();
-    if (opmap::UAVItem *u = m_map->GetUAV(0))
-        u->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));   // 定位=位置标记图标
-    m_map->UpdateVehiclePosition(pos);
+    // IP 兜底位置只上 GPS 标记（"我的位置"），不喂 vehiclePos（导航车）：
+    // 城市级粗位置进导航会搅乱进度与路线着色
+    showRealPosMarker(pos);
     statusBar()->showMessage(QString::fromUtf8("IP 定位（城市级，精度约数公里）：%1 (%2, %3)")
                              .arg(city).arg(pos.Lat(), 0, 'f', 4).arg(pos.Lng(), 0, 'f', 4), 10000);
-    if (m_locatePending) {
-        m_locatePending = false;
-        CenterOnVehicle();
-    }
+    m_locatePending = false;
 }
 
 void MainWindow::onIpLocationFailed(QString reason)

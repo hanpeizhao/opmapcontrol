@@ -204,6 +204,8 @@ private:
     bool m_hasRealPos;               ///< 是否有过真实位置源（GPS/IP/MAVLink/模拟）喂入的位置
     opmap::PointLatLng m_lastRealPos;///< 最近一次真实位置（导航起点等假想喂点不参与记录）
 
+    void showRealPosMarker(const opmap::PointLatLng &pos);  ///< 在真实位置显示 GPS 标记并居中（不碰导航车）
+
     PickMode m_pickMode;
     opmap::PointLatLng m_origin;     ///< 点选的起点（缺省用当前位置）
     opmap::PointLatLng m_dest;
