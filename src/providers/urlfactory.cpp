@@ -83,7 +83,12 @@ void UrlFactory::TryCorrectGoogleVersions()
     {
         QNetworkReply *reply;
         QNetworkRequest qheader;
-        QNetworkAccessManager network;
+        // QNetworkAccessManager 内部持有线程与锁，栈上临时对象销毁时会刷
+        // "QMutex: destroying locked mutex"；改为每线程复用一个实例
+        static thread_local QNetworkAccessManager *tlsNam = 0;
+        if (!tlsNam)
+            tlsNam = new QNetworkAccessManager;
+        QNetworkAccessManager &network = *tlsNam;
         QEventLoop q;
         QTimer tT;
 

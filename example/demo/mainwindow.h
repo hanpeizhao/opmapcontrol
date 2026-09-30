@@ -91,6 +91,9 @@ private slots:
     // IP 定位源（城市级兜底，桌面无 GPS 时仍能拿到大概位置）
     void onIpFetchTimeout();
     void onIpReplyFinished();
+    // 工具栏定位：优先用已喂入的车辆位置，否则自动走一次 IP 兜底
+    void onLocateClicked();
+    void CenterOnVehicle();
 
     // 离线下载
     void onRipMapClicked();
@@ -148,6 +151,7 @@ private:
     QGeoPositionInfoSource *m_gpsSource;   ///< 系统 GPS 源（惰性创建，可能为空）
     QTimer *m_ipTimer;                     ///< IP 定位轮询定时器
     QNetworkAccessManager *m_ipNam;        ///< IP 定位请求
+    bool m_locatePending;                  ///< 定位按钮触发的 IP 兜底进行中
     QCheckBox *m_followCheck;
     QCheckBox *m_trailCheck;
     QLabel *m_simInfo;

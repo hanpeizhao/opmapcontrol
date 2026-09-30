@@ -77,6 +77,7 @@ MainWindow::MainWindow()
       m_hasDest(false),
       m_ipTimer(new QTimer(this)),
       m_ipNam(new QNetworkAccessManager(this)),
+      m_locatePending(false),
       m_providerIsAmap(false)
 {
     setWindowTitle(QString::fromUtf8("opmapcontrol 示例 — 地图/航点/车载导航"));
@@ -160,19 +161,7 @@ void MainWindow::setupMenus()
         m_map->SetZoom(kHomeZoom);
     });
     QAction *locateAct = toolBar->addAction(QString::fromUtf8("定位当前位置"));
-    connect(locateAct, &QAction::triggered, [this]() {
-        if (!m_map->HasVehiclePosition()) {
-            QMessageBox::information(this, QString::fromUtf8("尚无车辆位置"),
-                    QString::fromUtf8("还没有任何位置源喂入车辆位置（桌面 PC 默认无 GPS），可：\n\n"
-                                      "· 点开始导航后，用行车模拟喂点\n"
-                                      "· 行车模拟面板把位置源切到系统 GPS"));
-            return;
-        }
-        m_map->SetCurrentPosition(m_map->VehiclePosition());
-        if (m_map->ZoomTotal() < 15.0)
-            m_map->SetZoom(15.0);       // 定位时切到街区级缩放
-        statusBar()->showMessage(QString::fromUtf8("已定位到车辆当前位置"), 3000);
-    });
+    connect(locateAct, SIGNAL(triggered()), this, SLOT(onLocateClicked()));
 }
 
 void MainWindow::setupDocks()
@@ -670,6 +659,26 @@ void MainWindow::stopGps()
 
 // ————————————————— IP 定位源（城市级兜底） —————————————————
 
+void MainWindow::onLocateClicked()
+{
+    if (m_map->HasVehiclePosition()) {
+        CenterOnVehicle();
+        return;
+    }
+    // 无车辆位置：自动走一次 IP 定位兜底（车载导航式的一键定位）
+    statusBar()->showMessage(QString::fromUtf8("正在通过 IP 定位当前位置…"), 10000);
+    m_locatePending = true;
+    onIpFetchTimeout();
+}
+
+void MainWindow::CenterOnVehicle()
+{
+    m_map->SetCurrentPosition(m_map->VehiclePosition());
+    if (m_map->ZoomTotal() < 15.0)
+        m_map->SetZoom(15.0);       // 定位时切到街区级缩放
+    statusBar()->showMessage(QString::fromUtf8("已定位到车辆当前位置"), 3000);
+}
+
 void MainWindow::onIpFetchTimeout()
 {
     // ip-api.com 免费无 key，返回 WGS-84 城市级坐标
@@ -683,12 +692,22 @@ void MainWindow::onIpReplyFinished()
         return;
     reply->deleteLater();
     if (reply->error() != QNetworkReply::NoError) {
+        if (m_locatePending) {
+            m_locatePending = false;
+            QMessageBox::warning(this, QString::fromUtf8("定位失败"),
+                    QString::fromUtf8("IP 定位服务不可达（%1），请检查网络后重试").arg(reply->errorString()));
+        }
         statusBar()->showMessage(QString::fromUtf8("IP 定位失败：%1").arg(reply->errorString()), 8000);
         return;
     }
     QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
     if (obj.value(QLatin1String("status")).toString() != QLatin1String("success")) {
         statusBar()->showMessage(QString::fromUtf8("IP 定位失败：服务返回异常"), 8000);
+        if (m_locatePending) {
+            m_locatePending = false;
+            QMessageBox::warning(this, QString::fromUtf8("定位失败"),
+                                 QString::fromUtf8("IP 定位服务返回异常，请稍后重试"));
+        }
         return;
     }
     const double lat = obj.value(QLatin1String("lat")).toDouble();
@@ -698,6 +717,10 @@ void MainWindow::onIpReplyFinished()
     m_map->UpdateVehiclePosition(opmap::PointLatLng(lat, lon));
     statusBar()->showMessage(QString::fromUtf8("IP 定位（城市级，精度约数公里）：%1 (%2, %3)")
                              .arg(city).arg(lat, 0, 'f', 4).arg(lon, 0, 'f', 4), 10000);
+    if (m_locatePending) {
+        m_locatePending = false;
+        CenterOnVehicle();
+    }
 }
 
 // ————————————————— 离线下载 —————————————————

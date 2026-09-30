@@ -28,6 +28,7 @@
 
 #include "mapengine.h"
 #include "coordtransform.h"
+#include <QThread>
 
 #ifdef DEBUG_CORE
 qlonglong opmap::MapEngine::debugcounter=0;
@@ -164,12 +165,10 @@ void MapEngine::run()
 #ifdef DEBUG_CORE
                                     qDebug()<<"ProcessLoadTask: " << task.ToString()<< " -> empty tile, retry " << retry<<" ID="<<debug;;
 #endif //DEBUG_CORE
-                                    {
-                                        QWaitCondition wait;
-                                        QMutex m;
-                                        m.lock();
-                                        wait.wait(&m,500);
-                                    }
+                                    // 原实现为局部 QMutex 加锁后 QWaitCondition 定时等待，
+                                    // 作用域结束时带锁销毁，每次重试都刷
+                                    // "QMutex: destroying locked mutex"，改为普通休眠
+                                    QThread::msleep(500);
                                 }
                             }
                             while(++retry < service->RetryLoadTile);
