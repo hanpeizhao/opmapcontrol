@@ -431,6 +431,17 @@ void MapEngine::UpdateCenterTileXYLocation()
         renderOffset.SetX(renderOffset.X() + wraps * period * ts.Width());
     }
 
+    // 垂直钳制：纬度方向两极有界、不循环（极地之外本无数据），极线不得拖入屏幕——
+    // 拖到北极/南极后视口停住，杜绝上下大空白（此前 renderOffset.Y 会无限漂移）
+    int mapSizeY = (Projection()->GetTileMatrixMaxXY(Zoom()).Height() + 1) * ts.Height();
+    int lowerY = Height - mapSizeY;   // 南极线贴屏幕底
+    int upperY = 0;                   // 北极线贴屏幕顶
+    if(lowerY <= upperY)
+        renderOffset.SetY(qBound(lowerY, renderOffset.Y(), upperY));
+    else
+        renderOffset.SetY((lowerY + upperY) / 2);  // 世界矮于屏幕（极低缩放）：垂直居中
+    raw.SetY(FloorDiv(Height/2 - renderOffset.Y(), ts.Height()));
+
     centerTileXYLocation = raw;
 }
 
