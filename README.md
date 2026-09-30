@@ -31,7 +31,7 @@ src/
 
 ## 构建
 
-依赖：Qt 5.12（需 core gui widgets network sql svg opengl 模块）、MinGW（Windows）或 GCC（Linux）。地图瓦片下载使用 HTTPS，Windows 下需要 OpenSSL 运行库（example 目录已附带 `libssl-1_1-x64.dll` / `libcrypto-1_1-x64.dll`）。
+依赖：Qt 5.12（需 core gui widgets network sql svg opengl 模块）、MinGW（Windows）或 GCC（Linux）。地图瓦片下载使用 HTTPS，Windows 下需要 OpenSSL 运行库（example/demo 目录已附带 `libssl-1_1-x64.dll` / `libcrypto-1_1-x64.dll`）。
 
 ```bash
 # 编译静态库
@@ -39,8 +39,8 @@ qmake opmapcontrol.pro
 mingw32-make        # Linux 下为 make
 
 # 编译 example
-cd example
-qmake opmapcontrol_example.pro
+cd example/demo
+qmake demo.pro
 mingw32-make
 ```
 
@@ -57,7 +57,7 @@ opmapcontrol_example.exe
 - 拖动/滚轮缩放浏览地图，鼠标读数为 WGS-84 经纬度
 - 右键菜单：切换地图类型 / Access Type / 航点增删改
 - 框选区域后点击 `Cache map` 下载离线瓦片；重启程序后命中缓存，不再联网
-- 地图类型等初始配置位于 `example/data/example.ini`
+- 地图类型等初始配置位于 `example/demo/data/demo.ini`
 
 ## 集成到自己的项目
 
@@ -95,7 +95,7 @@ map->RipMap();
 | 层级 | 位置 | 说明 |
 |------|------|------|
 | 内存缓存 | LRU 链表 | 容量可配（`Configuration::SetTileMemorySize`），超出自动淘汰 |
-| 磁盘缓存 | SQLite 数据库 | 按（地图类型, 缩放级别, x, y）索引，Tile 字段存原始图片字节；example 默认 `example/data/OPMaps.qmdb` |
+| 磁盘缓存 | SQLite 数据库 | 按（地图类型, 缩放级别, x, y）索引，Tile 字段存原始图片字节；example 默认 `example/demo/data/OPMaps.qmdb` |
 | 网络下载 | UrlFactory | 支持 HTTPS 与重定向跟随，仅前两层未命中时触发 |
 
 ## 截图

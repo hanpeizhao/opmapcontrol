@@ -35,7 +35,7 @@ SOURCES += \
 ################################################################################
 # opmapcontrol
 ################################################################################
-OPMAPCONTROL_DIR = ..
+OPMAPCONTROL_DIR = ../..
 INCLUDEPATH +=  $$OPMAPCONTROL_DIR/src \
                 $$OPMAPCONTROL_DIR/src/platform \
                 $$OPMAPCONTROL_DIR/src/cache \
