@@ -25,6 +25,7 @@
 * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 #include "traillineitem.h"
+#include "mapgraphicitem.h"
 
 namespace opmap {
 
@@ -36,8 +37,21 @@ TrailLineItem::TrailLineItem(opmap::PointLatLng const& coord1,
     m_brush=color;
     QPen pen;
     pen.setBrush(m_brush);
-    pen.setWidth(1);
+    pen.setWidth(2);
     this->setPen(pen);
+    map = static_cast<MapGraphicItem*>(parent);
+    RefreshPos();
+}
+
+/// 历史 bug：原始 OpenPilot 实现只存经纬度从未 setLine（零长度线不可见），
+/// 这里补上经纬度→屏幕坐标换算，拖动/缩放由 ChildPosRefresh 驱动重算
+void TrailLineItem::RefreshPos()
+{
+    if (!map)
+        return;
+    const opmap::Point p1 = map->FromLatLngToLocal(coord1);
+    const opmap::Point p2 = map->FromLatLngToLocal(coord2);
+    setLine(QLineF(QPointF(p1.X(), p1.Y()), QPointF(p2.X(), p2.Y())));
 }
 
 /*

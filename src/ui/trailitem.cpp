@@ -27,17 +27,24 @@
 */
 
 #include "trailitem.h"
+#include "mapgraphicitem.h"
 #include <QDateTime>
 
 namespace opmap
 {
 
-TrailItem::TrailItem(opmap::PointLatLng const& coord,int const& altitude, QBrush color, QGraphicsItem* parent):QGraphicsItem(parent),coord(coord)
+TrailItem::TrailItem(opmap::PointLatLng const& coord,int const& altitude, QBrush color, MapGraphicItem* map):QGraphicsItem(map),coord(coord),map(map)
 {
     m_brush=color;
     QDateTime time=QDateTime::currentDateTime();
     QString coord_str = " " + QString::number(coord.Lat(), 'f', 6) + "   " + QString::number(coord.Lng(), 'f', 6);
     setToolTip(QString(tr("Position:")+"%1\n"+tr("Altitude:")+"%2\n"+tr("Time:")+"%3").arg(coord_str).arg(QString::number(altitude)).arg(time.toString()));
+    setPos(QPointF(map->FromLatLngToLocal(coord).X(), map->FromLatLngToLocal(coord).Y()));
+}
+
+void TrailItem::RefreshPos()
+{
+    setPos(QPointF(map->FromLatLngToLocal(coord).X(), map->FromLatLngToLocal(coord).Y()));
 }
 
 void TrailItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)

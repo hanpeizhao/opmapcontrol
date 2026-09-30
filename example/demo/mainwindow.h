@@ -48,7 +48,8 @@ public:
 private slots:
     // 地图交互
     void onMapSourceTriggered();
-    void onMapMousePress(QMouseEvent *event);
+    void onMapMousePress(QMouseEvent *event);  ///< 地图左键按下（取点/记录防抖起点）
+    void onMapMouseRelease(QMouseEvent *event);  ///< 地图左键抬起（位移小于阈值才视为选点，避免拖图误加点）
     void onMapMouseMove(QMouseEvent *event);
     void onZoomChanged(double zoomt, double zoom, double zoomd);
     void onTilesStill(int number);
@@ -196,6 +197,8 @@ private:
     int m_lastDlPct;                 ///< 下载日志节流（上个 10% 档位）
     QPushButton *m_fenceBtn;         ///< 多边形围栏三态按钮
     QList<opmap::PointLatLng> m_fencePts;   ///< 围栏取点缓存（取点过程中逐点更新）
+    QPoint m_pressScreenPos;         ///< 左键按下屏幕位置（选点防抖：抬起时位移小才算点）
+    int m_flightSpeedMps;            ///< 航点飞行巡航速度（m/s，右键菜单可调）
 
     PickMode m_pickMode;
     opmap::PointLatLng m_origin;     ///< 点选的起点（缺省用当前位置）

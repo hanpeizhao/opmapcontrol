@@ -83,7 +83,7 @@ void GPSItem::SetUAVPos(const opmap::PointLatLng &position, const int &altitude)
         {
             if(timer.elapsed()>trailtime*1000)
             {
-                trail->addToGroup(new TrailItem(position,altitude,Qt::green,this));
+                trail->addToGroup(new TrailItem(position,altitude,Qt::green,map));
                 if(!lasttrailline.IsEmpty())
                     trailLine->addToGroup((new TrailLineItem(lasttrailline,position,Qt::green,map)));
                 lasttrailline=position;
@@ -95,10 +95,10 @@ void GPSItem::SetUAVPos(const opmap::PointLatLng &position, const int &altitude)
         {
             if(qAbs(opmap::PureProjection::DistanceBetweenLatLng(lastcoord,position)*1000)>traildistance)
             {
-                trail->addToGroup(new TrailItem(position,altitude,Qt::green,this));
+                trail->addToGroup(new TrailItem(position,altitude,Qt::green,map));
                 if(!lasttrailline.IsEmpty())
 
-                    trailLine->addToGroup((new TrailLineItem(lasttrailline,position,Qt::green,this)));
+                    trailLine->addToGroup((new TrailLineItem(lasttrailline,position,Qt::green,map)));
                 lasttrailline=position;
                 lastcoord=position;
             }

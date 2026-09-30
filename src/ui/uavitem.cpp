@@ -91,7 +91,7 @@ void UAVItem::SetUAVPos(const opmap::PointLatLng &position, const int &altitude,
     if(coord!=position) {
         if(trailtype==UAVTrailType::ByTimeElapsed) {
             if(timer.elapsed() > trailtime*1000) {
-                trail->addToGroup(new TrailItem(position,altitude,color,this));
+                trail->addToGroup(new TrailItem(position,altitude,color,map));
                 if(!lasttrailline.IsEmpty())
                     trailLine->addToGroup((new TrailLineItem(lasttrailline,position,color,map)));
                 lasttrailline=position;
@@ -99,7 +99,7 @@ void UAVItem::SetUAVPos(const opmap::PointLatLng &position, const int &altitude,
             }
         } else if(trailtype==UAVTrailType::ByDistance) {
             if(qAbs(opmap::PureProjection::DistanceBetweenLatLng(lastcoord,position)*1000) > traildistance) {
-                trail->addToGroup(new TrailItem(position,altitude,color,this));
+                trail->addToGroup(new TrailItem(position,altitude,color,map));
                 if(!lasttrailline.IsEmpty())
                     trailLine->addToGroup((new TrailLineItem(lasttrailline,position,color,map)));
                 lasttrailline=position;

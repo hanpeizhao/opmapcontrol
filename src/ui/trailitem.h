@@ -35,6 +35,7 @@
 
 namespace opmap
 {
+class MapGraphicItem;
 
     class TrailItem:public QObject,public QGraphicsItem
     {
@@ -42,14 +43,17 @@ namespace opmap
         Q_INTERFACES(QGraphicsItem)
     public:
                 enum { Type = UserType + 3 };
-        TrailItem(opmap::PointLatLng const& coord,int const& altitude, QBrush color, QGraphicsItem* parent);
+        TrailItem(opmap::PointLatLng const& coord,int const& altitude, QBrush color, MapGraphicItem* map);
         void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                     QWidget *widget);
         QRectF boundingRect() const;
         int type() const;
+        /// 地图拖动/缩放时由 ChildPosRefresh 驱动，重算屏幕位置
+        void RefreshPos();
         opmap::PointLatLng coord;
     private:
         QBrush m_brush;
+        MapGraphicItem *map;
 
 
     public slots:

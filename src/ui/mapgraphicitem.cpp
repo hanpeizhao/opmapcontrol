@@ -108,6 +108,12 @@ void MapGraphicItem::Core_OnNeedInvalidation()
         GeofenceItem* gf=qgraphicsitem_cast<GeofenceItem*>(i);
         if(gf)
             gf->RefreshPos();
+        TrailItem* ti=qgraphicsitem_cast<TrailItem*>(i);
+        if(ti)
+            ti->RefreshPos();
+        TrailLineItem* tl=qgraphicsitem_cast<TrailLineItem*>(i);
+        if(tl)
+            tl->RefreshPos();
 
         emit mapChanged();
     }
@@ -132,6 +138,12 @@ void MapGraphicItem::ChildPosRefresh()
         GeofenceItem* gf=qgraphicsitem_cast<GeofenceItem*>(i);
         if(gf)
             gf->RefreshPos();
+        TrailItem* ti=qgraphicsitem_cast<TrailItem*>(i);
+        if(ti)
+            ti->RefreshPos();
+        TrailLineItem* tl=qgraphicsitem_cast<TrailLineItem*>(i);
+        if(tl)
+            tl->RefreshPos();
 
         emit mapChanged();
     }

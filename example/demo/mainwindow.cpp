@@ -22,6 +22,7 @@
 #include <QtWidgets/QSlider>
 #include <QtWidgets/QSpinBox>
 #include <QtWidgets/QScrollArea>
+#include <QtWidgets/QInputDialog>
 #include <QtCore/QTime>
 #include <QtCore/QTimer>
 #include <QtCore/QDebug>
@@ -85,6 +86,8 @@ MainWindow::MainWindow()
       m_navStateLabel(0),
       m_lastDlPct(-1),
       m_fenceBtn(new QPushButton(QString::fromUtf8("绘制围栏"), this)),
+      m_pressScreenPos(),
+      m_flightSpeedMps(80),
       m_pickMode(PickNone),
       m_origin(0, 0),
       m_dest(0, 0),
@@ -102,6 +105,7 @@ MainWindow::MainWindow()
 
     // 地图信号 → 本窗口
     connect(m_map, SIGNAL(mousePress(QMouseEvent*)), this, SLOT(onMapMousePress(QMouseEvent*)));
+    connect(m_map, SIGNAL(mouseRelease(QMouseEvent*)), this, SLOT(onMapMouseRelease(QMouseEvent*)));
     connect(m_map, SIGNAL(mouseMove(QMouseEvent*)), this, SLOT(onMapMouseMove(QMouseEvent*)));
     connect(m_map, SIGNAL(zoomChanged(double,double,double)), this, SLOT(onZoomChanged(double,double,double)));
     connect(m_map, SIGNAL(OnTilesStillToLoad(int)), this, SLOT(onTilesStill(int)));
@@ -728,9 +732,9 @@ void MainWindow::onFlightClicked()
         });
     }
 
-    m_flightSim->start(start, coords, hoverSecs, 80.0);
-    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点（拍照 %2、悬停 %3），从 Home 图标处起飞，巡航 80 m/s，安全围栏 3000 m")
-             .arg(coords.size()).arg(photoCount).arg(hoverCount));
+    m_flightSim->start(start, coords, hoverSecs, double(m_flightSpeedMps));
+    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点（拍照 %2、悬停 %3），从 Home 图标处起飞，巡航 %4 m/s，安全围栏 3000 m")
+             .arg(coords.size()).arg(photoCount).arg(hoverCount).arg(m_flightSpeedMps));
 }
 
 /** 围栏按钮三态：绘制围栏 →（地图连续取点）→ 结束围栏 → 清除围栏 → 绘制围栏。 */
@@ -793,6 +797,12 @@ void MainWindow::SyncMapTypeActions()
 
 void MainWindow::onMapContextMenu(const QPoint &pos)
 {
+    // 围栏取点模式下右键 = 结束取点（不弹地图菜单）
+    if (m_pickMode == PickFence) {
+        onFenceClicked();
+        return;
+    }
+
     QMenu menu(this);
     QMenu *typeMenu = menu.addMenu(QString::fromUtf8("切换地图类型"));
     for (int i = 0; i < kMapSourceCount; ++i) {
@@ -807,6 +817,14 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     QAction *delWp = menu.addAction(QString::fromUtf8("删除选中航点"));
     delWp->setEnabled(!m_map->WPSelected().isEmpty());
 
+    // Home 返航点与飞行参数
+    menu.addSeparator();
+    QAction *setHome = menu.addAction(QString::fromUtf8("设置 Home 返航点到此位置"));
+    setHome->setEnabled(m_map->Home != 0);
+    QAction *setSafeArea = menu.addAction(QString::fromUtf8("设置安全围栏半径…"));
+    setSafeArea->setEnabled(m_map->Home != 0);
+    QAction *setSpeed = menu.addAction(QString::fromUtf8("设置航点飞行速度…"));
+
     QAction *chosen = menu.exec(m_map->mapToGlobal(pos));
     if (chosen == addWp) {
         const opmap::PointLatLng p = m_map->currentMousePosition();
@@ -815,12 +833,52 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
         QList<opmap::WayPointItem*> sel = m_map->WPSelected();
         for (int i = 0; i < sel.count(); ++i)
             m_map->WPDelete(sel.at(i));
+    } else if (chosen == setHome) {
+        m_map->Home->SetCoord(m_map->currentMousePosition());
+        m_map->Home->update();
+        logEvent(QString::fromUtf8("Home 返航点已移至 (%1, %2)，起飞将从此处开始")
+                 .arg(m_map->Home->Coord().Lat(), 0, 'f', 5)
+                 .arg(m_map->Home->Coord().Lng(), 0, 'f', 5));
+    } else if (chosen == setSafeArea) {
+        bool ok = false;
+        int meters = QInputDialog::getInt(this, QString::fromUtf8("安全围栏半径"),
+                                          QString::fromUtf8("半径（米，飞出即告警）："),
+                                          m_map->Home->SafeArea(), 100, 50000, 100, &ok);
+        if (ok) {
+            m_map->Home->SetSafeArea(meters);
+            m_map->Home->update();
+            logEvent(QString::fromUtf8("Home 安全围栏半径已设为 %1 m").arg(meters));
+        }
+    } else if (chosen == setSpeed) {
+        bool ok = false;
+        int mps = QInputDialog::getInt(this, QString::fromUtf8("航点飞行速度"),
+                                       QString::fromUtf8("巡航速度（m/s）："),
+                                       m_flightSpeedMps, 1, 300, 5, &ok);
+        if (ok) {
+            m_flightSpeedMps = mps;
+            logEvent(QString::fromUtf8("航点飞行巡航速度已设为 %1 m/s").arg(mps));
+        }
     }
 }
 
-void MainWindow::onMapMousePress(QMouseEvent *)
+void MainWindow::onMapMousePress(QMouseEvent *e)
 {
     if (m_pickMode == PickNone)
+        return;
+    if (m_pickMode == PickFence) {
+        // 围栏取点防抖：按下只记位置，抬起时位移小于阈值才固化（拖动地图不算选点）
+        m_pressScreenPos = e->pos();
+        return;
+    }
+    applyPickPoint(m_map->currentMousePosition());
+}
+
+void MainWindow::onMapMouseRelease(QMouseEvent *e)
+{
+    if (m_pickMode != PickFence)
+        return;
+    // 位移守卫：按下与抬起几乎未移动（<6px）才算一次选点点击，拖动地图不算
+    if ((e->pos() - m_pressScreenPos).manhattanLength() > 6)
         return;
     applyPickPoint(m_map->currentMousePosition());
 }

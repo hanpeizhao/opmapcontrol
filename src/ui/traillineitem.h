@@ -35,6 +35,7 @@
 
 namespace opmap
 {
+class MapGraphicItem;
 
     class TrailLineItem:public QObject,public QGraphicsLineItem
     {
@@ -46,10 +47,13 @@ namespace opmap
         int type() const;
       //  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
        //             QWidget *widget);
+        /// 地图拖动/缩放时由 ChildPosRefresh 驱动，重算屏幕线段
+        void RefreshPos();
         opmap::PointLatLng coord1;
         opmap::PointLatLng coord2;
     private:
         QBrush m_brush;
+        MapGraphicItem *map;
 
 
     public slots:
