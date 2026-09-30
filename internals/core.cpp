@@ -393,18 +393,6 @@ void Core::OnMapClose()
     CancelAsyncTasks();
 }
 
-GeoCoderStatusCode::Types Core::SetCurrentPositionByKeywords(QString const& keys)
-{
-    GeoCoderStatusCode::Types status = GeoCoderStatusCode::Unknow;
-    PointLatLng pos = OPMaps::Instance()->GetLatLngFromGeodecoder(keys, status);
-    if(!pos.IsEmpty() && (status == GeoCoderStatusCode::G_GEO_SUCCESS))
-    {
-        SetCurrentPosition(pos);
-    }
-
-    return status;
-}
-
 RectLatLng Core::CurrentViewArea()
 {
     // 视野边界用用户坐标(WGS-84)表示

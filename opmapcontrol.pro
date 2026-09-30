@@ -25,13 +25,11 @@ HEADERS += \
     ./core/coordtransform.h \
     ./core/debugheader.h \
     ./core/diagnostics.h \
-    ./core/geodecoderstatus.h \
     ./core/kibertilecache.h \
     ./core/languagetype.h \
     ./core/maptype.h \
     ./core/memorycache.h \
     ./core/opmaps.h \
-    ./core/placemark.h \
     ./core/point.h \
     ./core/providerstrings.h \
     ./core/pureimage.h \
@@ -78,7 +76,6 @@ SOURCES += \
     ./core/languagetype.cpp \
     ./core/memorycache.cpp \
     ./core/opmaps.cpp \
-    ./core/placemark.cpp \
     ./core/point.cpp \
     ./core/providerstrings.cpp \
     ./core/pureimage.cpp \

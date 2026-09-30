@@ -32,6 +32,7 @@
 #include "debugheader.h"
 
 namespace core {
+    /// 瓦片磁盘缓存的全局入口：管理缓存目录并持有 PureImageCache（SQLite 瓦片库）
     class Cache
     {
     public:
@@ -41,12 +42,6 @@ namespace core {
         PureImageCache ImageCache;
         QString CacheLocation();
         void setCacheLocation(const QString& value);
-        void CacheGeocoder(const QString &urlEnd,const QString &content);
-        QString GetGeocoderFromCache(const QString &urlEnd);
-        void CachePlacemark(const QString &urlEnd,const QString &content);
-        QString GetPlacemarkFromCache(const QString &urlEnd);
-        void CacheRoute(const QString &urlEnd,const QString &content);
-        QString GetRouteFromCache(const QString &urlEnd);
 
     private:
         Cache();
@@ -55,9 +50,6 @@ namespace core {
 
         static Cache* m_pInstance;
         QString cache;
-        QString routeCache;
-        QString geoCache;
-        QString placemarkCache;
     };
 }
 

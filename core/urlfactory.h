@@ -35,15 +35,14 @@
 #include <QTimer>
 #include <QCoreApplication>
 #include "providerstrings.h"
-#include "pureimagecache.h"
+#include "maptype.h"
+#include "point.h"
 #include "../internals/pointlatlng.h"
-#include "geodecoderstatus.h"
 #include <QTime>
-#include "cache.h"
-#include "placemark.h"
-#include <QTextCodec>
-#include "cmath"
+#include <QMutex>
 
+/// 生成各地图源（Google/OSM/ArcGIS/高德）的瓦片 URL，
+/// 并负责探测 Google 瓦片版本号
 namespace core {
     class UrlFactory: public QObject,public ProviderStrings
     {
@@ -57,8 +56,6 @@ namespace core {
         UrlFactory();
         ~UrlFactory();
         QString MakeImageUrl(const MapType::Types &type,const core::Point &pos,const int &zoom,const QString &language);
-        internals::PointLatLng GetLatLngFromGeodecoder(const QString &keywords,GeoCoderStatusCode::Types &status);
-        Placemark GetPlacemarkFromGeocoder(internals::PointLatLng location);
         int Timeout;
     private:
         int Random(int low, int high);
@@ -67,10 +64,7 @@ namespace core {
         void TryCorrectGoogleVersions();
         bool isCorrectedGoogleVersions;
         bool CorrectGoogleVersions;
-        bool UseGeocoderCache; //TODO GetSet
-        bool UsePlacemarkCache;//TODO GetSet
         static const double EarthRadiusKm;
-        double GetDistance(internals::PointLatLng p1,internals::PointLatLng p2);
         QMutex mutex;
 
     protected:
@@ -78,10 +72,6 @@ namespace core {
         QString LanguageStr;
         bool IsCorrectGoogleVersions();
         void setIsCorrectGoogleVersions(bool value);
-        QString MakeGeocoderUrl(QString keywords);
-        QString MakeReverseGeocoderUrl(internals::PointLatLng &pt,const QString &language);
-        internals::PointLatLng GetLatLngFromGeocoderUrl(const QString &url,const bool &useCache, GeoCoderStatusCode::Types &status);
-        Placemark GetPlacemarkFromReverseGeocoderUrl(const QString &url,const bool &useCache);
     };
 
 }

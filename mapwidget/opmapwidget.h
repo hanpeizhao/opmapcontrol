@@ -41,7 +41,6 @@
 #endif
 
 #include "../mapwidget/mapgraphicitem.h"
-#include "../core/geodecoderstatus.h"
 #include "../core/maptype.h"
 #include "../core/languagetype.h"
 #include "../core/diagnostics.h"
@@ -87,27 +86,6 @@ public:
          * @brief Returns QStringList with string representing all the enum values
          */
     static QStringList MapTypes(){return MapType::TypesList();}
-
-    /**
-        * @brief Converts from String to Type
-        */
-    static GeoCoderStatusCode::Types GeoCoderStatusCodeFromString(QString const& value) {
-        return GeoCoderStatusCode::TypeByStr(value);
-    }
-
-    /**
-        * @brief Converts from Type to String
-        */
-    static QString StrFromGeoCoderStatusCode(GeoCoderStatusCode::Types const& value) {
-        return GeoCoderStatusCode::StrByType(value);
-    }
-
-    /**
-        * @brief Returns QStringList with string representing all the enum values
-        */
-    static QStringList GeoCoderTypes() {
-        return GeoCoderStatusCode::TypesList();
-    }
 
     /**
         * @brief Converts from String to Type
@@ -216,7 +194,6 @@ class OPMapWidget:public QGraphicsView
     Q_PROPERTY(double Zoom READ ZoomTotal WRITE SetZoom)
     Q_PROPERTY(qreal Rotate READ Rotate WRITE SetRotate)
     Q_ENUMS(internals::MouseWheelZoomType::Types)
-    Q_ENUMS(core::GeoCoderStatusCode::Types)
 
 public:
     QSize sizeHint() const;
@@ -317,10 +294,6 @@ public:
     void ReloadMap() {
         map->ReloadMap();
         map->resize();
-    }
-
-    GeoCoderStatusCode::Types SetCurrentPositionByKeywords(QString const& keys) {
-        return map->SetCurrentPositionByKeywords(keys);
     }
 
     bool UseOpenGL(){return useOpenGL;}
@@ -498,7 +471,6 @@ private:
     internals::Core *core;
     QGraphicsScene mscene;
     bool useOpenGL;
-    GeoCoderStatusCode x;
     MapType y;
     core::AccessMode xx;
     internals::PointLatLng currentmouseposition;

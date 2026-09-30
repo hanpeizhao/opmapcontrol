@@ -45,7 +45,6 @@
 #include "rectlatlng.h"
 #include "../internals/projections/mercatorprojection.h"
 #include "../internals/projections/platecarreeprojection.h"
-#include "../core/geodecoderstatus.h"
 #include "../core/opmaps.h"
 #include "../core/diagnostics.h"
 
@@ -161,8 +160,6 @@ public:
     void OnMapSizeChanged(int const& width, int const& height);//TODO had as slot
 
     void OnMapClose();//TODO had as slot
-
-    GeoCoderStatusCode::Types SetCurrentPositionByKeywords(QString const& keys);
 
     RectLatLng CurrentViewArea();
 
