@@ -27,6 +27,8 @@ class GeofenceItem : public QObject, public QGraphicsItem
 public:
     explicit GeofenceItem(MapGraphicItem *map, QGraphicsItem *parent = 0);
 
+    enum { Type = UserType + 9 };   ///< qgraphicsitem_cast 依据；缺失时会与默认 type()=1 的子项（轨迹组等）误匹配
+
     QRectF boundingRect() const;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
 
