@@ -1063,6 +1063,9 @@ void MainWindow::onNavigateClicked()
     if (m_hasOrigin) {
         // 指定点选起点出发：先把车辆位置喂到起点（图标同步 + 作为规划起点）
         m_map->UpdateVehiclePosition(m_origin);
+        // 瞬移无航向意义：复位图标竖直（原位置→起点的随机方位角会让大头针歪斜）
+        if (opmap::UAVItem *u = m_map->GetUAV(0))
+            u->SetUAVHeading(0);
     }
     m_navInfo->setText(QString::fromUtf8("规划中…"));
     m_banner->show();

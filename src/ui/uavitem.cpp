@@ -212,8 +212,10 @@ void UAVItem::DeleteTrail()
     foreach(QGraphicsItem* i,trailLine->childItems())
         delete i;
 
-    // 复位轨迹线起点记忆：否则清空后首喂点会从旧终点拉出一条幽灵连线
-    lasttrailline=coord;
+    // 轨迹线起点记忆置空：清空后首个采样点只加点不画线，第二个采样点
+    // 才从新起点连线。（此前复位为 coord——清空时 UAV 所在位置——会让
+    // 首喂点与该位置之间拉出幽灵连线，如开始导航时原位置→起点）
+    lasttrailline=PointLatLng();
 }
 
 double UAVItem::Distance3D(const opmap::PointLatLng &coord, const int &altitude)
