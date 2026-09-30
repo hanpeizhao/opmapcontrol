@@ -473,8 +473,6 @@ public:
     QGraphicsItemGroup* waypointLine(int id);
     void SetShowUAV(bool const& value);
     bool ShowUAV()const{return showuav;}
-    /** @brief 显示/隐藏 GPS 位置标记（独立于 UAV；用于展示"我的真实位置"） */
-    void SetShowGPS(bool const& value);
     void SetUavPic(QString UAVPic);
 
     void SetShowHome(bool const& value);

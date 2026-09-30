@@ -70,6 +70,7 @@ MainWindow::MainWindow()
       m_simPauseBtn(new QPushButton(QString::fromUtf8("暂停"), this)),
       m_simStopBtn(new QPushButton(QString::fromUtf8("停止"), this)),
       m_yawBtn(new QPushButton(QString::fromUtf8("模拟偏航"), this)),
+      m_mockPosBtn(new QPushButton(QString::fromUtf8("喂模拟位置"), this)),
       m_speedCombo(new QComboBox(this)),
       m_posSourceCombo(new QComboBox(this)),
       m_gpsSource(0),
@@ -334,6 +335,7 @@ void MainWindow::setupDocks()
     speedRow->addWidget(m_speedCombo);
     simLayout->addLayout(speedRow);
     simLayout->addWidget(m_yawBtn);
+    simLayout->addWidget(m_mockPosBtn);
     simLayout->addWidget(m_followCheck);
     simLayout->addWidget(m_trailCheck);
     simLayout->addWidget(m_simInfo);
@@ -341,6 +343,7 @@ void MainWindow::setupDocks()
     connect(m_simStartBtn, SIGNAL(clicked()), this, SLOT(onSimStartClicked()));
     connect(m_simPauseBtn, SIGNAL(clicked()), this, SLOT(onSimPauseClicked()));
     connect(m_simStopBtn, SIGNAL(clicked()), this, SLOT(onSimStopClicked()));
+    connect(m_mockPosBtn, SIGNAL(clicked()), this, SLOT(onMockPosClicked()));
     connect(m_yawBtn, SIGNAL(clicked()), this, SLOT(onYawClicked()));
     connect(m_speedCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onSpeedChanged(int)));
     connect(m_posSourceCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onPosSourceChanged(int)));
@@ -1179,6 +1182,22 @@ void MainWindow::onSimStopClicked()
     m_simulator->stop();
 }
 
+void MainWindow::onMockPosClicked()
+{
+    // 以当前地图中心为基准在视野内随机取点（±0.02°，约±2km）喂一个 mock 位置：
+    // 手动单步造点测试位置驱动逻辑——围栏越界/进入、导航偏航重规划、轨迹记录等。
+    // 图标立即出现在当前视野内，所见即所得
+    const opmap::PointLatLng c = m_map->CurrentPosition();
+    const double lat = c.Lat() + (QRandomGenerator::global()->bounded(41) - 20) / 1000.0;
+    const double lng = c.Lng() + (QRandomGenerator::global()->bounded(41) - 20) / 1000.0;
+    const opmap::PointLatLng pos(lat, lng);
+    m_map->UpdateVehiclePosition(pos);
+    const QString text = QString::fromUtf8("已喂入模拟位置 (%1, %2)")
+                         .arg(lat, 0, 'f', 4).arg(lng, 0, 'f', 4);
+    logEvent(text);
+    statusBar()->showMessage(text, 8000);
+}
+
 void MainWindow::onYawClicked()
 {
     if (!m_simulator->isRunning()) {
@@ -1329,16 +1348,6 @@ void MainWindow::onMavLinkTimeout()
 
 // ————————————————— IP 定位源（城市级兜底） —————————————————
 
-void MainWindow::showRealPosMarker(const opmap::PointLatLng &pos)
-{
-    // "我的真实位置"用独立 GPS 标记显示：绝不喂 vehiclePos（导航车）——
-    // IP 兜底是城市级粗位置，喂进导航会搅乱进度与路线着色
-    m_map->SetShowGPS(true);
-    if (m_map->GPS)
-        m_map->GPS->SetUAVPos(pos, 0);
-    m_map->SetCurrentPosition(pos);
-}
-
 void MainWindow::onLocateClicked()
 {
     qDebug("[locate] onLocateClicked fired, hasVehicle=%d realPos=%d",
@@ -1352,9 +1361,10 @@ void MainWindow::onLocateClicked()
         return;
     }
     if (m_hasRealPos) {
-        // 真实位置用独立 GPS 标记显示：图标与中心一起回到真实位置，
-        // 不喂 vehiclePos（导航车）——导航中的路线/进度不被粗位置干扰
-        showRealPosMarker(m_lastRealPos);
+        // 图标与窗口中心都回到真实位置：图标此前可能停在导航起点（假想位置）；
+        // 若正在导航，真实位置偏离路线会触发库内偏航自动重规划（正确的接管语义）
+        m_map->UpdateVehiclePosition(m_lastRealPos);
+        m_map->SetCurrentPosition(m_lastRealPos);
         return;
     }
     statusBar()->showMessage(QString::fromUtf8("无实时位置源，正在通过 IP 定位兜底…"), 10000);
@@ -1384,12 +1394,16 @@ void MainWindow::onIpLocationReady(opmap::PointLatLng pos, QString city)
 {
     m_lastRealPos = pos;    // IP 兜底结果也计入真实位置记录（城市级精度）
     m_hasRealPos = true;
-    // IP 兜底位置只上 GPS 标记（"我的位置"），不喂 vehiclePos（导航车）：
-    // 城市级粗位置进导航会搅乱进度与路线着色
-    showRealPosMarker(pos);
+    ensureUAV();
+    if (opmap::UAVItem *u = m_map->GetUAV(0))
+        u->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));   // 定位=位置标记图标
+    m_map->UpdateVehiclePosition(pos);
     statusBar()->showMessage(QString::fromUtf8("IP 定位（城市级，精度约数公里）：%1 (%2, %3)")
                              .arg(city).arg(pos.Lat(), 0, 'f', 4).arg(pos.Lng(), 0, 'f', 4), 10000);
-    m_locatePending = false;
+    if (m_locatePending) {
+        m_locatePending = false;
+        CenterOnVehicle();
+    }
 }
 
 void MainWindow::onIpLocationFailed(QString reason)

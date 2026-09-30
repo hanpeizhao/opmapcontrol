@@ -83,6 +83,7 @@ private slots:
     void onSimPauseClicked();
     void onSimStopClicked();
     void onYawClicked();
+    void onMockPosClicked();
     void onSpeedChanged(int index);
     void onFollowToggled(bool on);
     void onTrailToggled(bool on);
@@ -174,6 +175,7 @@ private:
     QPushButton *m_simPauseBtn;
     QPushButton *m_simStopBtn;
     QPushButton *m_yawBtn;
+    QPushButton *m_mockPosBtn;   ///< 喂模拟位置：在当前视野内随机取点手动喂 vehiclePos
     QComboBox *m_speedCombo;
     QComboBox *m_posSourceCombo;     ///< 位置源：模拟 / 系统 GPS / IP 定位
     QGeoPositionInfoSource *m_gpsSource;   ///< 系统 GPS 源（惰性创建，可能为空）
@@ -203,8 +205,6 @@ private:
     int m_flightSpeedMps;            ///< 航点飞行巡航速度（m/s，右键菜单可调）
     bool m_hasRealPos;               ///< 是否有过真实位置源（GPS/IP/MAVLink/模拟）喂入的位置
     opmap::PointLatLng m_lastRealPos;///< 最近一次真实位置（导航起点等假想喂点不参与记录）
-
-    void showRealPosMarker(const opmap::PointLatLng &pos);  ///< 在真实位置显示 GPS 标记并居中（不碰导航车）
 
     PickMode m_pickMode;
     opmap::PointLatLng m_origin;     ///< 点选的起点（缺省用当前位置）
