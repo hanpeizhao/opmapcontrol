@@ -674,8 +674,12 @@ void MainWindow::onWingmanTick()
     opmap::UAVItem *wing = m_map->GetUAV(m_wingmanId);
     if (!wing)
         return;
-    const opmap::PointLatLng base = m_map->HasVehiclePosition() ? m_map->VehiclePosition()
-                                                                : m_map->CurrentPosition();
+    // 绕飞中心：优先跟随主机（护航盘旋效果），无主机时用车辆/当前中心
+    opmap::UAVItem *lead = m_map->GetUAV(0);
+    const opmap::PointLatLng base = (lead && lead->isVisible())
+            ? lead->UAVPos()
+            : (m_map->HasVehiclePosition() ? m_map->VehiclePosition()
+                                           : m_map->CurrentPosition());
     m_wingmanAngle = fmod(m_wingmanAngle + 30.0, 360.0);
     // destPoint 的距离单位为千米（历史语义），300m = 0.3km
     wing->SetUAVPos(m_map->destPoint(base, m_wingmanAngle, 0.3), 100);
@@ -744,6 +748,12 @@ void MainWindow::onFlightClicked()
         m_map->Home->SetShowSafeArea(true);
         m_map->Home->SetSafeArea(3000);
         m_map->Home->update();
+    }
+
+    // 地图跟随会让 UAV 永远钉在屏幕中央、看起来"原地不动"，飞行观察期间自动暂停
+    if (m_followCheck->isChecked()) {
+        m_followCheck->setChecked(false);
+        logEvent(QString::fromUtf8("已暂停地图跟随，以便观察飞机依次飞向航点（可随时勾选恢复）"));
     }
 
     // 主机 UAV：打开库内自动到达判定（进入 15 m 即 SetReached + UAVReachedWayPoint 信号）
@@ -1405,10 +1415,14 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
 
 opmap::UAVItem* MainWindow::ensureUAV()
 {
+    const bool firstCreate = !m_map->GetUAV(0);
     // 只用 UAVS 表管理（AddUAV），避免 SetShowUAV 连带创建 GPSItem 与重复图标
     opmap::UAVItem *uav = m_map->GetUAV(0);
     if (!uav)
         uav = m_map->AddUAV(0);
+    if (firstCreate)
+        logEvent(QString::fromUtf8("无人机图标已出现：它代表当前遥测位置（由位置源喂点驱动），"
+                                   "出现即说明有位置源/飞行模拟在工作"));
     uav->SetTrailType(opmap::UAVTrailType::ByTimeElapsed);
     uav->SetTrailTime(3);
     uav->SetShowTrail(m_trailCheck->isChecked());

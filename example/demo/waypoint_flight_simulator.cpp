@@ -90,8 +90,9 @@ void WaypointFlightSimulator::onTick()
     if (distM <= qMax(stepM, kArriveMeters))
     {
         m_pos = target;
+        const int passedIdx = m_target;   // 刚到达的航点下标（0 起）
         ++m_target;
-        emit waypointPassed(m_target, m_waypoints.size());
+        emit waypointPassed(passedIdx, m_waypoints.size());
         if (m_target >= m_waypoints.size())
         {
             stop();
