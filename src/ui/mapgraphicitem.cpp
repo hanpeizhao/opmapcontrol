@@ -517,8 +517,10 @@ void MapGraphicItem::SetZoom(double const& value)
     {
         if(value > MaxZoom())
         {
+            // 到地图源上限即停：不再把超出部分塞进 zoomDigi 做无上限数字放大
+            // （旧设计 zoomDigi=value-MaxZoom()，纯视觉拉伸、瓦片模糊且无上限）
+            zoomDigi = 0;
             zoomReal = MaxZoom();
-            zoomDigi =value-MaxZoom();
         }
         else
             if(value < MinZoom())
