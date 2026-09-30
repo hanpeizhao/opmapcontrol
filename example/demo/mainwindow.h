@@ -132,7 +132,8 @@ private:
         PickWaypoint,
         PickOrigin,
         PickDest,
-        PickFence       ///< 围栏取点：连续多点模式，点"结束围栏"闭合
+        PickFence,      ///< 围栏取点：连续多点模式，点"结束围栏"闭合
+        PickMock        ///< 点选喂位置：点哪喂哪，连续取点，点按钮/右键结束
     };
 
     void setupMenus();

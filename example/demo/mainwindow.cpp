@@ -70,7 +70,7 @@ MainWindow::MainWindow()
       m_simPauseBtn(new QPushButton(QString::fromUtf8("暂停"), this)),
       m_simStopBtn(new QPushButton(QString::fromUtf8("停止"), this)),
       m_yawBtn(new QPushButton(QString::fromUtf8("模拟偏航"), this)),
-      m_mockPosBtn(new QPushButton(QString::fromUtf8("喂模拟位置"), this)),
+      m_mockPosBtn(new QPushButton(QString::fromUtf8("点选喂位置"), this)),
       m_speedCombo(new QComboBox(this)),
       m_posSourceCombo(new QComboBox(this)),
       m_gpsSource(0),
@@ -819,9 +819,14 @@ void MainWindow::SyncMapTypeActions()
 
 void MainWindow::onMapContextMenu(const QPoint &pos)
 {
-    // 围栏取点模式下右键 = 结束取点（不弹地图菜单）
+    // 连续取点模式下右键 = 结束取点（不弹地图菜单）
     if (m_pickMode == PickFence) {
         onFenceClicked();
+        return;
+    }
+    if (m_pickMode == PickMock) {
+        setPickMode(PickNone);
+        statusBar()->showMessage(QString::fromUtf8("已结束喂点"), 5000);
         return;
     }
 
@@ -890,8 +895,8 @@ void MainWindow::onMapMousePress(QMouseEvent *e)
 {
     if (m_pickMode == PickNone)
         return;
-    if (m_pickMode == PickFence) {
-        // 围栏取点防抖：按下只记位置，抬起时位移小于阈值才固化（拖动地图不算选点）
+    if (m_pickMode == PickFence || m_pickMode == PickMock) {
+        // 连续取点模式防抖：按下只记位置，抬起时位移小于阈值才固化（拖动地图不算选点）
         m_pressScreenPos = e->pos();
         return;
     }
@@ -900,7 +905,7 @@ void MainWindow::onMapMousePress(QMouseEvent *e)
 
 void MainWindow::onMapMouseRelease(QMouseEvent *e)
 {
-    if (m_pickMode != PickFence)
+    if (m_pickMode != PickFence && m_pickMode != PickMock)
         return;
     // 位移守卫：按下与抬起几乎未移动（<6px）才算一次选点点击，拖动地图不算
     if ((e->pos() - m_pressScreenPos).manhattanLength() > 6)
@@ -1184,22 +1189,15 @@ void MainWindow::onSimStopClicked()
 
 void MainWindow::onMockPosClicked()
 {
-    // 以当前地图中心为基准在视野内随机取点（±0.02°，约±2km）喂一个 mock 位置：
-    // 手动单步造点测试位置驱动逻辑——围栏越界/进入、导航偏航重规划、轨迹记录等。
-    // 图标立即出现在当前视野内，所见即所得
-    const opmap::PointLatLng c = m_map->CurrentPosition();
-    const double lat = c.Lat() + (QRandomGenerator::global()->bounded(41) - 20) / 1000.0;
-    const double lng = c.Lng() + (QRandomGenerator::global()->bounded(41) - 20) / 1000.0;
-    const opmap::PointLatLng pos(lat, lng);
-    // 手动喂点是瞬移定位不是运动：先清旧轨迹，避免随机点之间连出满屏乱线
-    // （轨迹留给连续运动流：跟车模拟/GPS/MAVLink/航点飞行）
-    if (opmap::UAVItem *u = m_map->GetUAV(0))
-        u->DeleteTrail();
-    m_map->UpdateVehiclePosition(pos);
-    const QString text = QString::fromUtf8("已喂入模拟位置 (%1, %2)")
-                         .arg(lat, 0, 'f', 4).arg(lng, 0, 'f', 4);
-    logEvent(text);
-    statusBar()->showMessage(text, 8000);
+    // 切换"点选喂位置"模式：开启后点哪喂哪（所见即所得），可连续喂点；
+    // 右键或再点本按钮结束
+    if (m_pickMode == PickMock) {
+        setPickMode(PickNone);
+        statusBar()->showMessage(QString::fromUtf8("已结束喂点"), 5000);
+        return;
+    }
+    setPickMode(PickMock);
+    statusBar()->showMessage(QString::fromUtf8("点选喂位置模式：在地图上点击任意位置即喂入该点"), 8000);
 }
 
 void MainWindow::onYawClicked()
@@ -1439,6 +1437,9 @@ void MainWindow::setPickMode(PickMode mode)
 {
     m_pickMode = mode;
     m_addWpBtn->setEnabled(mode != PickWaypoint);
+    m_mockPosBtn->setText(mode == PickMock
+                          ? QString::fromUtf8("结束喂点")
+                          : QString::fromUtf8("点选喂位置"));
 }
 
 void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
@@ -1497,6 +1498,16 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
         logEvent(QString::fromUtf8("围栏顶点 %1: lat %2, lng %3")
                  .arg(m_fencePts.size()).arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         return;   // 保持 PickFence，直到点"结束围栏"
+    case PickMock:
+        // 点选喂位置：点哪喂哪（所见即所得），模式保持可连续喂点
+        if (opmap::UAVItem *u = m_map->GetUAV(0))
+            u->DeleteTrail();   // 手动喂点是瞬移定位不是运动：清旧轨迹避免乱线
+        m_map->UpdateVehiclePosition(p);
+        logEvent(QString::fromUtf8("喂入模拟位置: lat %1, lng %2")
+                 .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
+        statusBar()->showMessage(QString::fromUtf8("已喂入模拟位置 (%1, %2)，继续点击可连续喂点，右键/按钮结束")
+                                 .arg(p.Lat(), 0, 'f', 4).arg(p.Lng(), 0, 'f', 4), 8000);
+        return;   // 保持 PickMock，直到右键或点"结束喂点"
     default:
         break;
     }
