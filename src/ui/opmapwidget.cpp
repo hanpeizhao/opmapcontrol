@@ -315,8 +315,7 @@ opmap::NavigationEngine *OPMapWidget::GetNavigationEngine() const
 
 void OPMapWidget::SetGeofence(QList<opmap::PointLatLng> const& vertices)
 {
-    if (vertices.size() < 3) {
-        // 顶点不足构不成多边形：视作清除
+    if (vertices.isEmpty()) {
         ClearGeofence();
         return;
     }
@@ -324,7 +323,7 @@ void OPMapWidget::SetGeofence(QList<opmap::PointLatLng> const& vertices)
         geofenceItem = new GeofenceItem(map, map);   // 挂为 map 子项，随地图变换
         geofenceBreached = false;
     }
-    geofenceItem->SetVertices(vertices);
+    geofenceItem->SetVertices(vertices);   // 1~2 点为取点预览（画顶点/连线），不参与判定
 }
 
 void OPMapWidget::ClearGeofence()
@@ -341,8 +340,8 @@ bool OPMapWidget::HasGeofence() const
 
 void OPMapWidget::CheckGeofence(opmap::PointLatLng const& position)
 {
-    if (!geofenceItem)
-        return;
+    if (!geofenceItem || geofenceItem->Vertices().size() < 3)
+        return;   // 取点预览态（<3 点）不参与越界判定
     const bool inside = GeofenceItem::Contains(geofenceItem->Vertices(), position);
     if (!inside && !geofenceBreached) {
         geofenceBreached = true;    // 越界沿沿只发一次，回界内复位

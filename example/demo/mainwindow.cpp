@@ -611,6 +611,18 @@ void MainWindow::connectEventLog()
                          .arg(pos.Lat(), 0, 'f', 5).arg(pos.Lng(), 0, 'f', 5));
             });
 
+    // —— 多边形围栏越界：日志 + 状态栏警示 + 横幅 5 秒 ——
+    connect(m_map, &opmap::OPMapWidget::geofenceBreach,
+            [this](const opmap::PointLatLng &pos) {
+                logEvent(QString::fromUtf8("警告：飞出地理围栏 @ (%1, %2)")
+                         .arg(pos.Lat(), 0, 'f', 5).arg(pos.Lng(), 0, 'f', 5));
+                statusBar()->showMessage(QString::fromUtf8("越界警告：飞机已飞出地理围栏红线！"), 10000);
+                setBanner(QString::fromUtf8("警告：飞出地理围栏"),
+                          QString::fromUtf8("位置 lat %1, lng %2")
+                          .arg(pos.Lat(), 0, 'f', 5).arg(pos.Lng(), 0, 'f', 5), kBannerOffRoute);
+                QTimer::singleShot(5000, m_banner, &QLabel::hide);
+            });
+
     // —— 离线下载进度（percent 按 10% 档节流）——
     connect(m_map, &opmap::OPMapWidget::mapDownloadProgress,
             [this](int percent) {
@@ -755,10 +767,13 @@ void MainWindow::onFlightClicked()
                 [this](int idx, int total) {
             // 库只携带动作数据，实际拍照/悬停由上层在到达信号里响应（真机=下发任务指令）
             opmap::WayPointItem *wp = m_map->WPAll().values().value(idx);
-            if (wp && wp->Action() == opmap::WayPointItem::WayPointActionPhoto)
+            if (wp && wp->Action() == opmap::WayPointItem::WayPointActionPhoto) {
                 logEvent(QString::fromUtf8("【动作】触发拍照 [航点 %1]").arg(idx));
-            else if (wp && wp->Action() == opmap::WayPointItem::WayPointActionHover)
+                statusBar()->showMessage(QString::fromUtf8("已触发拍照 [航点 %1]（真机上此处下发相机指令）").arg(idx), 8000);
+            } else if (wp && wp->Action() == opmap::WayPointItem::WayPointActionHover) {
                 logEvent(QString::fromUtf8("【动作】原地悬停 %1 秒 [航点 %2]").arg(wp->HoverTime()).arg(idx));
+                statusBar()->showMessage(QString::fromUtf8("悬停中：%1 秒后飞向下一航点").arg(wp->HoverTime()), 8000);
+            }
             logEvent(QString::fromUtf8("航点飞行：已到达 %1/%2（库侧 UAVReachedWayPoint 同步打勾）").arg(idx).arg(total));
         });
         connect(m_flightSim, &WaypointFlightSimulator::finished, this, [this]() {
@@ -780,9 +795,10 @@ void MainWindow::onFenceClicked()
         if (m_fencePts.size() >= 3) {
             m_map->SetGeofence(m_fencePts);
             m_fenceBtn->setText(QString::fromUtf8("清除围栏"));
-            logEvent(QString::fromUtf8("多边形地理围栏生效：%1 个顶点，飞出边界触发 geofenceBreach 信号").arg(m_fencePts.size()));
+            logEvent(QString::fromUtf8("多边形地理围栏生效：%1 个顶点。配合航点飞行或行车模拟，飞机飞出红区即在日志报越界").arg(m_fencePts.size()));
         } else {
             m_fencePts.clear();
+            m_map->SetGeofence(QList<opmap::PointLatLng>());   // 清掉取点预览残留
             m_fenceBtn->setText(QString::fromUtf8("绘制围栏"));
             logEvent(QString::fromUtf8("围栏顶点不足 3 个，已取消"));
         }
@@ -1375,10 +1391,9 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
                                .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         break;
     case PickFence:
-        // 围栏取点：逐点加入并实时重画多边形（<3 点不构成围栏），模式保持不退出
+        // 围栏取点：逐点加入并实时预览（1 点=顶点圆点，2 点=连线，≥3 点闭合生效），模式保持不退出
         m_fencePts.append(p);
-        if (m_fencePts.size() >= 3)
-            m_map->SetGeofence(m_fencePts);
+        m_map->SetGeofence(m_fencePts);
         logEvent(QString::fromUtf8("围栏顶点 %1: lat %2, lng %3")
                  .arg(m_fencePts.size()).arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         return;   // 保持 PickFence，直到点"结束围栏"

@@ -729,7 +729,7 @@ public slots:
     bool IsIpLocationBusy() const;
 
     // —— 多边形地理围栏（多边形内部为允许飞行区）——
-    /// 设置/更新围栏顶点（<3 个顶点时相当于清除）；顶点即屏幕上绘制的多边形
+    /// 设置/更新围栏顶点；空列表清除，1~2 点为取点预览（不参与越界判定），≥3 点生效
     void SetGeofence(QList<opmap::PointLatLng> const& vertices);
     void ClearGeofence();                                  ///< 移除围栏
     bool HasGeofence() const;                              ///< 是否已设置有效围栏

@@ -41,15 +41,30 @@ void GeofenceItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opti
 {
     Q_UNUSED(option);
     Q_UNUSED(widget);
-    if (screenPolygon.size() < 3)
-        return;
 
     painter->setRenderHint(QPainter::Antialiasing, true);
+
+    // 取点预览：不足 3 点时画顶点圆点与连线，便于取点过程可见
+    if (screenPolygon.size() < 3) {
+        painter->setPen(QPen(QColor(220, 40, 40), 2));
+        if (screenPolygon.size() == 2)
+            painter->drawLine(screenPolygon.at(0), screenPolygon.at(1));
+        painter->setBrush(QBrush(QColor(220, 40, 40)));
+        for (int i = 0; i < screenPolygon.size(); ++i)
+            painter->drawEllipse(screenPolygon.at(i), 4, 4);
+        return;
+    }
+
     QColor fill(Qt::red);
     fill.setAlpha(28);
     painter->setPen(QPen(QColor(220, 40, 40), 2, Qt::DashLine));
     painter->setBrush(QBrush(fill));
     painter->drawPolygon(screenPolygon);
+
+    // 顶点圆点标记（不填充，与预览态区分闭合区域）
+    painter->setBrush(QBrush(QColor(220, 40, 40)));
+    for (int i = 0; i < screenPolygon.size(); ++i)
+        painter->drawEllipse(screenPolygon.at(i), 4, 4);
 }
 
 void GeofenceItem::RefreshPolygon()
