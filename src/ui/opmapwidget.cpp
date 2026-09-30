@@ -32,6 +32,7 @@
 #include "waypointitem.h"
 #include "geoutils.h"
 #include "osrmrouteprovider.h"
+#include "iplocationprovider.h"
 #include "navigationengine.h"
 #include "routeitem.h"
 
@@ -52,6 +53,7 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     routeProvider(0),
     navEngine(0),
     routeItem(0),
+    ipLocator(0),
     vehiclePosValid(false)
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
@@ -85,6 +87,12 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     navEngine->SetRouteProvider(routeProvider);
     routeItem = new RouteItem(map);
     routeItem->hide();
+
+    ipLocator = new IpLocationProvider(this);
+    connect(ipLocator, SIGNAL(locationReady(opmap::PointLatLng,QString)),
+            this, SIGNAL(ipLocationReady(opmap::PointLatLng,QString)));
+    connect(ipLocator, SIGNAL(locationFailed(QString)),
+            this, SIGNAL(ipLocationFailed(QString)));
 
     connect(navEngine, SIGNAL(routePlanned(opmap::Route)), routeItem, SLOT(SetRoute(opmap::Route)));
     connect(navEngine, SIGNAL(routePlanned(opmap::Route)), this, SIGNAL(navigationRouteReady(opmap::Route)));
@@ -281,6 +289,17 @@ void OPMapWidget::StopNavigation()
 {
     navEngine->Stop();
     routeItem->ClearRoute();
+}
+
+void OPMapWidget::RequestIpLocation()
+{
+    if (ipLocator)
+        ipLocator->requestLocation();
+}
+
+bool OPMapWidget::IsIpLocationBusy() const
+{
+    return ipLocator ? ipLocator->isBusy() : false;
 }
 
 void OPMapWidget::SetShowRoute(bool const& value)

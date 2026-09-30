@@ -56,6 +56,7 @@ HEADERS += \
     ./src/providers/abstractrouteprovider.h \
     ./src/providers/osrmrouteprovider.h \
     ./src/providers/amaprouteprovider.h \
+    ./src/providers/iplocationprovider.h \
     ./src/engine/mapservice.h \
     ./src/engine/mapengine.h \
     ./src/engine/navigationengine.h \
@@ -106,6 +107,7 @@ SOURCES += \
     ./src/providers/abstractrouteprovider.cpp \
     ./src/providers/osrmrouteprovider.cpp \
     ./src/providers/amaprouteprovider.cpp \
+    ./src/providers/iplocationprovider.cpp \
     ./src/engine/mapservice.cpp \
     ./src/engine/mapengine.cpp \
     ./src/engine/navigationengine.cpp \

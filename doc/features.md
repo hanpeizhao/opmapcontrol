@@ -95,7 +95,7 @@
 
 ## 8. 车载导航（路径规划 / NavigationEngine / RouteItem）
 
-内置完整车载导航链路：异步路径规划 → 沿线转向指引 → 偏航检测与自动重规划 → 到达判定。路线绘制（已走灰/未走蓝 + 起终点标记）由控件内部完成，车辆位置由外部程序喂入（行车模拟器、系统 GPS、IP 定位兜底等任意来源均可）。
+内置完整车载导航链路：异步路径规划 → 沿线转向指引 → 偏航检测与自动重规划 → 到达判定。路线绘制（已走灰/未走蓝 + 起终点标记）由控件内部完成，车辆位置由外部程序喂入（行车模拟器、系统 GPS 等任意来源均可，见第 9 节的 IP 定位兜底）。
 
 | 功能 | API | example |
 |------|:---:|:----:|
@@ -127,7 +127,29 @@
 - 引擎默认参数：偏航阈值 50m × 连续 3 次、到达阈值 30m、重规划最小间隔 5s、自动重规划开启（调整入口为 `NavigationEngine` 的 `SetOffRouteThresholdM` 等方法）
 - `geoutils`（platform 层）提供 haversine 距离、方位角等几何工具，模拟器与引擎共用
 
-## 9. example 未覆盖的能力汇总
+## 9. IP 定位兜底（IpLocationProvider）
+
+库内置城市级 IP 定位：通过公网出口 IP 估算所在城市，作为无 GPS 环境（桌面端等）的一键定位兜底。双源自动回退——主源 ip-api.com（国内城市识别准）、备源 ipwho.is（HTTPS），主源网络失败/返回异常/超时（8 秒）时静默切备源重试一次。坐标为 WGS-84 城市级精度（约数公里）。
+
+| 功能 | API | example |
+|------|:---:|:----:|
+| 发起一次 IP 定位（在途时重复调用被忽略） | 槽 `RequestIpLocation()` | ✅ |
+| 查询是否有请求在途 | `IsIpLocationBusy()` | — |
+
+IP 定位信号：
+
+| 信号 | 触发时机 | example |
+|------|----------|:----:|
+| `ipLocationReady(opmap::PointLatLng pos, QString city)` | 定位成功（WGS-84 城市级坐标 + 城市名） | ✅ |
+| `ipLocationFailed(QString reason)` | 双源均不可用或返回异常 | ✅ |
+
+说明：
+
+- 实现位于 `src/providers/iplocationprovider.h/.cpp`，与路线规划 provider 同层，由 `OPMapWidget` 持有并转发信号
+- 调用方拿到 `ipLocationReady` 后自行决定喂给 `UpdateVehiclePosition`（example 的做法）或仅显示
+- 若需更换定位服务，可在 `OPMapWidget` 外自行实现并替换（provider 只依赖 Qt 网络模块，无库内耦合）
+
+## 10. example 未覆盖的能力汇总
 
 example 已覆盖主要链路（切源、缩放、框选下载、航点增删/导入导出、车载导航全流程、行车模拟与模拟偏航、系统 GPS 与 IP 定位位置源）。以下能力为库完整提供但 example 未使用：
 

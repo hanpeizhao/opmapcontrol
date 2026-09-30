@@ -61,6 +61,7 @@ class UAVItem;
 class GPSItem;
 class HomeItem;
 class AbstractRouteProvider;
+class IpLocationProvider;
 class NavigationEngine;
 class RouteItem;
 
@@ -523,6 +524,7 @@ private:
     opmap::AbstractRouteProvider *routeProvider;   ///< 路由规划服务（接管外部传入者）
     opmap::NavigationEngine *navEngine;            ///< 导航状态机
     opmap::RouteItem *routeItem;                   ///< 路线绘制项（随 map 析构）
+    opmap::IpLocationProvider *ipLocator;          ///< IP 定位服务（城市级兜底）
     opmap::PointLatLng vehiclePos;                 ///< 最近喂入的车位置
     bool vehiclePosValid;
 
@@ -679,6 +681,12 @@ signals:
     /** @brief 导航失败（无路由服务、服务忙或初次规划失败） */
     void navigationFailed(QString reason);
 
+    // ———————— IP 定位信号 ————————
+    /** @brief IP 定位成功（pos 为 WGS-84 城市级坐标，city 为城市名） */
+    void ipLocationReady(opmap::PointLatLng pos, QString city);
+    /** @brief IP 定位失败（双源均不可用或返回异常） */
+    void ipLocationFailed(QString reason);
+
 public slots:
     /**
      * @brief Ripps the current selection to the DB
@@ -698,6 +706,15 @@ public slots:
 
     /// 停止导航并清除路线绘制
     void StopNavigation();
+
+    /**
+     * @brief 发起一次 IP 定位（城市级兜底，双源自动回退，8 秒超时），
+     *        结果经 ipLocationReady/ipLocationFailed 信号返回；在途时重复调用被忽略
+     */
+    void RequestIpLocation();
+
+    /// 是否有 IP 定位请求在途
+    bool IsIpLocationBusy() const;
 
     /**
      * @brief Sets the map zoom level
