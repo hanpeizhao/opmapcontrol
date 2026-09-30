@@ -69,6 +69,9 @@ public:
     void SetArrivalThresholdM(double meters) { m_arrivalThresholdM = meters; }
     void SetMinRerouteIntervalMs(int ms) { m_minRerouteIntervalMs = ms; }
 
+    /** @brief 当前连续偏航计数（相对 ConsecutiveFixes 阈值；0=在路线上） */
+    int OffRouteCount() const { return m_offRouteCount; }
+
 signals:
     /// 规划成功，导航开始
     void routePlanned(const opmap::Route &route);

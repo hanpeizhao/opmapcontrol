@@ -1499,16 +1499,25 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
                  .arg(m_fencePts.size()).arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         return;   // 保持 PickFence，直到点"结束围栏"
     case PickMock:
+    {
         // 点选喂位置：点哪喂哪（所见即所得），模式保持可连续喂点
         ensureUAV();   // 统一经 ensureUAV 创建图标（库直连创建会落到无人机默认图）
         if (opmap::UAVItem *u = m_map->GetUAV(0))
             u->DeleteTrail();   // 手动喂点是瞬移定位不是运动：清旧轨迹避免乱线
         m_map->UpdateVehiclePosition(p);
-        logEvent(QString::fromUtf8("喂入模拟位置: lat %1, lng %2")
-                 .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
-        statusBar()->showMessage(QString::fromUtf8("已喂入模拟位置 (%1, %2)，继续点击可连续喂点，右键/按钮结束")
-                                 .arg(p.Lat(), 0, 'f', 4).arg(p.Lng(), 0, 'f', 4), 8000);
+        // 瞬移无航向意义：复位图标竖直（航向仅对连续运动流有意义，瞬移
+        // 两点间随机方位角会让大头针歪斜）
+        if (opmap::UAVItem *u = m_map->GetUAV(0))
+            u->SetUAVHeading(0);
+        // 偏航计数可见化：连续 3 次偏 50m 外才触发重规划（防 GPS 抖动），中间点到路线 50m 内即清零
+        QString tip = QString::fromUtf8("已喂入模拟位置 (%1, %2)")
+                .arg(p.Lat(), 0, 'f', 4).arg(p.Lng(), 0, 'f', 4);
+        if (m_map->IsNavigating())
+            tip += QString::fromUtf8("，偏航计数 %1/3").arg(m_map->GetNavigationEngine()->OffRouteCount());
+        logEvent(tip);
+        statusBar()->showMessage(tip + QString::fromUtf8("，继续点击可连续喂点，右键/按钮结束"), 8000);
         return;   // 保持 PickMock，直到右键或点"结束喂点"
+    }
     default:
         break;
     }
