@@ -31,6 +31,7 @@
 
 #include "waypoint_store.h"
 #include "navigation_simulator.h"
+#include "waypoint_flight_simulator.h"
 #include "uavitem.h"
 #include "homeitem.h"
 #include "waypointitem.h"
@@ -53,6 +54,8 @@ MainWindow::MainWindow()
       m_wpList(new QListWidget(this)),
       m_addWpBtn(new QPushButton(QString::fromUtf8("地图点选添加"), this)),
       m_delWpBtn(new QPushButton(QString::fromUtf8("删除选中"), this)),
+      m_flightBtn(new QPushButton(QString::fromUtf8("航点飞行"), this)),
+      m_flightSim(0),
       m_originLabel(new QLabel(QString::fromUtf8("起点：未设置（导航缺省用当前位置）"), this)),
       m_destLabel(new QLabel(QString::fromUtf8("目的地：未设置"), this)),
       m_providerCombo(new QComboBox(this)),
@@ -218,7 +221,9 @@ void MainWindow::setupDocks()
     QHBoxLayout *wpBtnRow3 = new QHBoxLayout();
     wpBtnRow3->addWidget(insertWpBtn);
     wpBtnRow3->addWidget(renumWpBtn);
+    wpBtnRow3->addWidget(m_flightBtn);
     wpLayout->addLayout(wpBtnRow3);
+    connect(m_flightBtn, &QPushButton::clicked, this, &MainWindow::onFlightClicked);
     wpLayout->addWidget(m_wpList);
     connect(m_addWpBtn, SIGNAL(clicked()), this, SLOT(onAddWaypointClicked()));
     connect(m_delWpBtn, SIGNAL(clicked()), this, SLOT(onDeleteWaypointClicked()));
@@ -674,6 +679,68 @@ void MainWindow::onRenumberClicked()
         return;
     }
     m_map->WPRenumber(sel.first(), m_map->WPAll().size() + 1);
+}
+
+// ———————— 航点飞行（模拟遥测沿航点序列飞）————————
+
+void MainWindow::onFlightClicked()
+{
+    // 二次点击 = 停止飞行
+    if (m_flightSim && m_flightSim->isActive()) {
+        m_flightSim->stop();
+        m_flightBtn->setText(QString::fromUtf8("航点飞行"));
+        logEvent(QString::fromUtf8("航点飞行已手动停止"));
+        return;
+    }
+
+    // 收集航点坐标（WPAll 按编号有序）
+    QMap<int, opmap::WayPointItem*> wps = m_map->WPAll();
+    if (wps.isEmpty()) {
+        statusBar()->showMessage(QString::fromUtf8("请先在地图点选添加航点"), 5000);
+        return;
+    }
+    QList<opmap::PointLatLng> coords;
+    for (QMap<int, opmap::WayPointItem*>::const_iterator it = wps.constBegin(); it != wps.constEnd(); ++it)
+        coords.append(it.value()->Coord());
+
+    // Home 返航点设在起飞位置并打开安全围栏圈（现实场景：飞机飞出返航点半径即告警）
+    const opmap::PointLatLng start = m_map->HasVehiclePosition() ? m_map->VehiclePosition() : kHomePos;
+    if (m_map->Home) {
+        m_map->Home->SetCoord(start);
+        m_map->Home->SetShowSafeArea(true);
+        m_map->Home->SetSafeArea(3000);
+        m_map->Home->update();
+    }
+
+    // 主机 UAV：打开库内自动到达判定（进入 15 m 即 SetReached + UAVReachedWayPoint 信号）
+    opmap::UAVItem *uav = ensureUAV();
+    uav->SetAutoSetReached(true);
+    uav->SetAutoSetDistance(15);
+    uav->SetUAVPos(start, 120);
+    uav->SetUAVHeading(0);
+
+    if (!m_flightSim) {
+        m_flightSim = new WaypointFlightSimulator(this);
+        connect(m_flightSim, &WaypointFlightSimulator::positionChanged, this,
+                [this](opmap::PointLatLng p, double heading, int idx, int total) {
+            opmap::UAVItem *u = ensureUAV();   // 真机接入点：替换为遥测回调喂 SetUAVPos 即可
+            u->SetUAVPos(p, 120);
+            u->SetUAVHeading(heading);
+            m_flightBtn->setText(QString::fromUtf8("停止飞行（目标 %1/%2）")
+                                 .arg(qMin(idx + 1, total)).arg(total));
+        });
+        connect(m_flightSim, &WaypointFlightSimulator::waypointPassed, this,
+                [this](int idx, int total) {
+            logEvent(QString::fromUtf8("航点飞行：已到达 %1/%2（库侧 UAVReachedWayPoint 同步打勾）").arg(idx).arg(total));
+        });
+        connect(m_flightSim, &WaypointFlightSimulator::finished, this, [this]() {
+            m_flightBtn->setText(QString::fromUtf8("航点飞行"));
+            logEvent(QString::fromUtf8("航点任务完成：全部航点已到达"));
+        });
+    }
+
+    m_flightSim->start(start, coords, 25.0);
+    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点，从 Home 位置起飞，巡航 25 m/s，安全围栏 3000 m").arg(coords.size()));
 }
 
 void MainWindow::setupStatusBar()

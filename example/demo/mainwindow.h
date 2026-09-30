@@ -24,6 +24,7 @@
 
 class WaypointStore;
 class NavigationSimulator;
+class WaypointFlightSimulator;
 class QGeoPositionInfoSource;
 class QGeoPositionInfo;
 class QTimer;
@@ -58,6 +59,7 @@ private slots:
     void onClearWaypointsClicked();
     void onImportWaypointsClicked();
     void onExportWaypointsClicked();
+    void onFlightClicked();   ///< 航点飞行：模拟遥测沿航点序列飞（开始/停止二态）
     void onWaypointListItemClicked(QListWidgetItem *item);
 
     // 导航面板
@@ -147,6 +149,8 @@ private:
     QListWidget *m_wpList;
     QPushButton *m_addWpBtn;
     QPushButton *m_delWpBtn;
+    QPushButton *m_flightBtn;               ///< 航点飞行开始/停止按钮
+    WaypointFlightSimulator *m_flightSim;   ///< 航点飞行模拟数据源（真机接入时替换为遥测）
 
     // 导航面板
     QLabel *m_originLabel;

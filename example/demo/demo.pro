@@ -20,6 +20,7 @@ HEADERS += \
     mainwindow.h \
     waypoint_store.h \
     navigation_simulator.h \
+    waypoint_flight_simulator.h \
     uas_types.h
 
 SOURCES += \
@@ -27,6 +28,7 @@ SOURCES += \
     mainwindow.cpp \
     waypoint_store.cpp \
     navigation_simulator.cpp \
+    waypoint_flight_simulator.cpp \
     uas_types.cpp
 
 
