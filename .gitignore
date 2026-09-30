@@ -1,0 +1,37 @@
+# ===== Qt / qmake 生成文件 =====
+# 各目录下由 qmake 生成的 Makefile
+Makefile*
+Makefile.Debug
+Makefile.Release
+
+# rcc / moc / uic 生成的源文件
+qrc_*.cpp
+moc_*.cpp
+ui_*.h
+
+# qmake 状态缓存
+.qmake.stash
+
+# 链接脚本（qmake 生成）
+object_script.*
+
+# ===== 编译输出 =====
+# 库与 demo 的输出目录（DESTDIR 副本）
+build/
+release/
+debug/
+
+# Qt Creator 阴影构建目录
+build-*/
+
+# 可执行文件
+opmapcontrol_demo.exe
+
+# ===== IDE / 编辑器 =====
+# Qt Creator 用户本地配置（含本机 kit 路径，不应入库）
+*.pro.user
+*.autosave
+
+# ===== 系统文件 =====
+Thumbs.db
+Desktop.ini
