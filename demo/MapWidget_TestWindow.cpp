@@ -29,7 +29,7 @@ int QTestWin::setupLayout(void)
     lng  = m_conf->value("lastPos_lng", 108.888931).toDouble();
     zoom = m_conf->value("lastZoom", 11).toInt();
 
-    internals::PointLatLng p(lat, lng);
+    opmap::PointLatLng p(lat, lng);
     m_mapWidget->SetCurrentPosition(p);
     m_mapWidget->SetZoom(zoom);
     m_mapWidget->setConf(m_conf);
@@ -71,7 +71,7 @@ int QTestWin::setupLayout(void)
 
 void QTestWin::actFatchMap(void)
 {
-    internals::RectLatLng  rect;
+    opmap::RectLatLng  rect;
 
     rect = m_mapWidget->SelectedArea();
     if( rect.IsEmpty() ) {
@@ -104,7 +104,7 @@ void QTestWin::mapWidget_zoomChanged(int newZoom)
 void QTestWin::mapWidget_mouseMoveEvent(QMouseEvent *event)
 {
     if( m_cbMoveUAV->checkState() == Qt::Checked ) {
-        internals::PointLatLng p;
+        opmap::PointLatLng p;
 
         p = m_mapWidget->currentMousePosition();
         printf("p  = %f %f\n", p.Lat(), p.Lng());

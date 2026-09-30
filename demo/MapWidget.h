@@ -9,7 +9,7 @@
 
 #include "UAS_types.h"
 
-using namespace mapcontrol;
+using namespace opmap;
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -25,8 +25,8 @@ public:
     void setConf(QSettings *conf);
     void syncConf(void);
 
-    void setHome(internals::PointLatLng &p, double alt);
-    void getHome(internals::PointLatLng &p, double &alt);
+    void setHome(opmap::PointLatLng &p, double alt);
+    void getHome(opmap::PointLatLng &p, double &alt);
 
     int  getWaypoints(AP_WPArray &wpa);
     int  setWaypoints(AP_WPArray &wpa);
@@ -59,7 +59,7 @@ protected:
     QAction     *m_actSelectArea_end;
     QAction     *m_actSelectArea_clear;
     int         m_bSelectArea;
-    internals::PointLatLng  m_pSelectArea1, m_pSelectArea2;
+    opmap::PointLatLng  m_pSelectArea1, m_pSelectArea2;
 
     QAction     *m_actHome_Set;
     QAction     *m_actHome_Safearea;
@@ -67,7 +67,7 @@ protected:
 
     int                     m_homeShow;             // show or hide home
     double                  m_homeAlt;              // home altitude
-    internals::PointLatLng  m_homePos;              // home position
+    opmap::PointLatLng  m_homePos;              // home position
     double                  m_homeSafearea;         // safe area
 
     double                  m_flightHeight;         // default flight height
@@ -116,8 +116,8 @@ public:
 
     void setupMapType_list(void);
 
-    void setMapType(core::MapType::Types t);
-    core::MapType::Types getMapType(void);
+    void setMapType(opmap::MapType::Types t);
+    opmap::MapType::Types getMapType(void);
 
 public:
     QDialogButtonBox        *buttonBox;
@@ -140,10 +140,10 @@ public:
 
 
     int setWaypoints(int idx,
-                     QMap<int, mapcontrol::WayPointItem*> *wpMap,
+                     QMap<int, opmap::WayPointItem*> *wpMap,
                      int heightAltitude = 1);
     int setWaypoints_(int idx,
-                      QMap<int, mapcontrol::WayPointItem*> *wpMap,
+                      QMap<int, opmap::WayPointItem*> *wpMap,
                       int heightAltitude);
 
     int setTableItem(int ri, int ci, QString s);
@@ -163,7 +163,7 @@ private:
     QCheckBox           *cbHeightAltitude;
     QDialogButtonBox    *buttonBox;
 
-    QMap<int, mapcontrol::WayPointItem*>    *m_wpMap;       // waypoints map
+    QMap<int, opmap::WayPointItem*>    *m_wpMap;       // waypoints map
     int                                     m_wpIdx;        // active waypoint index
 
     int                 m_bHeightAltitude;                  // height or altitude

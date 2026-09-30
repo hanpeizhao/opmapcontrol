@@ -30,7 +30,7 @@
 #include <qmath.h>
 
 
-namespace internals {
+namespace opmap {
 
 const double PureProjection::PI = M_PI;
 const double PureProjection::HALF_PI = (M_PI * 0.5);

@@ -31,7 +31,7 @@
 #include <QString>
 #include "sizelatlng.h"
 
-namespace internals {
+namespace opmap {
 struct PointLatLng
 {
     //friend uint qHash(PointLatLng const& point);

@@ -15,18 +15,18 @@
 
 #include "pointlatlng.h"
 
-namespace core {
+namespace opmap {
 namespace coordtransform {
 
 /// <summary>
 /// WGS-84 坐标转换为 GCJ-02 坐标（中国境外原样返回）
 /// </summary>
-internals::PointLatLng WGS84ToGCJ02(const internals::PointLatLng &pt);
+opmap::PointLatLng WGS84ToGCJ02(const opmap::PointLatLng &pt);
 
 /// <summary>
 /// GCJ-02 坐标转换为 WGS-84 坐标（近似逆变换，误差亚米级）
 /// </summary>
-internals::PointLatLng GCJ02ToWGS84(const internals::PointLatLng &pt);
+opmap::PointLatLng GCJ02ToWGS84(const opmap::PointLatLng &pt);
 
 /// <summary>
 /// 判断坐标是否位于中国范围（GCJ-02 加密只在中国境内生效）
@@ -34,6 +34,6 @@ internals::PointLatLng GCJ02ToWGS84(const internals::PointLatLng &pt);
 bool outOfChina(double lat, double lng);
 
 } // namespace coordtransform
-} // namespace core
+} // namespace opmap
 
 #endif // COORDTRANSFORM_H

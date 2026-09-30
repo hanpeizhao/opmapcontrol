@@ -29,7 +29,7 @@
 
 #include <QString>
 
-namespace core {
+namespace opmap {
 
 struct Size;
 

@@ -31,7 +31,7 @@
 #include <QString>
 
 
-namespace internals {
+namespace opmap {
 
 struct PointLatLng;
 

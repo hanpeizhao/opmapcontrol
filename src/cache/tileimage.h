@@ -31,7 +31,7 @@
 #include <QByteArray>
 
 
-namespace core {
+namespace opmap {
     class TileImageProxy
     {
     public:

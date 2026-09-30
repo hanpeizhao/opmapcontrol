@@ -33,20 +33,20 @@
 #include "point.h"
 #include "debugheader.h"
 #include <QBuffer>
-namespace internals {
+namespace opmap {
 class TileMatrix
 {
 public:
     TileMatrix();
     void Clear();
-    void ClearPointsNotIn(QList<core::Point> list);
-    Tile* TileAt(const core::Point &p);
-    void SetTileAt(const core::Point &p,Tile* tile);
+    void ClearPointsNotIn(QList<opmap::Point> list);
+    Tile* TileAt(const opmap::Point &p);
+    void SetTileAt(const opmap::Point &p,Tile* tile);
     int count()const{return matrix.count();}
    // void RebuildToUpperZoom();
 protected:
-    QHash<core::Point,Tile*> matrix;
-    QList<core::Point> removals;
+    QHash<opmap::Point,Tile*> matrix;
+    QList<opmap::Point> removals;
     QMutex mutex;
 };
 

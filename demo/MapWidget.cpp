@@ -7,7 +7,7 @@
 #include "UAS_types.h"
 #include "MapWidget.h"
 
-using namespace mapcontrol;
+using namespace opmap;
 
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -18,7 +18,7 @@ struct MapType_Data
     int     typeID;
 };
 
-#define MAPTYPE_STRUCT(n)   { #n, core::MapType::n }
+#define MAPTYPE_STRUCT(n)   { #n, opmap::MapType::n }
 
 static MapType_Data g_arrMapType[] =
 {
@@ -42,7 +42,7 @@ static MapType_Data g_arrMapType[] =
     {"NULL", -1}
 };
 
-char *getMapName_fromID(core::MapType::Types t)
+char *getMapName_fromID(opmap::MapType::Types t)
 {
     int     i = 0;
 
@@ -66,7 +66,7 @@ MapType_Dialog::MapType_Dialog(QWidget *parent) : QDialog(parent)
     setupUi();
 
     setupMapType_list();
-    setMapType(core::MapType::GoogleSatellite);
+    setMapType(opmap::MapType::GoogleSatellite);
 }
 
 void MapType_Dialog::setupUi(void)
@@ -111,7 +111,7 @@ void MapType_Dialog::setupMapType_list(void)
     }
 }
 
-void MapType_Dialog::setMapType(core::MapType::Types t)
+void MapType_Dialog::setMapType(opmap::MapType::Types t)
 {
     int i = 0;
 
@@ -130,14 +130,14 @@ void MapType_Dialog::setMapType(core::MapType::Types t)
     cbMapType->setCurrentIndex(0);
 }
 
-core::MapType::Types MapType_Dialog::getMapType(void)
+opmap::MapType::Types MapType_Dialog::getMapType(void)
 {
     int     idx, typeID;
 
     idx    = cbMapType->currentIndex();
     typeID = g_arrMapType[cbMapType->currentIndex()].typeID;
 
-    return (core::MapType::Types) typeID;
+    return (opmap::MapType::Types) typeID;
 }
 
 
@@ -166,7 +166,7 @@ WaypointEdit_Dialog::WaypointEdit_Dialog(QWidget *parent) : QDialog(parent)
     setupUi();
 }
 
-int WaypointEdit_Dialog::setWaypoints(int idx, QMap<int, mapcontrol::WayPointItem*> *wpMap,
+int WaypointEdit_Dialog::setWaypoints(int idx, QMap<int, opmap::WayPointItem*> *wpMap,
                                       int heightAltitude)
 {
     m_wpIdx  = idx;
@@ -190,7 +190,7 @@ int WaypointEdit_Dialog::setWaypoints(int idx, QMap<int, mapcontrol::WayPointIte
 }
 
 int WaypointEdit_Dialog::setWaypoints_(int idx,
-                                       QMap<int, mapcontrol::WayPointItem*> *wpMap,
+                                       QMap<int, opmap::WayPointItem*> *wpMap,
                                        int heightAltitude)
 {
     if( heightAltitude ) {
@@ -209,7 +209,7 @@ int WaypointEdit_Dialog::setWaypoints_(int idx,
         cbAllWaypoints->setCheckState(Qt::Unchecked);
         tableWaypoints->setRowCount(1);
 
-        mapcontrol::WayPointItem *item;
+        opmap::WayPointItem *item;
         item = wpMap->value(idx);
 
         if( heightAltitude ) h = item->Altitude() - m_referenceAltitude;
@@ -230,7 +230,7 @@ int WaypointEdit_Dialog::setWaypoints_(int idx,
         tableWaypoints->setRowCount(ids.size());
 
         foreach(int i, ids) {
-            mapcontrol::WayPointItem *item;
+            opmap::WayPointItem *item;
             item = wpMap->value(i);
 
             if( heightAltitude ) h = item->Altitude() - m_referenceAltitude;
@@ -391,11 +391,11 @@ void WaypointEdit_Dialog::act_cbHeightAltitude_clicked(bool s)
 ////////////////////////////////////////////////////////////////////////////////
 
 MapWidget::MapWidget(QWidget *parent) :
-    mapcontrol::OPMapWidget(parent)
+    opmap::OPMapWidget(parent)
 {
     m_conf = NULL;
 
-    configuration->SetAccessMode(core::AccessMode::ServerAndCache);
+    configuration->SetAccessMode(opmap::AccessMode::ServerAndCache);
     configuration->SetTileMemorySize(200);
     configuration->SetCacheLocation("./data/");
 
@@ -434,12 +434,12 @@ void MapWidget::setConf(QSettings *conf)
     // map type & access mode
     {
         MapType::Types              mapType;
-        core::AccessMode::Types     accessMode;
+        opmap::AccessMode::Types     accessMode;
         QString                     cacheLocation;
 
         // load settings
-        accessMode    = (core::AccessMode::Types) m_conf->value("mapWidget_accessMode",
-                                                                (int)(core::AccessMode::ServerAndCache)).toInt();
+        accessMode    = (opmap::AccessMode::Types) m_conf->value("mapWidget_accessMode",
+                                                                (int)(opmap::AccessMode::ServerAndCache)).toInt();
         mapType       = (MapType::Types) m_conf->value("mapWidget_mapType",
                                                        (int)(MapType::AutoNaviRoad)).toInt();
         cacheLocation = m_conf->value("mapWidget_cacheLocation", "./data/").toString();
@@ -450,10 +450,10 @@ void MapWidget::setConf(QSettings *conf)
         SetMapType(mapType);
 
         // set accessMode actions
-        if( accessMode == core::AccessMode::ServerAndCache ) {
+        if( accessMode == opmap::AccessMode::ServerAndCache ) {
             m_actMapAccess_ServerAndCache->setChecked(true);
             m_actMapAccess_Cache->setChecked(false);
-        } else if ( accessMode == core::AccessMode::CacheOnly ) {
+        } else if ( accessMode == opmap::AccessMode::CacheOnly ) {
             m_actMapAccess_ServerAndCache->setChecked(false);
             m_actMapAccess_Cache->setChecked(true);
         }
@@ -488,7 +488,7 @@ void MapWidget::syncConf(void)
 
     // map type & access mode
     MapType::Types              mapType;
-    core::AccessMode::Types     accessMode;
+    opmap::AccessMode::Types     accessMode;
 
     mapType = GetMapType();
     accessMode = configuration->AccessMode();
@@ -508,7 +508,7 @@ void MapWidget::syncConf(void)
     m_conf->sync();
 }
 
-void MapWidget::setHome(internals::PointLatLng &p, double alt)
+void MapWidget::setHome(opmap::PointLatLng &p, double alt)
 {
     m_homePos = p;
     m_homeAlt = alt;
@@ -523,7 +523,7 @@ void MapWidget::setHome(internals::PointLatLng &p, double alt)
     ReloadMap();
 }
 
-void MapWidget::getHome(internals::PointLatLng &p, double &alt)
+void MapWidget::getHome(opmap::PointLatLng &p, double &alt)
 {
     p = m_homePos;
     alt = m_homeAlt;
@@ -532,12 +532,12 @@ void MapWidget::getHome(internals::PointLatLng &p, double &alt)
 
 int MapWidget::getWaypoints(AP_WPArray &wpa)
 {
-    QMap<int, mapcontrol::WayPointItem*> wpMap;
+    QMap<int, opmap::WayPointItem*> wpMap;
 
     // get waypoints
     wpMap  = WPAll();
 
-    foreach(mapcontrol::WayPointItem* p, wpMap) {
+    foreach(opmap::WayPointItem* p, wpMap) {
         AP_WayPoint wp;
 
         wp.idx      = p->Number();
@@ -651,7 +651,7 @@ void MapWidget::mousePressEvent(QMouseEvent *event)
     if( event->button() == Qt::RightButton ) {
         m_popupMenu->popup(event->globalPos());
     } else {
-        mapcontrol::OPMapWidget::mousePressEvent(event);
+        opmap::OPMapWidget::mousePressEvent(event);
     }
 }
 
@@ -659,7 +659,7 @@ void MapWidget::mousePressEvent(QMouseEvent *event)
 void MapWidget::actMapType_SelectMap(void)
 {
     MapType_Dialog          diag;
-    core::MapType::Types    mt, mt0;
+    opmap::MapType::Types    mt, mt0;
 
     // set current map type active
     mt0 = GetMapType();
@@ -691,10 +691,10 @@ void MapWidget::actMapAccess_ServerAndCache(void)
     m_actMapAccess_ServerAndCache->setChecked(true);
     m_actMapAccess_Cache->setChecked(false);
 
-    configuration->SetAccessMode(core::AccessMode::ServerAndCache);
+    configuration->SetAccessMode(opmap::AccessMode::ServerAndCache);
 
     if( m_conf != NULL ) {
-        m_conf->setValue("mapWidget_accessMode", (int)(core::AccessMode::ServerAndCache));
+        m_conf->setValue("mapWidget_accessMode", (int)(opmap::AccessMode::ServerAndCache));
         m_conf->sync();
     }
 }
@@ -704,10 +704,10 @@ void MapWidget::actMapAccess_Cache(void)
     m_actMapAccess_ServerAndCache->setChecked(false);
     m_actMapAccess_Cache->setChecked(true);
 
-    configuration->SetAccessMode(core::AccessMode::CacheOnly);
+    configuration->SetAccessMode(opmap::AccessMode::CacheOnly);
 
     if( m_conf != NULL ) {
-        m_conf->setValue("mapWidget_accessMode", (int)(core::AccessMode::CacheOnly));
+        m_conf->setValue("mapWidget_accessMode", (int)(opmap::AccessMode::CacheOnly));
         m_conf->sync();
     }
 }
@@ -715,11 +715,11 @@ void MapWidget::actMapAccess_Cache(void)
 
 void MapWidget::actWaypoint_add(void)
 {
-    internals::PointLatLng p;
+    opmap::PointLatLng p;
 
     p = currentMousePosition();
 
-    mapcontrol::WayPointItem *wp = this->WPCreate();
+    opmap::WayPointItem *wp = this->WPCreate();
     wp->SetCoord(p);
     wp->SetAltitude(m_homeAlt + m_flightHeight);
 
@@ -729,7 +729,7 @@ void MapWidget::actWaypoint_add(void)
 
 void MapWidget::actWaypoint_del(void)
 {
-    QList<mapcontrol::WayPointItem*>    wpList;
+    QList<opmap::WayPointItem*>    wpList;
     int                     i, n;
 
     // set selected waypoints
@@ -743,8 +743,8 @@ void MapWidget::actWaypoint_del(void)
 
 void MapWidget::actWaypoint_edit(void)
 {
-    QMap<int, mapcontrol::WayPointItem*>    wpMap;
-    QList<mapcontrol::WayPointItem*>        wpList;
+    QMap<int, opmap::WayPointItem*>    wpMap;
+    QList<opmap::WayPointItem*>        wpList;
     int                                     idx;
 
     WaypointEdit_Dialog                     wpDialog;
@@ -776,7 +776,7 @@ void MapWidget::actWaypoint_clear(void)
 
 void MapWidget::actWPEdit(int num, WayPointItem *wp)
 {
-    QMap<int, mapcontrol::WayPointItem*>    wpMap;
+    QMap<int, opmap::WayPointItem*>    wpMap;
     int                                     idx;
 
     WaypointEdit_Dialog                     wpDialog;
@@ -795,7 +795,7 @@ void MapWidget::actWPEdit(int num, WayPointItem *wp)
 
 void MapWidget::actWaypoint_save(void)
 {
-    QMap<int, mapcontrol::WayPointItem*> wpMap;
+    QMap<int, opmap::WayPointItem*> wpMap;
     QString fname, path = "./data";
 
     // get waypoints
@@ -814,7 +814,7 @@ void MapWidget::actWaypoint_save(void)
     // copy to AP_WPArray
     AP_WPArray  arrWP;
 
-    foreach(mapcontrol::WayPointItem* p, wpMap) {
+    foreach(opmap::WayPointItem* p, wpMap) {
         AP_WayPoint wp;
 
         wp.idx = p->Number();
@@ -859,8 +859,8 @@ void MapWidget::actWaypoint_load(void)
         p = it->second;
 
         // create new wp item
-        internals::PointLatLng coord(p->lat, p->lng);
-        mapcontrol::WayPointItem* wp = new mapcontrol::WayPointItem(coord, p->alt, map);
+        opmap::PointLatLng coord(p->lat, p->lng);
+        opmap::WayPointItem* wp = new opmap::WayPointItem(coord, p->alt, map);
         wp->SetNumber(p->idx);
         wp->SetHeading(p->heading);
 
@@ -875,7 +875,7 @@ void MapWidget::actWaypoint_load(void)
 
 void MapWidget::actSelectArea_beg(void)
 {
-    internals::PointLatLng p;
+    opmap::PointLatLng p;
 
     p = currentMousePosition();
 
@@ -885,7 +885,7 @@ void MapWidget::actSelectArea_beg(void)
 
 void MapWidget::actSelectArea_end(void)
 {
-    internals::PointLatLng p;
+    opmap::PointLatLng p;
 
     double  lat1, lat2;
     double  lng1, lng2;
@@ -915,7 +915,7 @@ void MapWidget::actSelectArea_end(void)
     }
 
 
-    internals::RectLatLng rect(lat1, lng1, fabs(lng2 - lng1), fabs(lat2 - lat1));
+    opmap::RectLatLng rect(lat1, lng1, fabs(lng2 - lng1), fabs(lat2 - lat1));
     SetSelectedArea(rect);
 
     //this->update();
@@ -924,7 +924,7 @@ void MapWidget::actSelectArea_end(void)
 
 void MapWidget::actSelectArea_clear(void)
 {
-    internals::RectLatLng rect;
+    opmap::RectLatLng rect;
 
     SetSelectedArea(rect);
 
@@ -934,7 +934,7 @@ void MapWidget::actSelectArea_clear(void)
 
 void MapWidget::actHome_Set(void)
 {
-    internals::PointLatLng p;
+    opmap::PointLatLng p;
 
     p = currentMousePosition();
 

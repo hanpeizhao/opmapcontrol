@@ -30,8 +30,8 @@
 #include "pureprojection.h"
 
  
-namespace projections {
-class PlateCarreeProjection:public internals::PureProjection
+namespace opmap {
+class PlateCarreeProjection:public opmap::PureProjection
 {
 public:
     PlateCarreeProjection();
@@ -39,8 +39,8 @@ public:
     virtual Size TileSize() const;
     virtual double Axis() const;
     virtual double Flattening()const;
-    virtual core::Point FromLatLngToPixel(double lat, double lng, int const& zoom);
-    virtual internals::PointLatLng FromPixelToLatLng(const int &x,const int &y,const int &zoom);
+    virtual opmap::Point FromLatLngToPixel(double lat, double lng, int const& zoom);
+    virtual opmap::PointLatLng FromPixelToLatLng(const int &x,const int &y,const int &zoom);
     virtual  Size GetTileMatrixMinXY(const int &zoom);
     virtual  Size GetTileMatrixMaxXY(const int &zoom);
 private:

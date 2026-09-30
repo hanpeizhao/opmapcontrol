@@ -28,9 +28,9 @@
 
 #include "mapripper.h"
 
-namespace mapcontrol {
+namespace opmap {
 
-MapRipper::MapRipper(internals::MapEngine * core, const internals::RectLatLng & rect):
+MapRipper::MapRipper(opmap::MapEngine * core, const opmap::RectLatLng & rect):
     sleep(1), cancel(false), progressForm(0), core(core)
 {
     if(!rect.IsEmpty()) {
@@ -38,9 +38,9 @@ MapRipper::MapRipper(internals::MapEngine * core, const internals::RectLatLng & 
         progressForm=new MapRipForm;
         area=rect;
         // 下载区域转换到当前地图源的瓦片坐标系（GCJ-02 源自动纠偏）
-        internals::PointLatLng tl = core->ToTileDatum(rect.LocationTopLeft());
-        internals::PointLatLng br = core->ToTileDatum(internals::PointLatLng(rect.Bottom(), rect.Right()));
-        tileArea = internals::RectLatLng::FromLTRB(tl.Lng(), tl.Lat(), br.Lng(), br.Lat());
+        opmap::PointLatLng tl = core->ToTileDatum(rect.LocationTopLeft());
+        opmap::PointLatLng br = core->ToTileDatum(opmap::PointLatLng(rect.Bottom(), rect.Right()));
+        tileArea = opmap::RectLatLng::FromLTRB(tl.Lng(), tl.Lat(), br.Lng(), br.Lat());
         zoom=core->Zoom();
         maxzoom=core->MaxZoom();
         points=core->Projection()->GetAreaTileList(tileArea,zoom,0);
@@ -106,19 +106,19 @@ void MapRipper::run()
     bool goodtile=false;
 
     //  Stuff.Shuffle<Point>(ref list);
-    QVector<core::MapType::Types> types = core->Service()->GetAllLayersOfType(type);
+    QVector<opmap::MapType::Types> types = core->Service()->GetAllLayersOfType(type);
     int all=points.count();
     for(int i = 0; i < all; i++) {
         emit numberOfTilesChanged(all,i+1);
 
         if( cancel ) break;
 
-        core::Point p = points[i];
+        opmap::Point p = points[i];
 
         {
             //qDebug()<<"offline fetching:"<<p.ToString();
-            foreach(core::MapType::Types type, types) {
-                emit providerChanged(core::MapType::StrByType(type), zoom);
+            foreach(opmap::MapType::Types type, types) {
+                emit providerChanged(opmap::MapType::StrByType(type), zoom);
 
                 QByteArray img = core->Service()->GetImageFrom(type, p, zoom);
                 if(img.length()!=0) {
@@ -144,4 +144,4 @@ void MapRipper::run()
     }
 }
 
-} // end of namespace mapcontrol
+} // end of namespace opmap

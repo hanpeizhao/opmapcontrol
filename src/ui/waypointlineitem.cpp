@@ -1,8 +1,8 @@
 #include "waypointlineitem.h"
 
-namespace mapcontrol
+namespace opmap
 {
-WaypointLineItem::WaypointLineItem(WayPointItem* wp1, WayPointItem* wp2, QColor color, mapcontrol::MapGraphicItem* map) :
+WaypointLineItem::WaypointLineItem(WayPointItem* wp1, WayPointItem* wp2, QColor color, opmap::MapGraphicItem* map) :
         QGraphicsLineItem(map),
     wp1(wp1),
     wp2(wp2),
@@ -21,8 +21,8 @@ WaypointLineItem::WaypointLineItem(WayPointItem* wp1, WayPointItem* wp2, QColor 
     point2 = wp2->Coord();
 
     // Pixel coordinates of the local points
-    core::Point localPoint1 = map->FromLatLngToLocal(wp1->Coord());
-    core::Point localPoint2 = map->FromLatLngToLocal(wp2->Coord());
+    opmap::Point localPoint1 = map->FromLatLngToLocal(wp1->Coord());
+    opmap::Point localPoint2 = map->FromLatLngToLocal(wp2->Coord());
     // Draw line
     setLine(localPoint1.X(), localPoint1.Y(), localPoint2.X(), localPoint2.Y());
 
@@ -49,8 +49,8 @@ void WaypointLineItem::RefreshPos()
     {
         // Set new pixel coordinates based on new global coordinates
         //QTimer::singleShot(0, this, SLOT(updateWPValues()));
-        core::Point localPoint1 = map->FromLatLngToLocal(point1);
-        core::Point localPoint2 = map->FromLatLngToLocal(point2);
+        opmap::Point localPoint1 = map->FromLatLngToLocal(point1);
+        opmap::Point localPoint2 = map->FromLatLngToLocal(point2);
         if (!localPoint1.IsEmpty() && !localPoint2.IsEmpty())
         {
             setLine(localPoint1.X(), localPoint1.Y(), localPoint2.X(), localPoint2.Y());
@@ -71,8 +71,8 @@ void WaypointLineItem::updateWPValues(WayPointItem* waypoint)
         // Set new pixel coordinates based on new global coordinates
         point1 = wp1->Coord();
         point2 = wp2->Coord();
-        core::Point localPoint1 = map->FromLatLngToLocal(wp1->Coord());
-        core::Point localPoint2 = map->FromLatLngToLocal(wp2->Coord());
+        opmap::Point localPoint1 = map->FromLatLngToLocal(wp1->Coord());
+        opmap::Point localPoint2 = map->FromLatLngToLocal(wp2->Coord());
 
         setLine(localPoint1.X(), localPoint1.Y(), localPoint2.X(), localPoint2.Y());
     }

@@ -30,7 +30,7 @@
 #include <QString>
 
 
-namespace core {
+namespace opmap {
     /// 各地图服务提供商的版本参数与密钥（Google 瓦片版本号等）
     class ProviderStrings
     {

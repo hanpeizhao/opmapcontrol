@@ -32,9 +32,9 @@
 #include "size.h"
 #include "math.h"
 
-using namespace core;
 
-namespace internals
+
+namespace opmap
 {
 
 struct Rectangle
@@ -54,7 +54,7 @@ public:
         this->height = height;
     }
 
-    Rectangle(core::Point location, core::Size size)
+    Rectangle(opmap::Point location, opmap::Size size)
     {
         this->x = location.X();
         this->y = location.Y();
@@ -62,11 +62,11 @@ public:
         this->height = size.Height();
     }
 
-    core::Point GetLocation() {
-        return core::Point(x, y);
+    opmap::Point GetLocation() {
+        return opmap::Point(x, y);
     }
 
-    void SetLocation(const core::Point &value)
+    void SetLocation(const opmap::Point &value)
     {
         x = value.X();
         y = value.Y();
@@ -97,7 +97,7 @@ public:
         return this->x<=x && x<this->x+this->width && this->y<=y && y<this->y+this->height;
     }
 
-    bool Contains(const core::Point &pt)
+    bool Contains(const opmap::Point &pt)
     {
         return Contains(pt.X(),pt.Y());
     }
@@ -145,7 +145,7 @@ public:
                 (this->y < rect.y + rect.height);
     }
     static Rectangle Union(const Rectangle &a,const Rectangle &b);
-    void Offset(const core::Point &pos)
+    void Offset(const opmap::Point &pos)
     {
         Offset(pos.X(), pos.Y());
     }

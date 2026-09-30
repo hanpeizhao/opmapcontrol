@@ -4,7 +4,7 @@
 #include <QGraphicsLineItem>
 #include "opmapcontrol.h"
 
-namespace mapcontrol {
+namespace opmap {
 
 class WaypointLineItem : public QObject, public QGraphicsLineItem
 {
@@ -35,13 +35,13 @@ public slots:
     void RefreshPos();
 
 protected:
-    internals::PointLatLng point1;
-    internals::PointLatLng point2;
+    opmap::PointLatLng point1;
+    opmap::PointLatLng point2;
     WayPointItem* wp1;
     WayPointItem* wp2;
     MapGraphicItem* map;              ///< The map this item is parent of
 };
 
-} // end of namespace mapcontrol
+} // end of namespace opmap
 
 #endif // WAYPOINTLINEITEM_H

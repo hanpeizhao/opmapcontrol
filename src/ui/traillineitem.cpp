@@ -26,10 +26,10 @@
 */
 #include "traillineitem.h"
 
-namespace mapcontrol {
+namespace opmap {
 
-TrailLineItem::TrailLineItem(internals::PointLatLng const& coord1,
-                             internals::PointLatLng const& coord2,
+TrailLineItem::TrailLineItem(opmap::PointLatLng const& coord1,
+                             opmap::PointLatLng const& coord2,
                              QBrush color, QGraphicsItem* parent) :
     QGraphicsLineItem(parent), coord1(coord1), coord2(coord2)
 {

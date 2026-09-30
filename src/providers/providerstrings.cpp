@@ -27,7 +27,7 @@
 #include "providerstrings.h"
 
 
-namespace core {
+namespace opmap {
 
     ProviderStrings::ProviderStrings()
     {

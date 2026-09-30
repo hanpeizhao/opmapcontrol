@@ -27,7 +27,7 @@
 #include "mercatorprojection.h"
 #include <qmath.h>
  
-namespace projections {
+namespace opmap {
 MercatorProjection::MercatorProjection():MinLatitude(-85.05112878), MaxLatitude(85.05112878),MinLongitude(-177),
 MaxLongitude(177), tileSize(256, 256)
 {
@@ -52,9 +52,9 @@ Point MercatorProjection::FromLatLngToPixel(double lat, double lng, const int &z
 
     return ret;
 }
-internals::PointLatLng MercatorProjection::FromPixelToLatLng(const int &x, const int &y, const int &zoom)
+opmap::PointLatLng MercatorProjection::FromPixelToLatLng(const int &x, const int &y, const int &zoom)
 {
-    internals::PointLatLng ret;// = internals::PointLatLng.Empty;
+    opmap::PointLatLng ret;// = opmap::PointLatLng.Empty;
 
     Size s = GetTileMatrixSizePixel(zoom);
     double mapSizeX = s.Width();

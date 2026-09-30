@@ -29,7 +29,7 @@
 #include "pureprojection.h"
 #include "uavitem.h"
 
-namespace mapcontrol {
+namespace opmap {
 
 UAVItem::UAVItem(MapGraphicItem* map,OPMapWidget* parent,QString uavPic) :
     map(map), mapwidget(parent),
@@ -82,7 +82,7 @@ QRectF UAVItem::boundingRect()const
     return QRectF(-pic.width()/2,-pic.height()/2,pic.width(),pic.height());
 }
 
-void UAVItem::SetUAVPos(const internals::PointLatLng &position, const int &altitude,
+void UAVItem::SetUAVPos(const opmap::PointLatLng &position, const int &altitude,
                         const QColor &color)
 {
     if(coord.IsEmpty())
@@ -98,7 +98,7 @@ void UAVItem::SetUAVPos(const internals::PointLatLng &position, const int &altit
                 timer.restart();
             }
         } else if(trailtype==UAVTrailType::ByDistance) {
-            if(qAbs(internals::PureProjection::DistanceBetweenLatLng(lastcoord,position)*1000) > traildistance) {
+            if(qAbs(opmap::PureProjection::DistanceBetweenLatLng(lastcoord,position)*1000) > traildistance) {
                 trail->addToGroup(new TrailItem(position,altitude,color,this));
                 if(!lasttrailline.IsEmpty())
                     trailLine->addToGroup((new TrailLineItem(lasttrailline,position,color,map)));
@@ -213,9 +213,9 @@ void UAVItem::DeleteTrail() const
         delete i;
 }
 
-double UAVItem::Distance3D(const internals::PointLatLng &coord, const int &altitude)
+double UAVItem::Distance3D(const opmap::PointLatLng &coord, const int &altitude)
 {
-    return sqrt(pow(internals::PureProjection::DistanceBetweenLatLng(this->coord,coord)*1000,2)+
+    return sqrt(pow(opmap::PureProjection::DistanceBetweenLatLng(this->coord,coord)*1000,2)+
                 pow(static_cast<float>(this->altitude-altitude),2));
 }
 
@@ -224,4 +224,4 @@ void UAVItem::SetUavPic(QString UAVPic)
     pic.load(":/uavs/images/"+UAVPic);
 }
 
-} // end of namespace mapcontrol
+} // end of namespace opmap

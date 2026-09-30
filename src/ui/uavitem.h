@@ -43,7 +43,7 @@
 #include "trailitem.h"
 #include "traillineitem.h"
 
-namespace mapcontrol {
+namespace opmap {
 
 class WayPointItem;
 class OPMapWidget;
@@ -70,7 +70,7 @@ public:
         * @param position LatLng point
         * @param altitude altitude in meters
         */
-    void SetUAVPos(internals::PointLatLng const& position,int const& altitude, QColor const& color=QColor(Qt::red));
+    void SetUAVPos(opmap::PointLatLng const& position,int const& altitude, QColor const& color=QColor(Qt::red));
 
     /**
         * @brief Sets the UAV heading
@@ -82,9 +82,9 @@ public:
     /**
         * @brief Returns the UAV position
         *
-        * @return internals::PointLatLng
+        * @return opmap::PointLatLng
         */
-    internals::PointLatLng UAVPos()const{return coord;}
+    opmap::PointLatLng UAVPos()const{return coord;}
 
     /**
         * @brief Sets the Map follow type
@@ -231,20 +231,20 @@ private:
     int altitude;
     UAVMapFollowType::Types mapfollowtype;
     UAVTrailType::Types trailtype;
-    internals::PointLatLng coord;
-    internals::PointLatLng lastcoord;
-    core::Point localposition;
+    opmap::PointLatLng coord;
+    opmap::PointLatLng lastcoord;
+    opmap::Point localposition;
     OPMapWidget* mapwidget;
     QGraphicsItemGroup* trail;
     QGraphicsItemGroup * trailLine;
-    internals::PointLatLng lasttrailline;
+    opmap::PointLatLng lasttrailline;
     QTime timer;
     bool showtrail;
     bool showtrailline;
     int trailtime;
     int traildistance;
     bool autosetreached;
-    double Distance3D(internals::PointLatLng const& coord, int const& altitude);
+    double Distance3D(opmap::PointLatLng const& coord, int const& altitude);
     double autosetdistance;
     //  QRectF rect;
 
@@ -252,7 +252,7 @@ public slots:
 
 signals:
     void UAVReachedWayPoint(int const& waypointnumber,WayPointItem* waypoint);
-    void UAVLeftSafetyBouble(internals::PointLatLng const& position);
+    void UAVLeftSafetyBouble(opmap::PointLatLng const& position);
 };
 
 }

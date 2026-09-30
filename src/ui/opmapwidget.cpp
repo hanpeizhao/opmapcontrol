@@ -31,7 +31,7 @@
 #include <QMetaObject>
 #include "waypointitem.h"
 
-namespace mapcontrol {
+namespace opmap {
 
 OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView(parent),
     configuration(config),
@@ -48,17 +48,17 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
-    service=new core::MapService;
+    service=new opmap::MapService;
     configuration->SetMapService(service);
-    core=new internals::MapEngine(service);
+    core=new opmap::MapEngine(service);
     map=new MapGraphicItem(core, config);
     mscene.addItem(map);
     this->setScene(&mscene);
     this->adjustSize();
 
     connect(map,SIGNAL(zoomChanged(double,double,double)),this,SIGNAL(zoomChanged(double,double,double)));
-    connect(map->core,SIGNAL(OnCurrentPositionChanged(internals::PointLatLng)),this,SIGNAL(OnCurrentPositionChanged(internals::PointLatLng)));
-    connect(map->core,SIGNAL(OnEmptyTileError(int,core::Point)),this,SIGNAL(OnEmptyTileError(int,core::Point)));
+    connect(map->core,SIGNAL(OnCurrentPositionChanged(opmap::PointLatLng)),this,SIGNAL(OnCurrentPositionChanged(opmap::PointLatLng)));
+    connect(map->core,SIGNAL(OnEmptyTileError(int,opmap::Point)),this,SIGNAL(OnEmptyTileError(int,opmap::Point)));
     connect(map->core,SIGNAL(OnMapDrag()),this,SIGNAL(OnMapDrag()));
     connect(map->core,SIGNAL(OnMapTypeChanged(MapType::Types)),this,SIGNAL(OnMapTypeChanged(MapType::Types)));
     connect(map->core,SIGNAL(OnMapZoomChanged()),this,SIGNAL(OnMapZoomChanged()));
@@ -172,7 +172,7 @@ void OPMapWidget::SetShowUAV(const bool &value)
 
         // FIXME XXX The map widget is here actually handling
         // safety and mission logic - might be worth some refactoring
-        connect(this,SIGNAL(UAVLeftSafetyBouble(internals::PointLatLng)),UAV,SIGNAL(UAVLeftSafetyBouble(internals::PointLatLng)));
+        connect(this,SIGNAL(UAVLeftSafetyBouble(opmap::PointLatLng)),UAV,SIGNAL(UAVLeftSafetyBouble(opmap::PointLatLng)));
         connect(this,SIGNAL(UAVReachedWayPoint(int,WayPointItem*)),UAV,SIGNAL(UAVReachedWayPoint(int,WayPointItem*)));
     } else if(!value) {
         if(UAV!=0) {
@@ -269,7 +269,7 @@ void OPMapWidget::SetUseOpenGL(const bool &value)
     update();
 }
 
-internals::PointLatLng OPMapWidget::currentMousePosition()
+opmap::PointLatLng OPMapWidget::currentMousePosition()
 {
     return currentmouseposition;
 }
@@ -317,7 +317,7 @@ void OPMapWidget::WPCreate(WayPointItem* item)
 void OPMapWidget::WPCreate(int id, WayPointItem* item)
 {
     Q_UNUSED(id);
-    static internals::PointLatLng lastPos;
+    static opmap::PointLatLng lastPos;
 
     ConnectWP(item);
     item->setParentItem(map);
@@ -344,7 +344,7 @@ void OPMapWidget::WPCreate(int id, WayPointItem* item)
     //        lasttrailline=position;
 }
 
-WayPointItem* OPMapWidget::WPCreate(internals::PointLatLng const& coord,int const& altitude)
+WayPointItem* OPMapWidget::WPCreate(opmap::PointLatLng const& coord,int const& altitude)
 {
     WayPointItem* item=new WayPointItem(coord,altitude,map);
     ConnectWP(item);
@@ -352,7 +352,7 @@ WayPointItem* OPMapWidget::WPCreate(internals::PointLatLng const& coord,int cons
     return item;
 }
 
-WayPointItem* OPMapWidget::WPCreate(internals::PointLatLng const& coord,int const& altitude, QString const& description)
+WayPointItem* OPMapWidget::WPCreate(opmap::PointLatLng const& coord,int const& altitude, QString const& description)
 {
     WayPointItem* item=new WayPointItem(coord,altitude,description,map);
     ConnectWP(item);
@@ -379,7 +379,7 @@ void OPMapWidget::WPInsert(WayPointItem* item,const int &position)
 
 }
 
-WayPointItem* OPMapWidget::WPInsert(internals::PointLatLng const& coord,int const& altitude,const int &position)
+WayPointItem* OPMapWidget::WPInsert(opmap::PointLatLng const& coord,int const& altitude,const int &position)
 {
     WayPointItem* item=new WayPointItem(coord,altitude,map);
     item->SetNumber(position);
@@ -389,7 +389,7 @@ WayPointItem* OPMapWidget::WPInsert(internals::PointLatLng const& coord,int cons
     return item;
 }
 
-WayPointItem* OPMapWidget::WPInsert(internals::PointLatLng const& coord,int const& altitude, QString const& description,const int &position)
+WayPointItem* OPMapWidget::WPInsert(opmap::PointLatLng const& coord,int const& altitude, QString const& description,const int &position)
 {
     WayPointItem* item=new WayPointItem(coord,altitude,description,map);
     item->SetNumber(position);
@@ -517,7 +517,7 @@ void OPMapWidget::RipMap()
 // *************************************************************************************
 // return the bearing from one point to another .. in degrees
 
-double OPMapWidget::bearing(internals::PointLatLng from, internals::PointLatLng to)
+double OPMapWidget::bearing(opmap::PointLatLng from, opmap::PointLatLng to)
 {
     double lat1 = from.Lat() * deg_to_rad;
     double lon1 = from.Lng() * deg_to_rad;
@@ -542,7 +542,7 @@ double OPMapWidget::bearing(internals::PointLatLng from, internals::PointLatLng 
 // *************************************************************************************
 // return a destination lat/lon point given a source lat/lon point and the bearing and distance from the source point
 
-internals::PointLatLng OPMapWidget::destPoint(internals::PointLatLng source, double bear, double dist)
+opmap::PointLatLng OPMapWidget::destPoint(opmap::PointLatLng source, double bear, double dist)
 {
     double lat1 = source.Lat() * deg_to_rad;
     double lon1 = source.Lng() * deg_to_rad;
@@ -554,7 +554,7 @@ internals::PointLatLng OPMapWidget::destPoint(internals::PointLatLng source, dou
     double lat2 = asin(sin(lat1) * cos(ad) + cos(lat1) * sin(ad) * cos(bear));
     double lon2 = lon1 + atan2(sin(bear) * sin(ad) * cos(lat1), cos(ad) - sin(lat1) * sin(lat2));
 
-    return internals::PointLatLng(lat2 * rad_to_deg, lon2 * rad_to_deg);
+    return opmap::PointLatLng(lat2 * rad_to_deg, lon2 * rad_to_deg);
 }
 
-} // end namespace mapcontrol
+} // end namespace opmap

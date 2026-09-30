@@ -38,7 +38,7 @@ protected:
     QPushButton                 *m_btnFatchMap;
     QCheckBox                   *m_cbMoveUAV;
 
-    mapcontrol::UAVItem         *m_uav;
+    opmap::UAVItem         *m_uav;
 };
 
 #endif // QTESTWIN_H

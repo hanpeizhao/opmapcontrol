@@ -33,7 +33,7 @@
 #include <QMetaEnum>
 #include <QStringList>
 
-namespace core {
+namespace opmap {
     class AccessMode:public QObject
     {
         Q_OBJECT

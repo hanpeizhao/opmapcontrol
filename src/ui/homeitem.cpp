@@ -28,7 +28,7 @@
 
 #include "homeitem.h"
 
-namespace mapcontrol {
+namespace opmap {
 
 HomeItem::HomeItem(MapGraphicItem* map,OPMapWidget* parent) :
     safe(true), map(map), mapwidget(parent),
@@ -40,7 +40,7 @@ HomeItem::HomeItem(MapGraphicItem* map,OPMapWidget* parent) :
     localposition=map->FromLatLngToLocal(mapwidget->CurrentPosition());
     this->setPos(localposition.X(),localposition.Y());
     this->setZValue(4);
-    coord=internals::PointLatLng(50, 50);
+    coord=opmap::PointLatLng(50, 50);
 
     //        this->setFlag(QGraphicsItem::ItemIsMovable,true);
     //        this->setFlag(QGraphicsItem::ItemIgnoresTransformations,true);

@@ -28,7 +28,7 @@
 
 #include "omapconfiguration.h"
 
-namespace mapcontrol {
+namespace opmap {
 
 Configuration::Configuration() : mapService(0)
 {
@@ -41,22 +41,22 @@ Configuration::Configuration() : mapService(0)
     DragButton = Qt::LeftButton;
 }
 
-void Configuration::SetAccessMode(core::AccessMode::Types const& type)
+void Configuration::SetAccessMode(opmap::AccessMode::Types const& type)
 {
     mapService->setAccessMode(type);
 }
 
-core::AccessMode::Types Configuration::AccessMode()
+opmap::AccessMode::Types Configuration::AccessMode()
 {
     return mapService->GetAccessMode();
 }
 
-void Configuration::SetLanguage(core::LanguageType::Types const& type)
+void Configuration::SetLanguage(opmap::LanguageType::Types const& type)
 {
     mapService->setLanguage(type);
 }
 
-core::LanguageType::Types Configuration::Language()
+opmap::LanguageType::Types Configuration::Language()
 {
     return mapService->GetLanguage();
 }
@@ -66,4 +66,4 @@ void Configuration::SetUseMemoryCache(bool const& value)
     mapService->setUseMemoryCache(value);
 }
 
-} // end of namespace mapcontrol
+} // end of namespace opmap

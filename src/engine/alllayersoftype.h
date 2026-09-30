@@ -33,7 +33,7 @@
 #include <QList>
 #include <QVector>
 
-namespace core {
+namespace opmap {
     class AllLayersOfType
     {
     public:

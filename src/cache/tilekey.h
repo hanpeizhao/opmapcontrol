@@ -32,24 +32,24 @@
 #include <QString>
 #include <QHash>
 
-namespace core {
+namespace opmap {
     class TileKey
     {
         friend uint qHash(TileKey const& tile);
         friend bool operator==(TileKey const& lhs,TileKey const& rhs);
 
     public:
-        TileKey(const MapType::Types &Type,const core::Point &Pos,const int &Zoom);
+        TileKey(const MapType::Types &Type,const opmap::Point &Pos,const int &Zoom);
         QString ToString(void);
         MapType::Types Type();
-        core::Point Pos();
+        opmap::Point Pos();
         int Zoom();
         void setType(const MapType::Types &value);
-        void setPos(const core::Point &value);
+        void setPos(const opmap::Point &value);
         void setZoom(const int &value);
     private:
         MapType::Types type;
-        core::Point pos;
+        opmap::Point pos;
         int zoom;
     };
 }

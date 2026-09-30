@@ -27,7 +27,7 @@
 #include "loadtask.h"
 
  
-namespace internals {
+namespace opmap {
 
 bool operator==(LoadTask const& lhs,LoadTask const& rhs)
 {

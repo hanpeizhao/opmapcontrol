@@ -34,9 +34,9 @@
 #include "cmath"
 #include "rectlatlng.h"
 
-using namespace core;
 
-namespace internals
+
+namespace opmap
 {
 
 class PureProjection
@@ -48,22 +48,22 @@ public:
 
     virtual double Flattening()const=0;
 
-    virtual core::Point FromLatLngToPixel(double lat, double lng, int const& zoom)=0;
+    virtual opmap::Point FromLatLngToPixel(double lat, double lng, int const& zoom)=0;
 
     virtual PointLatLng FromPixelToLatLng(const int &x,const int &y,const int &zoom)=0;
 
     virtual QString Type(){return "PureProjection";}
-    core::Point FromLatLngToPixel(const PointLatLng &p,const int &zoom);
+    opmap::Point FromLatLngToPixel(const PointLatLng &p,const int &zoom);
 
     PointLatLng FromPixelToLatLng(const Point &p,const int &zoom);
-    virtual core::Point FromPixelToTileXY(const core::Point &p);
-    virtual core::Point FromTileXYToPixel(const core::Point &p);
+    virtual opmap::Point FromPixelToTileXY(const opmap::Point &p);
+    virtual opmap::Point FromTileXYToPixel(const opmap::Point &p);
     virtual  Size GetTileMatrixMinXY(const int &zoom)=0;
     virtual  Size GetTileMatrixMaxXY(const int &zoom)=0;
     virtual Size GetTileMatrixSizeXY(const int &zoom);
     int GetTileMatrixItemCount(const int &zoom);
     virtual Size GetTileMatrixSizePixel(const int &zoom);
-    QList<core::Point> GetAreaTileList(const RectLatLng &rect,const int &zoom,const int &padding);
+    QList<opmap::Point> GetAreaTileList(const RectLatLng &rect,const int &zoom,const int &padding);
     virtual double GetGroundResolution(const int &zoom,const double &latitude);
 
     double DegreesToRadians(const double &deg)const

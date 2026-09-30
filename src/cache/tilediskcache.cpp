@@ -32,7 +32,7 @@
 
 //#define DEBUG_PUREIMAGECACHE
 
-namespace core {
+namespace opmap {
 
 qlonglong TileDiskCache::ConnCounter=0;
 
@@ -360,4 +360,4 @@ bool TileDiskCache::ExportMapDataToDB(QString sourceFile, QString destFile)
     return true;
 }
 
-} // end namespace core
+} // end namespace opmap

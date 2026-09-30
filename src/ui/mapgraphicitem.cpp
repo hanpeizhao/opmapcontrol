@@ -33,9 +33,9 @@
 #include "waypointlineitem.h"
 #include <QGraphicsSceneMouseEvent>
 
-namespace mapcontrol {
+namespace opmap {
 
-MapGraphicItem::MapGraphicItem(internals::MapEngine *core, Configuration *configuration) :
+MapGraphicItem::MapGraphicItem(opmap::MapEngine *core, Configuration *configuration) :
     core(core),
     config(configuration),
     MapRenderTransform(1),
@@ -50,7 +50,7 @@ MapGraphicItem::MapGraphicItem(internals::MapEngine *core, Configuration *config
     showTileGridLines=false;
     isMouseOverMarker=false;
     maprect=QRectF(0,0,1022,680);
-    core->SetCurrentRegion(internals::Rectangle(0, 0, maprect.width(), maprect.height()));
+    core->SetCurrentRegion(opmap::Rectangle(0, 0, maprect.width(), maprect.height()));
     core->SetMapType(MapType::GoogleHybrid);
     this->SetZoom(2);
     connect(core,SIGNAL(OnNeedInvalidation()),this,SLOT(Core_OnNeedInvalidation()));
@@ -76,7 +76,7 @@ void MapGraphicItem::resize(const QRectF &rect)
     }
 
     core->OnMapSizeChanged(maprect.width(),maprect.height());
-    core->SetCurrentRegion(internals::Rectangle(0, 0, maprect.width(), maprect.height()));
+    core->SetCurrentRegion(opmap::Rectangle(0, 0, maprect.width(), maprect.height()));
     if(isVisible())
     {
         core->GoToCurrentPosition();
@@ -224,15 +224,15 @@ void MapGraphicItem::mouseMoveEvent(QGraphicsSceneMouseEvent *event)
     {
         selectionEnd = FromLocalToLatLng(event->pos().x(), event->pos().y());
         {
-            internals::PointLatLng p1 = selectionStart;
-            internals::PointLatLng p2 = selectionEnd;
+            opmap::PointLatLng p1 = selectionStart;
+            opmap::PointLatLng p2 = selectionEnd;
 
             double x1 = qMin(p1.Lng(), p2.Lng());
             double y1 = qMax(p1.Lat(), p2.Lat());
             double x2 = qMax(p1.Lng(), p2.Lng());
             double y2 = qMin(p1.Lat(), p2.Lat());
 
-            SetSelectedArea(internals::RectLatLng(y1, x1, x2 - x1, y1 - y2));
+            SetSelectedArea(opmap::RectLatLng(y1, x1, x2 - x1, y1 - y2));
         }
     }
     QGraphicsItem::mouseMoveEvent(event);
@@ -255,8 +255,8 @@ void MapGraphicItem::mousePressEvent(QGraphicsSceneMouseEvent *event)
         else if(!isSelected && ((event->modifiers()==Qt::AltModifier)||(event->modifiers()==Qt::ShiftModifier)))
         {
             isSelected = true;
-            SetSelectedArea (internals::RectLatLng::Empty);
-            selectionEnd = internals::PointLatLng::Empty;
+            SetSelectedArea (opmap::RectLatLng::Empty);
+            selectionEnd = opmap::PointLatLng::Empty;
             selectionStart = FromLocalToLatLng(event->pos().x(), event->pos().y());
         }
     }
@@ -296,12 +296,12 @@ void MapGraphicItem::mouseReleaseEvent(QGraphicsSceneMouseEvent *event)
     }
 }
 
-bool MapGraphicItem::SetZoomToFitRect(internals::RectLatLng const& rect)
+bool MapGraphicItem::SetZoomToFitRect(opmap::RectLatLng const& rect)
 {
     int maxZoom = core->GetMaxZoomToFitRect(rect);
     if(maxZoom > 0)
     {
-        internals::PointLatLng center=internals::PointLatLng(rect.Lat()-(rect.HeightLat()/2), rect.Lng()+(rect.WidthLng()/2));
+        opmap::PointLatLng center=opmap::PointLatLng(rect.Lat()-(rect.HeightLat()/2), rect.Lng()+(rect.WidthLng()/2));
         core->SetCurrentPosition(center);
 
         if(maxZoom > MaxZoom())
@@ -325,15 +325,15 @@ void MapGraphicItem::wheelEvent(QGraphicsSceneWheelEvent *event)
     {
         if(core->GetmouseLastZoom().X() != event->pos().x() && core->mouseLastZoom.Y() != event->pos().y())
         {
-            if(GetMouseWheelZoomType() == internals::MouseWheelZoomType::MousePositionAndCenter)
+            if(GetMouseWheelZoomType() == opmap::MouseWheelZoomType::MousePositionAndCenter)
             {
                 core->SetCurrentPosition(FromLocalToLatLng(event->pos().x(), event->pos().y()));
             }
-            else if(GetMouseWheelZoomType() == internals::MouseWheelZoomType::ViewCenter)
+            else if(GetMouseWheelZoomType() == opmap::MouseWheelZoomType::ViewCenter)
             {
                 core->SetCurrentPosition(FromLocalToLatLng((int) maprect.width()/2, (int) maprect.height()/2));
             }
-            else if(GetMouseWheelZoomType() == internals::MouseWheelZoomType::MousePositionWithoutCenter)
+            else if(GetMouseWheelZoomType() == opmap::MouseWheelZoomType::MousePositionWithoutCenter)
             {
                 core->SetCurrentPosition(FromLocalToLatLng(event->pos().x(), event->pos().y()));
 
@@ -344,7 +344,7 @@ void MapGraphicItem::wheelEvent(QGraphicsSceneWheelEvent *event)
         }
 
         // set mouse position to map center
-        if(GetMouseWheelZoomType() != internals::MouseWheelZoomType::MousePositionWithoutCenter)
+        if(GetMouseWheelZoomType() != opmap::MouseWheelZoomType::MousePositionWithoutCenter)
         {
             {
                 //                      System.Drawing.Point p = PointToScreen(new System.Drawing.Point(Width/2, Height/2));
@@ -381,7 +381,7 @@ void MapGraphicItem::DrawMap2D(QPainter *painter)
             core->SettilePoint (core->GetcenterTileXYLocation());
             core->SettilePoint(Point(core->GettilePoint().X()+ i,core->GettilePoint().Y()+j));
             {
-                internals::Tile* t = core->Matrix.TileAt(core->GettilePoint());
+                opmap::Tile* t = core->Matrix.TileAt(core->GettilePoint());
                 if(true)
                 {
                     core->tileRect.SetX(core->GettilePoint().X()*core->tileRect.Width());
@@ -439,8 +439,8 @@ void MapGraphicItem::DrawMap2D(QPainter *painter)
                         }
                         if(!SelectedArea().IsEmpty())
                         {
-                            core::Point p1 = FromLatLngToLocal(SelectedArea().LocationTopLeft());
-                            core::Point p2 = FromLatLngToLocal(SelectedArea().LocationRightBottom());
+                            opmap::Point p1 = FromLatLngToLocal(SelectedArea().LocationTopLeft());
+                            opmap::Point p2 = FromLatLngToLocal(SelectedArea().LocationRightBottom());
                             int x1 = p1.X();
                             int y1 = p1.Y();
                             int x2 = p2.X();
@@ -462,9 +462,9 @@ void MapGraphicItem::DrawMap2D(QPainter *painter)
 }
 
 
-core::Point MapGraphicItem::FromLatLngToLocal(internals::PointLatLng const& point)
+opmap::Point MapGraphicItem::FromLatLngToLocal(opmap::PointLatLng const& point)
 {
-    core::Point ret = core->FromLatLngToLocal(point);
+    opmap::Point ret = core->FromLatLngToLocal(point);
     if(MapRenderTransform!=1)
     {
         ret.SetX((int) (ret.X() * MapRenderTransform));
@@ -477,7 +477,7 @@ core::Point MapGraphicItem::FromLatLngToLocal(internals::PointLatLng const& poin
     return ret;
 }
 
-internals::PointLatLng MapGraphicItem::FromLocalToLatLng(int x, int y)
+opmap::PointLatLng MapGraphicItem::FromLocalToLatLng(int x, int y)
 {
     if(MapRenderTransform!=1)
     {
@@ -490,7 +490,7 @@ internals::PointLatLng MapGraphicItem::FromLocalToLatLng(int x, int y)
     return core->FromLocalToLatLng(x, y);
 }
 
-float MapGraphicItem::metersToPixels(double meters, internals::PointLatLng coord)
+float MapGraphicItem::metersToPixels(double meters, opmap::PointLatLng coord)
 {
     return meters/this->Projection()->GetGroundResolution(this->ZoomTotal(),coord.Lat());
 }
@@ -623,10 +623,10 @@ QRectF MapGraphicItem::boundingBox(const QRectF &rect, const qreal &angle)
 
 QSize MapGraphicItem::sizeHint()const
 {
-    core::Size size=core->projection->GetTileMatrixMaxXY(MinZoom());
-    core::Size tilesize=core->projection->TileSize();
+    opmap::Size size=core->projection->GetTileMatrixMaxXY(MinZoom());
+    opmap::Size tilesize=core->projection->TileSize();
     QSize rsize((size.Width()+1)*tilesize.Width(),(size.Height()+1)*tilesize.Height());
     return rsize;
 }
 
-} // end of namespace mapcontrol
+} // end of namespace opmap

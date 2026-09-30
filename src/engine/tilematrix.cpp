@@ -29,7 +29,7 @@
 #include "tilematrix.h"
 
 
-namespace internals {
+namespace opmap {
 
 TileMatrix::TileMatrix()
 {
@@ -153,4 +153,4 @@ void TileMatrix::SetTileAt(const Point &p, Tile* tile)
     mutex.unlock();
 }
 
-} // end of namespace internals
+} // end of namespace opmap

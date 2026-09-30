@@ -35,7 +35,7 @@
 #include <QStringList>
 
 
-namespace core {
+namespace opmap {
     class LanguageType:public QObject
     {
         Q_OBJECT

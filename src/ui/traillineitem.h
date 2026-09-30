@@ -33,7 +33,7 @@
 #include "pointlatlng.h"
 #include <QObject>
 
-namespace mapcontrol
+namespace opmap
 {
 
     class TrailLineItem:public QObject,public QGraphicsLineItem
@@ -42,12 +42,12 @@ namespace mapcontrol
         Q_INTERFACES(QGraphicsItem)
     public:
                 enum { Type = UserType + 7 };
-        TrailLineItem(internals::PointLatLng const& coord1,internals::PointLatLng const& coord2, QBrush color, QGraphicsItem* parent);
+        TrailLineItem(opmap::PointLatLng const& coord1,opmap::PointLatLng const& coord2, QBrush color, QGraphicsItem* parent);
         int type() const;
       //  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
        //             QWidget *widget);
-        internals::PointLatLng coord1;
-        internals::PointLatLng coord2;
+        opmap::PointLatLng coord1;
+        opmap::PointLatLng coord2;
     private:
         QBrush m_brush;
 

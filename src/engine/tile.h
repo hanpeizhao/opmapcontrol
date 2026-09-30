@@ -36,21 +36,21 @@
 #include <QDebug>
 #include "debugheader.h"
 
-using namespace core;
 
-namespace internals
+
+namespace opmap
 {
 
 class Tile
 {
 public:
-    Tile(int zoom,core::Point pos);
+    Tile(int zoom,opmap::Point pos);
     Tile();
     void Clear();
     int GetZoom(){return zoom;}
-    core::Point GetPos(){return pos;}
+    opmap::Point GetPos(){return pos;}
     void SetZoom(const int &value){zoom=value;}
-    void SetPos(const core::Point &value){pos=value;}
+    void SetPos(const opmap::Point &value){pos=value;}
     Tile& operator= (const Tile &cSource);
     Tile(const Tile &cSource)
     {
@@ -65,7 +65,7 @@ protected:
 
 private:
     int zoom;
-    core::Point pos;
+    opmap::Point pos;
 };
 
 }

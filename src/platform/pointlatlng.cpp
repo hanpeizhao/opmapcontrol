@@ -27,7 +27,7 @@
 #include "pointlatlng.h"
 
  
-namespace internals {
+namespace opmap {
 
 PointLatLng PointLatLng::Empty=PointLatLng();
 

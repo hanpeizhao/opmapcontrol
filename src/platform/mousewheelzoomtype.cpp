@@ -27,6 +27,6 @@
 #include "mousewheelzoomtype.h"
 
  
-namespace internals {
+namespace opmap {
 
 }

@@ -21,7 +21,7 @@
 #include <QTimer>
 #include <QDir>
 
-namespace core {
+namespace opmap {
 
 MapService::MapService() :
     RetryLoadTile(2),
@@ -223,4 +223,4 @@ diagnostics MapService::GetDiagnostics()
     return i;
 }
 
-} // end of namespace core
+} // end of namespace opmap

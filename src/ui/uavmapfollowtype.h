@@ -31,7 +31,7 @@
 #include <QMetaObject>
 #include <QMetaEnum>
 #include <QStringList>
-namespace mapcontrol {
+namespace opmap {
     class UAVMapFollowType:public QObject
     {
         Q_OBJECT

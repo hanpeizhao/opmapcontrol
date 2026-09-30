@@ -29,7 +29,7 @@
 #include "cacheitemqueue.h"
 
 
-namespace core {
+namespace opmap {
 
 CacheItemQueue::CacheItemQueue(const MapType::Types &Type, const Point &Pos, const QByteArray &Img, const int &Zoom)
 {
@@ -85,4 +85,4 @@ bool CacheItemQueue::operator ==(const CacheItemQueue &cSource)
     return b;
 }
 
-} // end of namespace core
+} // end of namespace opmap

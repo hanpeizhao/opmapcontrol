@@ -28,9 +28,9 @@
 #include "waypointitem.h"
 #include <QGraphicsSceneMouseEvent>
 
-namespace mapcontrol {
+namespace opmap {
 
-WayPointItem::WayPointItem(const internals::PointLatLng &coord,
+WayPointItem::WayPointItem(const opmap::PointLatLng &coord,
                            double const& altitude,
                            MapGraphicItem *map) :
     map(map),
@@ -64,7 +64,7 @@ WayPointItem::WayPointItem(const internals::PointLatLng &coord,
     RefreshPos();
 }
 
-WayPointItem::WayPointItem(const internals::PointLatLng &coord,
+WayPointItem::WayPointItem(const opmap::PointLatLng &coord,
                            double const& altitude,
                            const QString &description, MapGraphicItem *map) :
     map(map),
@@ -205,7 +205,7 @@ void WayPointItem::SetHeading(const float &value)
     this->update();
 }
 
-void WayPointItem::SetCoord(const internals::PointLatLng &value)
+void WayPointItem::SetCoord(const opmap::PointLatLng &value)
 {
     coord=value;
     emit WPValuesChanged(this);
@@ -358,7 +358,7 @@ WayPointItem::~WayPointItem()
 
 void WayPointItem::RefreshPos()
 {
-    core::Point point=map->FromLatLngToLocal(coord);
+    opmap::Point point=map->FromLatLngToLocal(coord);
     this->setPos(point.X(),point.Y());
 }
 
@@ -370,4 +370,4 @@ void WayPointItem::RefreshToolTip()
 
 int WayPointItem::snumber=0;
 
-} // end of namespace mapcontrol
+} // end of namespace opmap

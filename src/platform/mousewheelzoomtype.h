@@ -34,7 +34,7 @@
 #include <QMetaObject>
 #include <QMetaEnum>
 
-namespace internals {
+namespace opmap {
 
 class MouseWheelZoomType : public QObject
 {
@@ -92,7 +92,7 @@ public:
 
 }
 
-Q_DECLARE_METATYPE(internals::MouseWheelZoomType::Types)
+Q_DECLARE_METATYPE(opmap::MouseWheelZoomType::Types)
 
 #endif // MOUSEWHEELZOOMTYPE_H
 

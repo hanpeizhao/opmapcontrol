@@ -34,12 +34,12 @@
 #include <QByteArray>
 
 
-namespace core {
+namespace opmap {
 
 class CacheItemQueue
 {
 public:
-    CacheItemQueue(const MapType::Types &Type,const core::Point &Pos,const QByteArray &Img,const int &Zoom);
+    CacheItemQueue(const MapType::Types &Type,const opmap::Point &Pos,const QByteArray &Img,const int &Zoom);
     CacheItemQueue(){};
     CacheItemQueue(const CacheItemQueue &cSource)
     {
@@ -53,10 +53,10 @@ public:
     bool operator== (const CacheItemQueue &cSource);
 
     void SetMapType(const MapType::Types &value);
-    void SetPosition(const core::Point &value);
+    void SetPosition(const opmap::Point &value);
     void SetImg(const QByteArray &value);
     MapType::Types GetMapType();
-    core::Point GetPosition();
+    opmap::Point GetPosition();
     QByteArray GetImg();
 
     int GetZoom(){return zoom;};
@@ -64,11 +64,11 @@ public:
 
 private:
     MapType::Types type;
-    core::Point pos;
+    opmap::Point pos;
     QByteArray img;
     int zoom;
 };
 
-} // end of namespace core
+} // end of namespace opmap
 
 #endif // CACHEITEMQUEUE_H

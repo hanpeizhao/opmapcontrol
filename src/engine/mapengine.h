@@ -54,26 +54,26 @@
 
 #include <QObject>
 
-namespace mapcontrol {
+namespace opmap {
 class OPMapControl;
 class MapGraphicItem;
 }
 
-namespace internals {
+namespace opmap {
 
 class MapEngine:public QObject, public QRunnable
 {
     Q_OBJECT
 
-    friend class mapcontrol::OPMapControl;
-    friend class mapcontrol::MapGraphicItem;
+    friend class opmap::OPMapControl;
+    friend class opmap::MapGraphicItem;
 
 public:
-    explicit MapEngine(core::MapService *mapService);
+    explicit MapEngine(opmap::MapService *mapService);
     ~MapEngine();
 
     /// 所属的地图数据服务（MapRipper 等经此访问缓存与下载）
-    core::MapService *Service()const{return service;}
+    opmap::MapService *Service()const{return service;}
 
     void run();
 
@@ -81,29 +81,29 @@ public:
 
     void SetCurrentPosition(const PointLatLng &value);
 
-    core::Point GetcurrentPositionGPixel(){return currentPositionPixel;}
-    void SetcurrentPositionGPixel(const core::Point &value){currentPositionPixel=value;}
+    opmap::Point GetcurrentPositionGPixel(){return currentPositionPixel;}
+    void SetcurrentPositionGPixel(const opmap::Point &value){currentPositionPixel=value;}
 
-    core::Point GetrenderOffset(){return renderOffset;}
-    void SetrenderOffset(const core::Point &value){renderOffset=value;}
+    opmap::Point GetrenderOffset(){return renderOffset;}
+    void SetrenderOffset(const opmap::Point &value){renderOffset=value;}
 
-    core::Point GetcenterTileXYLocation(){return centerTileXYLocation;}
-    void SetcenterTileXYLocation(const core::Point &value){centerTileXYLocation=value;}
+    opmap::Point GetcenterTileXYLocation(){return centerTileXYLocation;}
+    void SetcenterTileXYLocation(const opmap::Point &value){centerTileXYLocation=value;}
 
-    core::Point GetcenterTileXYLocationLast(){return centerTileXYLocationLast;}
-    void SetcenterTileXYLocationLast(const core::Point &value){centerTileXYLocationLast=value;}
+    opmap::Point GetcenterTileXYLocationLast(){return centerTileXYLocationLast;}
+    void SetcenterTileXYLocationLast(const opmap::Point &value){centerTileXYLocationLast=value;}
 
-    core::Point GetdragPoint(){return dragPoint;}
-    void SetdragPoint(const core::Point &value){dragPoint=value;}
+    opmap::Point GetdragPoint(){return dragPoint;}
+    void SetdragPoint(const opmap::Point &value){dragPoint=value;}
 
-    core::Point GetmouseDown(){return mouseDown;}
-    void SetmouseDown(const core::Point &value){mouseDown=value;}
+    opmap::Point GetmouseDown(){return mouseDown;}
+    void SetmouseDown(const opmap::Point &value){mouseDown=value;}
 
-    core::Point GetmouseCurrent(){return mouseCurrent;}
-    void SetmouseCurrent(const core::Point &value){mouseCurrent=value;}
+    opmap::Point GetmouseCurrent(){return mouseCurrent;}
+    void SetmouseCurrent(const opmap::Point &value){mouseCurrent=value;}
 
-    core::Point GetmouseLastZoom(){return mouseLastZoom;}
-    void SetmouseLastZoom(const core::Point &value){mouseLastZoom=value;}
+    opmap::Point GetmouseLastZoom(){return mouseLastZoom;}
+    void SetmouseLastZoom(const opmap::Point &value){mouseLastZoom=value;}
 
     MouseWheelZoomType::Types GetMouseWheelZoomType(){return mousewheelzoomtype;}
     void SetMouseWheelZoomType(const MouseWheelZoomType::Types &value){mousewheelzoomtype=value;}
@@ -123,13 +123,13 @@ public:
     Rectangle GettileRect(){return tileRect;}
     void SettileRect(const Rectangle &value){tileRect=value;}
 
-    core::Point GettilePoint(){return tilePoint;}
-    void SettilePoint(const core::Point &value){tilePoint=value;}
+    opmap::Point GettilePoint(){return tilePoint;}
+    void SettilePoint(const opmap::Point &value){tilePoint=value;}
 
     Rectangle GetCurrentRegion(){return CurrentRegion;}
     void SetCurrentRegion(const Rectangle &value){CurrentRegion=value;}
 
-    QList<core::Point> tileDrawingList;
+    QList<opmap::Point> tileDrawingList;
 
     PureProjection* Projection()
     {
@@ -139,7 +139,7 @@ public:
     void SetProjection(PureProjection* value)
     {
         projection=value;
-        tileRect=Rectangle(core::Point(0,0),value->TileSize());
+        tileRect=Rectangle(opmap::Point(0,0),value->TileSize());
     }
 
 
@@ -184,7 +184,7 @@ public:
 
     int GetMaxZoomToFitRect(RectLatLng const& rect);
 
-    void BeginDrag(core::Point const& pt);
+    void BeginDrag(opmap::Point const& pt);
 
     void EndDrag();
 
@@ -194,13 +194,13 @@ public:
 
     bool MouseWheelZooming;
 
-    void DragOffset(core::Point const& offset);
+    void DragOffset(opmap::Point const& offset);
 
-    void Drag(core::Point const& pt);
+    void Drag(opmap::Point const& pt);
 
     void CancelAsyncTasks();
 
-    void FindTilesAround(QList<core::Point> &list);
+    void FindTilesAround(QList<opmap::Point> &list);
 
     void UpdateGroundResolution();
 
@@ -211,29 +211,29 @@ public:
     diagnostics GetDiagnostics();
 
 signals:
-    void OnCurrentPositionChanged(internals::PointLatLng point);
+    void OnCurrentPositionChanged(opmap::PointLatLng point);
     void OnTileLoadComplete();
     void OnTilesStillToLoad(int number);
     void OnTileLoadStart();
     void OnMapDrag();
     void OnMapZoomChanged();
     void OnMapTypeChanged(MapType::Types type);
-    void OnEmptyTileError(int zoom, core::Point pos);
+    void OnEmptyTileError(int zoom, opmap::Point pos);
     void OnNeedInvalidation();
 
 private:
     PointLatLng currentPosition;
-    core::Point currentPositionPixel;
-    core::Point renderOffset;
-    core::Point centerTileXYLocation;
-    core::Point centerTileXYLocationLast;
-    core::Point dragPoint;
+    opmap::Point currentPositionPixel;
+    opmap::Point renderOffset;
+    opmap::Point centerTileXYLocation;
+    opmap::Point centerTileXYLocationLast;
+    opmap::Point dragPoint;
     Rectangle tileRect;
-    core::Point mouseDown;
+    opmap::Point mouseDown;
     bool CanDragMap;
-    core::Point mouseCurrent;
+    opmap::Point mouseCurrent;
     PointLatLng LastLocationInBounds;
-    core::Point mouseLastZoom;
+    opmap::Point mouseLastZoom;
 
     MouseWheelZoomType::Types mousewheelzoomtype;
 
@@ -242,7 +242,7 @@ private:
     Size minOfTiles;
     Size maxOfTiles;
 
-    core::Point tilePoint;
+    opmap::Point tilePoint;
 
     Rectangle CurrentRegion;
 
@@ -278,7 +278,7 @@ private:
     int runningThreads;
     diagnostics diag;
 
-    core::MapService *service;   ///< 地图数据服务（OPMapWidget 所有，注入）
+    opmap::MapService *service;   ///< 地图数据服务（OPMapWidget 所有，注入）
 
 protected:
     bool started;
@@ -291,11 +291,11 @@ protected:
     int pxRes100km; // 100km
     int pxRes1000km; // 1000km
     int pxRes5000km; // 5000km
-    void SetCurrentPositionGPixel(core::Point const& value){currentPositionPixel = value;}
+    void SetCurrentPositionGPixel(opmap::Point const& value){currentPositionPixel = value;}
     void GoToCurrentPositionOnZoom();
 
 };
 
-} // end of namespace core
+} // end of namespace opmap
 
 #endif // CORE_H

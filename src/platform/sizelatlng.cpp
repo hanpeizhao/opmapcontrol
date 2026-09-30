@@ -29,7 +29,7 @@
 #include "sizelatlng.h"
 #include "pointlatlng.h"
 
-namespace internals {
+namespace opmap {
 
 SizeLatLng::SizeLatLng():heightLat(0),widthLng(0)
 {
@@ -64,4 +64,4 @@ bool operator!=(SizeLatLng const&  sz1, SizeLatLng const&  sz2)
 
 SizeLatLng SizeLatLng::Empty=SizeLatLng();
 
-} // end of namespace internals
+} // end of namespace opmap

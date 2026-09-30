@@ -43,7 +43,7 @@
 
 /// 生成各地图源（Google/OSM/ArcGIS/高德）的瓦片 URL，
 /// 并负责探测 Google 瓦片版本号
-namespace core {
+namespace opmap {
     class UrlFactory: public QObject,public ProviderStrings
     {
         Q_OBJECT
@@ -55,12 +55,12 @@ namespace core {
         QNetworkProxy Proxy;
         UrlFactory();
         ~UrlFactory();
-        QString MakeImageUrl(const MapType::Types &type,const core::Point &pos,const int &zoom,const QString &language);
+        QString MakeImageUrl(const MapType::Types &type,const opmap::Point &pos,const int &zoom,const QString &language);
         int Timeout;
     private:
         int Random(int low, int high);
-        void GetSecGoogleWords(const core::Point &pos,  QString &sec1, QString &sec2);
-        int GetServerNum(const core::Point &pos,const int &max) const;
+        void GetSecGoogleWords(const opmap::Point &pos,  QString &sec1, QString &sec2);
+        int GetServerNum(const opmap::Point &pos,const int &max) const;
         void TryCorrectGoogleVersions();
         bool isCorrectedGoogleVersions;
         bool CorrectGoogleVersions;

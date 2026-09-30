@@ -7,7 +7,7 @@
 #include "coordtransform.h"
 #include <qmath.h>
 
-namespace core {
+namespace opmap {
 namespace coordtransform {
 
 static const double PI          = 3.14159265358979323846;
@@ -43,7 +43,7 @@ static double transformLng(double x, double y)
     return ret;
 }
 
-internals::PointLatLng WGS84ToGCJ02(const internals::PointLatLng &pt)
+opmap::PointLatLng WGS84ToGCJ02(const opmap::PointLatLng &pt)
 {
     double lat = pt.Lat();
     double lng = pt.Lng();
@@ -62,18 +62,18 @@ internals::PointLatLng WGS84ToGCJ02(const internals::PointLatLng &pt)
     dLat = (dLat * 180.0) / ((A * (1 - EE)) / (magic * sqrtMagic) * PI);
     dLng = (dLng * 180.0) / (A / sqrtMagic * qCos(radLat) * PI);
 
-    return internals::PointLatLng(lat + dLat, lng + dLng);
+    return opmap::PointLatLng(lat + dLat, lng + dLng);
 }
 
-internals::PointLatLng GCJ02ToWGS84(const internals::PointLatLng &pt)
+opmap::PointLatLng GCJ02ToWGS84(const opmap::PointLatLng &pt)
 {
     // GCJ-02 无解析逆变换，用一步近似逆：在目标点处重新求偏移并扣除
-    internals::PointLatLng gcj = WGS84ToGCJ02(pt);
+    opmap::PointLatLng gcj = WGS84ToGCJ02(pt);
     double dLat = gcj.Lat() - pt.Lat();
     double dLng = gcj.Lng() - pt.Lng();
 
-    return internals::PointLatLng(pt.Lat() - dLat, pt.Lng() - dLng);
+    return opmap::PointLatLng(pt.Lat() - dLat, pt.Lng() - dLng);
 }
 
 } // namespace coordtransform
-} // namespace core
+} // namespace opmap

@@ -27,7 +27,7 @@
 #include "size.h"
 
  
-namespace core {
+namespace opmap {
 
 Size::Size():width(0),height(0)
 {}

@@ -31,7 +31,7 @@
 
 //#define DEBUG_TILECACHEQUEUE
 
-namespace core {
+namespace opmap {
 
 
 TileCacheQueue::TileCacheQueue(TileDiskCache *cache) : imageCache(cache)
@@ -133,4 +133,4 @@ void TileCacheQueue::run()
 #endif //DEBUG_TILECACHEQUEUE
 }
 
-} // end of namespace core
+} // end of namespace opmap

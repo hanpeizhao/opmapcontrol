@@ -43,7 +43,7 @@
 #include "waypointitem.h"
 //#include "uavitem.h"
 
-namespace mapcontrol
+namespace opmap
 {
 class OPMapWidget;
 
@@ -54,7 +54,7 @@ class OPMapWidget;
     */
 class MapGraphicItem:public QObject,public QGraphicsItem
 {
-    friend class mapcontrol::OPMapWidget;
+    friend class opmap::OPMapWidget;
     Q_OBJECT
     Q_INTERFACES(QGraphicsItem)
 
@@ -66,7 +66,7 @@ public:
         * @param configuration the configuration to be used
         * @return
         */
-    MapGraphicItem(internals::MapEngine *core,Configuration *configuration);
+    MapGraphicItem(opmap::MapEngine *core,Configuration *configuration);
 
     QRectF boundingRect() const;
 
@@ -79,18 +79,18 @@ public:
         * @brief Convertes LatLong coordinates to local item coordinates
         *
         * @param point LatLong point to be converted
-        * @return core::Point Local item point
+        * @return opmap::Point Local item point
         */
-    core::Point FromLatLngToLocal(internals::PointLatLng const& point);
+    opmap::Point FromLatLngToLocal(opmap::PointLatLng const& point);
 
     /**
         * @brief Converts from local item coordinates to LatLong point
         *
         * @param x x local coordinate
         * @param y y local coordinate
-        * @return internals::PointLatLng LatLng coordinate
+        * @return opmap::PointLatLng LatLng coordinate
         */
-    internals::PointLatLng FromLocalToLatLng(int x, int y);
+    opmap::PointLatLng FromLocalToLatLng(int x, int y);
 
     /**
         * @brief Converts from meters at one location to pixels
@@ -99,7 +99,7 @@ public:
         * @param coord Coordinate close to the distance measure
         * @return float Distance in pixels
         */
-    float metersToPixels(double meters, internals::PointLatLng coord);
+    float metersToPixels(double meters, opmap::PointLatLng coord);
 
     /**
         * @brief Returns true if map is being dragged
@@ -110,11 +110,11 @@ public:
 
     QImage lastimage;
     //        QPainter* imagePainter;
-    core::Point lastimagepoint;
+    opmap::Point lastimagepoint;
 
     void paintImage(QPainter* painter);
     void ConstructLastImage(int const& zoomdiff);
-    internals::PureProjection* Projection()const{return core->Projection();}
+    opmap::PureProjection* Projection()const{return core->Projection();}
     double Zoom();
     double ZoomDigi();
     double ZoomTotal();
@@ -124,10 +124,10 @@ public:
         *
         * @return The rectangle in lat/lon coordinates currently selected
         */
-    internals::RectLatLng SelectedArea()const{return selectedArea;}
+    opmap::RectLatLng SelectedArea()const{return selectedArea;}
 
 public slots:
-    void SetSelectedArea(internals::RectLatLng const& value){selectedArea = value;this->update();}
+    void SetSelectedArea(opmap::RectLatLng const& value){selectedArea = value;this->update();}
 
 protected:
     void mouseMoveEvent ( QGraphicsSceneMouseEvent * event );
@@ -159,8 +159,8 @@ protected:
 
 private:
     bool showDragons;
-    bool SetZoomToFitRect(internals::RectLatLng const& rect);
-    internals::MapEngine *core;
+    bool SetZoomToFitRect(opmap::RectLatLng const& rect);
+    opmap::MapEngine *core;
     Configuration *config;
     bool showTileGridLines;
     qreal MapRenderTransform;
@@ -180,9 +180,9 @@ private:
         */
     int minZoom;
 
-    internals::RectLatLng selectedArea;
-    internals::PointLatLng selectionStart;
-    internals::PointLatLng selectionEnd;
+    opmap::RectLatLng selectedArea;
+    opmap::PointLatLng selectionStart;
+    opmap::PointLatLng selectionEnd;
 
     double zoomReal;
     qreal rotation;
@@ -219,8 +219,8 @@ private:
         */
     int MinZoom()const{return minZoom;}
 
-    internals::MouseWheelZoomType::Types GetMouseWheelZoomType(){return core->GetMouseWheelZoomType();}
-    internals::RectLatLng BoundsOfMap;
+    opmap::MouseWheelZoomType::Types GetMouseWheelZoomType(){return core->GetMouseWheelZoomType();}
+    opmap::RectLatLng BoundsOfMap;
 
     void Offset(int const& x, int const& y);
     bool CanDragMap()const{return core->CanDragMap;}

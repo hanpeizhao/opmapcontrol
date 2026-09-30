@@ -42,15 +42,15 @@
 #include <QList>
 #include <QMutex>
 #include <QReadWriteLock>
-namespace core {
+namespace opmap {
     class TileDiskCache
     {
 
     public:
         TileDiskCache();
         static bool CreateEmptyDB(const QString &file);
-        bool PutImageToCache(const QByteArray &tile,const MapType::Types &type,const core::Point &pos, const int &zoom);
-        QByteArray GetImageFromCache(MapType::Types type, core::Point pos, int zoom);
+        bool PutImageToCache(const QByteArray &tile,const MapType::Types &type,const opmap::Point &pos, const int &zoom);
+        QByteArray GetImageFromCache(MapType::Types type, opmap::Point pos, int zoom);
         QString GtileCache();
         void setGtileCache(const QString &value);
         static bool ExportMapDataToDB(QString sourceFile, QString destFile);

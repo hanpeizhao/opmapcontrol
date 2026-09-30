@@ -36,7 +36,7 @@
 #include <QDebug>
 #include "debugheader.h"
 
-namespace core {
+namespace opmap {
     class TileMemoryCache
     {
     public:

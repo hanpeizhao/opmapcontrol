@@ -30,14 +30,14 @@
 #include "coordtransform.h"
 
 #ifdef DEBUG_CORE
-qlonglong internals::MapEngine::debugcounter=0;
+qlonglong opmap::MapEngine::debugcounter=0;
 #endif
 
-using namespace projections;
 
-namespace internals {
 
-MapEngine::MapEngine(core::MapService *mapService) :
+namespace opmap {
+
+MapEngine::MapEngine(opmap::MapService *mapService) :
     MouseWheelZooming(false),
     currentPosition(0,0),
     currentPositionPixel(0,0),

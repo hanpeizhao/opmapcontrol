@@ -36,7 +36,7 @@
 #include <QObject>
 #include "opmapwidget.h"
 
-namespace mapcontrol
+namespace opmap
 {
 
 class HomeItem:public QObject,public QGraphicsItem
@@ -57,8 +57,8 @@ public:
     int SafeArea()const{return safearea;}
     void SetSafeArea(int const& value){safearea=value;}
     bool safe;
-    void SetCoord(internals::PointLatLng const& value){coord=value;}
-    internals::PointLatLng Coord()const{return coord;}
+    void SetCoord(opmap::PointLatLng const& value){coord=value;}
+    opmap::PointLatLng Coord()const{return coord;}
     void SetAltitude(int const& value){altitude=value;}
     int Altitude()const{return altitude;}
 
@@ -66,8 +66,8 @@ private:
     MapGraphicItem* map;
     OPMapWidget* mapwidget;
     QPixmap pic;
-    core::Point localposition;
-    internals::PointLatLng coord;
+    opmap::Point localposition;
+    opmap::PointLatLng coord;
     bool showsafearea;
     int safearea;
     int localsafearea;
@@ -79,6 +79,6 @@ signals:
 
 };
 
-} // end of namespace mapcontrol
+} // end of namespace opmap
 
 #endif // HOMEITEM_H

@@ -30,9 +30,9 @@
 #include <QString>
 #include "point.h"
 
-using namespace core;
 
-namespace internals
+
+namespace opmap
 {
 
 struct LoadTask
@@ -40,7 +40,7 @@ struct LoadTask
     friend bool operator==(LoadTask const& lhs,LoadTask const& rhs);
 
 public:
-    core::Point Pos;
+    opmap::Point Pos;
     int Zoom;
 
     LoadTask(Point pos, int zoom)
@@ -51,7 +51,7 @@ public:
 
     LoadTask()
     {
-        Pos=core::Point(-1,-1);
+        Pos=opmap::Point(-1,-1);
         Zoom=-1;
     }
 

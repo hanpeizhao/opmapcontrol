@@ -29,7 +29,7 @@
 #include "tile.h"
 
 
-namespace internals {
+namespace opmap {
 
 Tile::Tile(int zoom, Point pos)
 {
@@ -63,4 +63,4 @@ Tile& Tile::operator =(const Tile &cSource)
     return *this;
 }
 
-} // end of namespace internals
+} // end of namespace opmap

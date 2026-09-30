@@ -34,7 +34,7 @@
 #include "mapgraphicitem.h"
 #include <QObject>
 
-namespace mapcontrol {
+namespace opmap {
 
 /**
 * @brief A QGraphicsItem representing a WayPoint
@@ -58,7 +58,7 @@ public:
     * @param map pointer to map to use
     * @return 
     */
-    WayPointItem(internals::PointLatLng const& coord, double const& altitude, MapGraphicItem* map);
+    WayPointItem(opmap::PointLatLng const& coord, double const& altitude, MapGraphicItem* map);
 
     /**
     * @brief Constructer
@@ -69,7 +69,7 @@ public:
     * @param map pointer to map to use
     * @return
     */
-    WayPointItem(internals::PointLatLng const& coord,double const& altitude,QString const& description,MapGraphicItem* map);
+    WayPointItem(opmap::PointLatLng const& coord,double const& altitude,QString const& description,MapGraphicItem* map);
 
     ~WayPointItem();
 
@@ -118,14 +118,14 @@ public:
     * @brief Returns WayPoint LatLng coordinate
     *
     */
-    internals::PointLatLng Coord() const {return coord;}
+    opmap::PointLatLng Coord() const {return coord;}
 
     /**
     * @brief  Sets WayPoint LatLng coordinate
     *
     * @param value
     */
-    void SetCoord(internals::PointLatLng const& value);
+    void SetCoord(opmap::PointLatLng const& value);
 
     /**
     * @brief Used if WayPoint number is to be drawn on screen
@@ -191,7 +191,7 @@ protected:
     QGraphicsSimpleTextItem* numberI;
     QGraphicsRectItem* numberIBG;
     QTransform transf;
-    internals::PointLatLng coord;//coordinates of this WayPoint
+    opmap::PointLatLng coord;//coordinates of this WayPoint
     bool reached;
     QString description;
     bool shownumber;
@@ -252,6 +252,6 @@ signals:
     void WPEdit(int num, WayPointItem *wp);
 };
 
-} // end of namespace mapcontrol
+} // end of namespace opmap
 
 #endif // WAYPOINTITEM_H

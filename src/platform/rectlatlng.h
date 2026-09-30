@@ -34,7 +34,7 @@
 #include <QString>
 #include "sizelatlng.h"
  
-namespace internals {
+namespace opmap {
 struct RectLatLng
 {
 public:

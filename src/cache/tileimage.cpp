@@ -28,7 +28,7 @@
 
 
  
-namespace core {
+namespace opmap {
 TileImageProxy::TileImageProxy()
 {
 

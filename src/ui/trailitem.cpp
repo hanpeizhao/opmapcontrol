@@ -29,10 +29,10 @@
 #include "trailitem.h"
 #include <QDateTime>
 
-namespace mapcontrol
+namespace opmap
 {
 
-TrailItem::TrailItem(internals::PointLatLng const& coord,int const& altitude, QBrush color, QGraphicsItem* parent):QGraphicsItem(parent),coord(coord)
+TrailItem::TrailItem(opmap::PointLatLng const& coord,int const& altitude, QBrush color, QGraphicsItem* parent):QGraphicsItem(parent),coord(coord)
 {
     m_brush=color;
     QDateTime time=QDateTime::currentDateTime();

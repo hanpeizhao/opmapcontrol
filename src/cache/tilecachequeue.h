@@ -37,7 +37,7 @@
 #include "tilediskcache.h"
 
 
-namespace core {
+namespace opmap {
     /// 后台线程：把网络下载的瓦片异步写入磁盘缓存（SQLite）
     class TileCacheQueue:public QThread
     {

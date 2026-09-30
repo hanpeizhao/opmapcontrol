@@ -31,7 +31,7 @@
 #include <QString>
 #include <QHash>
 
-namespace core {
+namespace opmap {
     struct Size
     {
 

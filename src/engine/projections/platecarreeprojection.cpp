@@ -28,7 +28,7 @@
 
 
  
-namespace projections {
+namespace opmap {
 PlateCarreeProjection::PlateCarreeProjection():MinLatitude(-85.05112878), MaxLatitude(85.05112878),MinLongitude(-180),
 MaxLongitude(180), tileSize(512, 512)
 {
@@ -52,9 +52,9 @@ Point PlateCarreeProjection::FromLatLngToPixel(double lat, double lng, const int
     return ret;
 
 }
-internals::PointLatLng PlateCarreeProjection::FromPixelToLatLng(const int &x, const int &y, const int &zoom)
+opmap::PointLatLng PlateCarreeProjection::FromPixelToLatLng(const int &x, const int &y, const int &zoom)
 {
-    internals::PointLatLng ret;// = internals::PointLatLng.Empty;
+    opmap::PointLatLng ret;// = opmap::PointLatLng.Empty;
 
     Size s = GetTileMatrixSizePixel(zoom);
     double mapSizeX = s.Width();

@@ -54,7 +54,7 @@
 #include "mapripper.h"
 #include "uavtrailtype.h"
 
-namespace mapcontrol {
+namespace opmap {
 
 class UAVItem;
 class GPSItem;
@@ -90,64 +90,64 @@ public:
     /**
         * @brief Converts from String to Type
         */
-    static internals::MouseWheelZoomType::Types MouseWheelZoomTypeFromString(QString const& value) {
-        return internals::MouseWheelZoomType::TypeByStr(value);
+    static opmap::MouseWheelZoomType::Types MouseWheelZoomTypeFromString(QString const& value) {
+        return opmap::MouseWheelZoomType::TypeByStr(value);
     }
 
     /**
         * @brief Converts from Type to String
         */
-    static QString StrFromMouseWheelZoomType(internals::MouseWheelZoomType::Types const& value) {
-        return internals::MouseWheelZoomType::StrByType(value);
+    static QString StrFromMouseWheelZoomType(opmap::MouseWheelZoomType::Types const& value) {
+        return opmap::MouseWheelZoomType::StrByType(value);
     }
 
     /**
         * @brief Returns QStringList with string representing all the enum values
         */
     static QStringList MouseWheelZoomTypes() {
-        return internals::MouseWheelZoomType::TypesList();
+        return opmap::MouseWheelZoomType::TypesList();
     }
 
     /**
         * @brief Converts from String to Type
         */
-    static core::LanguageType::Types LanguageTypeFromString(QString const& value) {
-        return core::LanguageType::TypeByStr(value);
+    static opmap::LanguageType::Types LanguageTypeFromString(QString const& value) {
+        return opmap::LanguageType::TypeByStr(value);
     }
 
     /**
         * @brief Converts from Type to String
         */
-    static QString StrFromLanguageType(core::LanguageType::Types const& value) {
-        return core::LanguageType::StrByType(value);
+    static QString StrFromLanguageType(opmap::LanguageType::Types const& value) {
+        return opmap::LanguageType::StrByType(value);
     }
 
     /**
         * @brief Returns QStringList with string representing all the enum values
         */
     static QStringList LanguageTypes() {
-        return core::LanguageType::TypesList();
+        return opmap::LanguageType::TypesList();
     }
 
     /**
         * @brief Converts from String to Type
         */
-    static core::AccessMode::Types AccessModeFromString(QString const& value) {
-        return core::AccessMode::TypeByStr(value);
+    static opmap::AccessMode::Types AccessModeFromString(QString const& value) {
+        return opmap::AccessMode::TypeByStr(value);
     }
 
     /**
         * @brief Converts from Type to String
         */
-    static QString StrFromAccessMode(core::AccessMode::Types const& value) {
-        return core::AccessMode::StrByType(value);
+    static QString StrFromAccessMode(opmap::AccessMode::Types const& value) {
+        return opmap::AccessMode::StrByType(value);
     }
 
     /**
         * @brief Returns QStringList with string representing all the enum values
         */
     static QStringList AccessModeTypes() {
-        return core::AccessMode::TypesList();
+        return opmap::AccessMode::TypesList();
     }
 
     /**
@@ -193,7 +193,7 @@ class OPMapWidget:public QGraphicsView
     Q_PROPERTY(bool ShowTileGridLines READ ShowTileGridLines WRITE SetShowTileGridLines)
     Q_PROPERTY(double Zoom READ ZoomTotal WRITE SetZoom)
     Q_PROPERTY(qreal Rotate READ Rotate WRITE SetRotate)
-    Q_ENUMS(internals::MouseWheelZoomType::Types)
+    Q_ENUMS(opmap::MouseWheelZoomType::Types)
 
 public:
     QSize sizeHint() const;
@@ -253,19 +253,19 @@ public:
      */
     void SetMinZoom(int const& value){map->minZoom = value;}
 
-    internals::MouseWheelZoomType::Types GetMouseWheelZoomType() {
+    opmap::MouseWheelZoomType::Types GetMouseWheelZoomType() {
         return  map->core->GetMouseWheelZoomType();
     }
-    void SetMouseWheelZoomType(internals::MouseWheelZoomType::Types const& value) {
+    void SetMouseWheelZoomType(opmap::MouseWheelZoomType::Types const& value) {
         map->core->SetMouseWheelZoomType(value);
     }
-    //  void SetMouseWheelZoomTypeByStr(const QString &value){map->core->SetMouseWheelZoomType(internals::MouseWheelZoomType::TypeByStr(value));}
+    //  void SetMouseWheelZoomTypeByStr(const QString &value){map->core->SetMouseWheelZoomType(opmap::MouseWheelZoomType::TypeByStr(value));}
     //  QString GetMouseWheelZoomTypeStr(){return map->GetMouseWheelZoomTypeStr();}
 
-    internals::RectLatLng SelectedArea() const {
+    opmap::RectLatLng SelectedArea() const {
         return  map->selectedArea;
     }
-    void SetSelectedArea(internals::RectLatLng const& value) {
+    void SetSelectedArea(opmap::RectLatLng const& value) {
         map->selectedArea = value;
         this->update();
     }
@@ -277,10 +277,10 @@ public:
         map->SetCanDragMap(value);
     }
 
-    internals::PointLatLng CurrentPosition() const {
+    opmap::PointLatLng CurrentPosition() const {
         return map->core->CurrentPosition();
     }
-    void SetCurrentPosition(internals::PointLatLng const& value) {
+    void SetCurrentPosition(opmap::PointLatLng const& value) {
         map->core->SetCurrentPosition(value);
     }
 
@@ -313,21 +313,21 @@ public:
 
     Configuration* configuration;
 
-    internals::PointLatLng currentMousePosition();
+    opmap::PointLatLng currentMousePosition();
 
     void SetFollowMouse(bool const& value){followmouse=value;this->setMouseTracking(followmouse);}
     bool FollowMouse(){return followmouse;}
 
-    internals::PointLatLng GetFromLocalToLatLng(QPointF p) {return map->FromLocalToLatLng(p.x(),p.y());}
+    opmap::PointLatLng GetFromLocalToLatLng(QPointF p) {return map->FromLocalToLatLng(p.x(),p.y());}
 
     /** @brief Convert meters to pixels */
     float metersToPixels(double meters);
 
     /** @brief Return the bearing from one point to another .. in degrees */
-    double bearing(internals::PointLatLng from, internals::PointLatLng to);
+    double bearing(opmap::PointLatLng from, opmap::PointLatLng to);
 
     /** @brief Return a destination lat/lon point given a source lat/lon point and the bearing and distance from the source point */
-    internals::PointLatLng destPoint(internals::PointLatLng source, double bear, double dist);
+    opmap::PointLatLng destPoint(opmap::PointLatLng source, double bear, double dist);
 
     /**
      * @brief Creates a new WayPoint on the center of the map
@@ -358,7 +358,7 @@ public:
      * @param altitude the Altitude of the WayPoint
      * @return WayPointItem a pointer to the WayPoint created
      */
-    WayPointItem* WPCreate(internals::PointLatLng const& coord, int const& altitude);
+    WayPointItem* WPCreate(opmap::PointLatLng const& coord, int const& altitude);
 
     /**
      * @brief Creates a new WayPoint
@@ -368,7 +368,7 @@ public:
      * @param description the description of the WayPoint
      * @return WayPointItem a pointer to the WayPoint created
      */
-    WayPointItem* WPCreate(internals::PointLatLng const& coord,int const& altitude, QString const& description);
+    WayPointItem* WPCreate(opmap::PointLatLng const& coord,int const& altitude, QString const& description);
 
     /**
      * @brief Inserts a new WayPoint on the specified position
@@ -394,7 +394,7 @@ public:
      * @param position index of the WayPoint
      * @return WayPointItem a pointer to the WayPoint Inserted
      */
-    WayPointItem* WPInsert(internals::PointLatLng const& coord,int const& altitude,int const& position);
+    WayPointItem* WPInsert(opmap::PointLatLng const& coord,int const& altitude,int const& position);
 
     /**
      * @brief Inserts a new WayPoint on the specified position
@@ -405,7 +405,7 @@ public:
      * @param position index of the WayPoint
      * @return WayPointItem a pointer to the WayPoint Inserted
      */
-    WayPointItem* WPInsert(internals::PointLatLng const& coord,int const& altitude, QString const& description,int const& position);
+    WayPointItem* WPInsert(opmap::PointLatLng const& coord,int const& altitude, QString const& description,int const& position);
 
     /**
      * @brief Deletes the WayPoint
@@ -468,13 +468,13 @@ public:
     QMap<int, UAVItem*> UAVS;
 
 private:
-    core::MapService *service;   ///< 地图数据服务（构造创建、析构释放）
-    internals::MapEngine *core;
+    opmap::MapService *service;   ///< 地图数据服务（构造创建、析构释放）
+    opmap::MapEngine *core;
     QGraphicsScene mscene;
     bool useOpenGL;
     MapType y;
-    core::AccessMode xx;
-    internals::PointLatLng currentmouseposition;
+    opmap::AccessMode xx;
+    opmap::PointLatLng currentmouseposition;
     bool followmouse;
     QGraphicsSvgItem *compass;
     bool showuav;
@@ -566,14 +566,14 @@ signals:
      *
      * @param position the position of the UAV
      */
-    void UAVLeftSafetyBouble(internals::PointLatLng const& position);
+    void UAVLeftSafetyBouble(opmap::PointLatLng const& position);
 
     /**
      * @brief Fires when map position changes
      *
      * @param point the point in LatLng of the new center of the map
      */
-    void OnCurrentPositionChanged(internals::PointLatLng point);
+    void OnCurrentPositionChanged(opmap::PointLatLng point);
 
     /**
      * @brief Fires when there are no more tiles to load
@@ -612,7 +612,7 @@ signals:
      * @param zoom tile zoom
      * @param pos tile position
      */
-    void OnEmptyTileError(int zoom, core::Point pos);
+    void OnEmptyTileError(int zoom, opmap::Point pos);
 
     /**
      * @brief Fires when the number of tiles in the load queue changes
@@ -646,6 +646,6 @@ public slots:
     }
 };
 
-} // end of namespace mapcontrol
+} // end of namespace opmap
 
 #endif // OPMAPWIDGET_H

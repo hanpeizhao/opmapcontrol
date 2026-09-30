@@ -34,7 +34,7 @@
 #include <QFont>
 #include "mapservice.h"
 #include "accessmode.h"
-namespace mapcontrol
+namespace opmap
 {
     
 /**
@@ -90,33 +90,33 @@ public:
     */
     Qt::MouseButton DragButton;
 
-    core::MapService *mapService;   ///< 地图数据服务（OPMapWidget 注入，不接管所有权）
+    opmap::MapService *mapService;   ///< 地图数据服务（OPMapWidget 注入，不接管所有权）
 
     /**
     * @brief Sets the access mode for the map (cache only, server and cache...)
     *
     * @param type access mode
     */
-    void SetAccessMode(core::AccessMode::Types const& type);
+    void SetAccessMode(opmap::AccessMode::Types const& type);
     /**
     * @brief Returns the access mode for the map (cache only, server and cache...)
     *
-    * @return core::AccessMode::Types access mode for the map
+    * @return opmap::AccessMode::Types access mode for the map
     */
-    core::AccessMode::Types AccessMode();
+    opmap::AccessMode::Types AccessMode();
 
     /**
     * @brief Sets the language used for geocaching
     *
     * @param type The language to be used
     */
-    void SetLanguage(core::LanguageType::Types const& type);
+    void SetLanguage(opmap::LanguageType::Types const& type);
     /**
     * @brief Returns the language used for geocaching
     *
-    * @return core::LanguageType::Types
+    * @return opmap::LanguageType::Types
     */
-    core::LanguageType::Types Language();
+    opmap::LanguageType::Types Language();
 
     /**
     * @brief Used to allow disallow use of memory caching
@@ -173,7 +173,7 @@ public:
     * @param destDB the destination DB. If it doesnt exhist it will be created.
     * @return
     */
-    void ExportMapDataToDB(QString const& sourceDB, QString const& destDB)const{core::TileDiskCache::ExportMapDataToDB(sourceDB,destDB);}
+    void ExportMapDataToDB(QString const& sourceDB, QString const& destDB)const{opmap::TileDiskCache::ExportMapDataToDB(sourceDB,destDB);}
     /**
     * @brief Returns the location for the SQLite Database used for caching and the geocoding cache files
     *
@@ -186,7 +186,7 @@ public:
     *
     * @param service 地图数据服务指针，不接管所有权
     */
-    void SetMapService(core::MapService *service){mapService=service;}
+    void SetMapService(opmap::MapService *service){mapService=service;}
 
 
 };

@@ -37,29 +37,29 @@
 #include "mapripform.h"
 
 
-namespace mapcontrol {
+namespace opmap {
 
 class MapRipper : public QThread
 {
     Q_OBJECT
 
 public:
-    MapRipper(internals::MapEngine *, internals::RectLatLng const&);
+    MapRipper(opmap::MapEngine *, opmap::RectLatLng const&);
 
     void run();
 
 private:
-    QList<core::Point> points;
+    QList<opmap::Point> points;
     int zoom;
-    core::MapType::Types type;
+    opmap::MapType::Types type;
     int sleep;
-    internals::RectLatLng area;         // 用户坐标(WGS-84)下的下载区域
-    internals::RectLatLng tileArea;     // 瓦片坐标系下的下载区域（GCJ-02 地图源已纠偏）
+    opmap::RectLatLng area;         // 用户坐标(WGS-84)下的下载区域
+    opmap::RectLatLng tileArea;     // 瓦片坐标系下的下载区域（GCJ-02 地图源已纠偏）
 
     bool cancel;
     MapRipForm * progressForm;
     int maxzoom;
-    internals::MapEngine * core;
+    opmap::MapEngine * core;
 
 signals:
     void percentageChanged(int const& perc);

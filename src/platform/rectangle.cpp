@@ -28,7 +28,7 @@
 
 #include "rectangle.h"
 
-namespace internals {
+namespace opmap {
 
 Rectangle Rectangle::Empty=Rectangle();
 
@@ -86,4 +86,4 @@ uint qHash(Rectangle const& rect)
                   (((quint32) rect.height <<  7) | ((quint32) rect.height >> 25)));
 }
 
-} // end of namespace internals
+} // end of namespace opmap

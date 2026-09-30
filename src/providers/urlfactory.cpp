@@ -30,7 +30,7 @@
 #include <QRegExp>
 #include <qmath.h>
 
-namespace core {
+namespace opmap {
 
 const double UrlFactory::EarthRadiusKm = 6378.137; // WGS-84
 
@@ -277,4 +277,4 @@ void UrlFactory::GetSecGoogleWords(const Point &pos,  QString &sec1, QString &se
     }
 }
 
-} // end of namespace core
+} // end of namespace opmap

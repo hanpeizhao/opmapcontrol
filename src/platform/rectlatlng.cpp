@@ -29,7 +29,7 @@
 #include "rectlatlng.h"
 
 
-namespace internals {
+namespace opmap {
 
 RectLatLng RectLatLng::Empty=RectLatLng();
 
@@ -52,4 +52,4 @@ bool operator!=(RectLatLng const& left,RectLatLng const& right)
     return !(left == right);
 }
 
-} // end of namespace internals
+} // end of namespace opmap

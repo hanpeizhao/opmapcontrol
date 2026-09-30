@@ -27,7 +27,7 @@
 #include "point.h"
 #include "size.h"
 
-namespace core {
+namespace opmap {
     Point::Point(int dw)
     {
         this->x=(short)Point::loWord(dw);

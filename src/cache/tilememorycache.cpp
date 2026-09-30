@@ -30,7 +30,7 @@
 
 //TODO add readwrite lock
 
-namespace core {
+namespace opmap {
 
 TileMemoryCache::TileMemoryCache()
 {

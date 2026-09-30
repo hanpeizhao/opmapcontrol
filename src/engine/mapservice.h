@@ -30,7 +30,7 @@
 #include "urlfactory.h"
 #include "diagnostics.h"
 
-namespace core {
+namespace opmap {
 
 class MapService
 {
@@ -93,6 +93,6 @@ private:
     QMutex errorvars;
 };
 
-} // end of namespace core
+} // end of namespace opmap
 
 #endif // MAPSERVICE_H

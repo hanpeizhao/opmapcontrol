@@ -27,7 +27,7 @@
 #include "tilekey.h"
 
  
-namespace core {
+namespace opmap {
 
 TileKey::TileKey(const MapType::Types &Type, const Point &Pos, const int &Zoom)
 {
@@ -84,4 +84,4 @@ bool operator==(TileKey const &lhs,TileKey const &rhs)
     return (lhs.pos==rhs.pos && lhs.zoom==rhs.zoom && lhs.type==rhs.type);
 }
 
-} // end of namespace core
+} // end of namespace opmap

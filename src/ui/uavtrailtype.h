@@ -33,7 +33,7 @@
 #include <QMetaEnum>
 #include <QStringList>
 
-namespace mapcontrol {
+namespace opmap {
 
 class UAVTrailType:public QObject
 {
@@ -94,6 +94,6 @@ public:
     }
 };
 
-} // end of namespace mapcontrol
+} // end of namespace opmap
 
 #endif // UAVTRAILTYPE_H

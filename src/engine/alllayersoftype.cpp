@@ -28,7 +28,7 @@
 
 #include "alllayersoftype.h"
 
-namespace core {
+namespace opmap {
 
 AllLayersOfType::AllLayersOfType()
 {
@@ -61,4 +61,4 @@ QVector<MapType::Types> AllLayersOfType::GetAllLayersOfType(const MapType::Types
     return types;
 }
 
-} // end of namespace core
+} // end of namespace opmap
