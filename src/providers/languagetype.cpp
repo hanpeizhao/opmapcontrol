@@ -3,7 +3,7 @@
 *
 * @file       languagetype.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      地图语言枚举与 URL 短码      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

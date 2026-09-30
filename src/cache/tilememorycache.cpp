@@ -3,7 +3,7 @@
 *
 * @file       tilememorycache.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      内存瓦片 LRU 缓存，超过容量后淘汰最早瓦片      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

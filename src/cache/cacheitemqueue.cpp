@@ -3,7 +3,7 @@
 *
 * @file       cacheitemqueue.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      写库任务项：待落盘瓦片的数据封装      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

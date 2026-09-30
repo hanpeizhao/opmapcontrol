@@ -242,12 +242,12 @@ public:
     //  void SetMaxZoom(int const& value){map->maxZoom = value;}
 
     /**
-     * @brief
+     * @brief Returns the minimum zoom for the map
      *
      */
     int MinZoom()const{return map->minZoom;}
     /**
-     * @brief
+     * @brief Sets the minimum zoom for the map
      *
      * @param value
      */

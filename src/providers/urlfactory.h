@@ -3,7 +3,7 @@
 *
 * @file       urlfactory.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      各地图源（Google/OSM/ArcGIS/高德）瓦片 URL 工厂      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

@@ -32,6 +32,9 @@ opmapcontrol_demo.exe
 *.pro.user
 *.autosave
 
+# Trae IDE 本地目录（会话与文档缓存）
+.trae/
+
 # ===== 系统文件 =====
 Thumbs.db
 Desktop.ini

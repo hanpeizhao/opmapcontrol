@@ -3,7 +3,7 @@
 *
 * @file       core.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      地图引擎核心：瓦片矩阵调度、加载线程与几何变换      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{
@@ -51,8 +51,8 @@ MapEngine::MapEngine(opmap::MapService *mapService) :
     loaderLimit(5),
     maxzoom(21),
     runningThreads(0),
-    started(false),
-    service(mapService)
+    service(mapService),
+    started(false)
 {
     mousewheelzoomtype=MouseWheelZoomType::MousePositionAndCenter;
     SetProjection(new MercatorProjection());

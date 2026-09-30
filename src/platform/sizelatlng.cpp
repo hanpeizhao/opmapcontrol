@@ -3,7 +3,7 @@
 *
 * @file       sizelatlng.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      经纬度尺寸（跨经纬度量）      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

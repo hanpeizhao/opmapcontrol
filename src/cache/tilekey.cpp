@@ -3,7 +3,7 @@
 *
 * @file       tilekey.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      瓦片缓存键：地图类型 + 瓦片坐标 + 缩放级别      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

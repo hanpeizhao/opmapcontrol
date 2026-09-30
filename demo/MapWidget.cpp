@@ -132,9 +132,8 @@ void MapType_Dialog::setMapType(opmap::MapType::Types t)
 
 opmap::MapType::Types MapType_Dialog::getMapType(void)
 {
-    int     idx, typeID;
+    int     typeID;
 
-    idx    = cbMapType->currentIndex();
     typeID = g_arrMapType[cbMapType->currentIndex()].typeID;
 
     return (opmap::MapType::Types) typeID;
@@ -363,7 +362,7 @@ void WaypointEdit_Dialog::setupUi(void)
     QMetaObject::connectSlotsByName(this);
 }
 
-void WaypointEdit_Dialog::act_cbAllWaypoints_clicked(bool s)
+void WaypointEdit_Dialog::act_cbAllWaypoints_clicked(bool)
 {
     if( cbAllWaypoints->checkState() == Qt::Checked ) {
         setWaypoints_(-1, m_wpMap, m_bHeightAltitude);
@@ -372,7 +371,7 @@ void WaypointEdit_Dialog::act_cbAllWaypoints_clicked(bool s)
     }
 }
 
-void WaypointEdit_Dialog::act_cbHeightAltitude_clicked(bool s)
+void WaypointEdit_Dialog::act_cbHeightAltitude_clicked(bool)
 {
     if( cbHeightAltitude->checkState() == Qt::Checked ) {
         m_bHeightAltitude = 1;
@@ -552,7 +551,7 @@ int MapWidget::getWaypoints(AP_WPArray &wpa)
     return 0;
 }
 
-int MapWidget::setWaypoints(AP_WPArray &wpa)
+int MapWidget::setWaypoints(AP_WPArray &)
 {
     return 0;
 }
@@ -774,7 +773,7 @@ void MapWidget::actWaypoint_clear(void)
     ReloadMap();
 }
 
-void MapWidget::actWPEdit(int num, WayPointItem *wp)
+void MapWidget::actWPEdit(int num, WayPointItem *)
 {
     QMap<int, opmap::WayPointItem*>    wpMap;
     int                                     idx;

@@ -3,7 +3,7 @@
 *
 * @file       maptype.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      地图源类型枚举与名称映射（数值是历史遗留的稳定 ID）      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

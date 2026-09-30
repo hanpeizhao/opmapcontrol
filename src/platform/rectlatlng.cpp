@@ -3,7 +3,7 @@
 *
 * @file       rectlatlng.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      经纬度矩形区域，用于框选与离线下载范围      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

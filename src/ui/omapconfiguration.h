@@ -77,7 +77,7 @@ public:
     */
     QPen SelectionPen;
     /**
-    * @brief
+    * @brief Font used to draw missing data text on empty tiles
     *
     * @var MissingDataFont
     */

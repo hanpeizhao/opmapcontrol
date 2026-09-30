@@ -3,7 +3,7 @@
 *
 * @file       tilecachequeue.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      后台线程：把网络下载的瓦片异步写入磁盘缓存      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

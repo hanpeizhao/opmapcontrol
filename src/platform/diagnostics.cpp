@@ -3,7 +3,7 @@
 *
 * @file       diagnostics.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief
+* @brief      网络与缓存命中统计结构
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

@@ -86,7 +86,7 @@ void QTestWin::actFatchMap(void)
 }
 
 
-void QTestWin::moveUAVStateChanged(bool state)
+void QTestWin::moveUAVStateChanged(bool)
 {
     if( m_cbMoveUAV->checkState() == Qt::Checked ) {
         m_uav = m_mapWidget->AddUAV(0);
@@ -101,7 +101,7 @@ void QTestWin::mapWidget_zoomChanged(int newZoom)
     printf(">>> zoom to: %d\n", newZoom);
 }
 
-void QTestWin::mapWidget_mouseMoveEvent(QMouseEvent *event)
+void QTestWin::mapWidget_mouseMoveEvent(QMouseEvent *)
 {
     if( m_cbMoveUAV->checkState() == Qt::Checked ) {
         opmap::PointLatLng p;
@@ -113,7 +113,7 @@ void QTestWin::mapWidget_mouseMoveEvent(QMouseEvent *event)
     }
 }
 
-void QTestWin::timerEvent(QTimerEvent *event)
+void QTestWin::timerEvent(QTimerEvent *)
 {
 
 }

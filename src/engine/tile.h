@@ -3,7 +3,7 @@
 *
 * @file       tile.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      单个地图瓦片：位置与多层叠加图像      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

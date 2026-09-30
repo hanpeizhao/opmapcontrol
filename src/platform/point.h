@@ -3,7 +3,7 @@
 *
 * @file       point.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      二维像素坐标点（整型），用于瓦片与屏幕坐标运算      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

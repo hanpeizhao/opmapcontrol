@@ -3,7 +3,7 @@
 *
 * @file       size.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      宽高尺寸，用于瓦片与区域大小计算      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

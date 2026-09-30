@@ -3,7 +3,7 @@
 *
 * @file       rectangle.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      像素矩形，用于视口与瓦片范围计算      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

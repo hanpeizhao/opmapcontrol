@@ -3,7 +3,7 @@
 *
 * @file       alllayersoftype.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      地图类型→图层列表拆分（如 Hybrid = 影像 + 路网）      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

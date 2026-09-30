@@ -3,7 +3,7 @@
 *
 * @file       pureprojection.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      投影基类：经纬度↔像素换算与瓦片范围      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

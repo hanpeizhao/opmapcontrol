@@ -3,7 +3,7 @@
 *
 * @file       tilematrix.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      瓦片矩阵：按坐标存取当前视口的瓦片      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

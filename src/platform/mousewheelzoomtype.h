@@ -3,7 +3,7 @@
 *
 * @file       mousewheelzoomtype.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      滚轮缩放模式枚举（围绕中心/围绕鼠标位置）      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

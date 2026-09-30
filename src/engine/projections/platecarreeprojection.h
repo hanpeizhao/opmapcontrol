@@ -3,7 +3,7 @@
 *
 * @file       platecarreeprojection.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      Plate Carrée 等距圆柱投影（ArcGIS 系）      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

@@ -3,7 +3,7 @@
 *
 * @file       core.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      地图引擎核心：瓦片矩阵调度、加载线程与几何变换      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

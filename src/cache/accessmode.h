@@ -3,7 +3,7 @@
 *
 * @file       accessmode.h
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      缓存访问模式枚举（仅服务器/仅缓存/两者）      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{

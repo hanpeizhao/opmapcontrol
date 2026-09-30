@@ -3,7 +3,7 @@
 *
 * @file       pointlatlng.cpp
 * @author     The OpenPilot Team, http://www.openpilot.org Copyright (C) 2010.
-* @brief      
+* @brief      经纬度坐标点（浮点），对外统一使用 WGS-84      
 * @see        The GNU Public License (GPL) Version 3
 * @defgroup   OPMapWidget
 * @{
