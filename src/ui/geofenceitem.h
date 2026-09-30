@@ -1,0 +1,49 @@
+/**
+******************************************************************************
+*
+* @file       geofenceitem.h
+* @brief      多边形地理围栏：绘制围栏多边形并提供点在多边形内判定（射线法）。
+*             语义：多边形内部为允许飞行区，UAV 飞出即触发 geofenceBreach
+* @see        The GNU Public License (GPL) Version 3
+* @{
+*
+*****************************************************************************/
+#ifndef GEOFENCEITEM_H
+#define GEOFENCEITEM_H
+
+#include <QtCore/QList>
+#include <QtGui/QColor>
+
+#include "pointlatlng.h"
+#include "mapgraphicitem.h"
+
+namespace opmap {
+
+class GeofenceItem : public QObject, public QGraphicsItem
+{
+    Q_OBJECT
+    Q_INTERFACES(QGraphicsItem)
+
+public:
+    explicit GeofenceItem(MapGraphicItem *map, QGraphicsItem *parent = 0);
+
+    QRectF boundingRect() const;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+
+    const QList<opmap::PointLatLng>& Vertices() const { return vertices; }
+    void SetVertices(const QList<opmap::PointLatLng> &value);
+
+    /// 射线法：point 是否在多边形内部（围栏允许区内）
+    static bool Contains(const QList<opmap::PointLatLng> &polygon, const opmap::PointLatLng &point);
+
+private:
+    void RefreshPolygon();
+
+    MapGraphicItem *map;
+    QList<opmap::PointLatLng> vertices;   ///< 围栏顶点（WGS-84）
+    QPolygonF screenPolygon;              ///< 屏幕坐标多边形（随地图刷新）
+};
+
+} // namespace opmap
+
+#endif // GEOFENCEITEM_H

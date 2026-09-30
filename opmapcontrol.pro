@@ -57,6 +57,7 @@ HEADERS += \
     ./src/providers/osrmrouteprovider.h \
     ./src/providers/amaprouteprovider.h \
     ./src/providers/iplocationprovider.h \
+    ./src/providers/mavlinktelemetryprovider.h \
     ./src/engine/mapservice.h \
     ./src/engine/mapengine.h \
     ./src/engine/navigationengine.h \
@@ -74,6 +75,7 @@ HEADERS += \
     ./src/ui/mapripper.h \
     ./src/ui/opmapwidget.h \
     ./src/ui/routeitem.h \
+    ./src/ui/geofenceitem.h \
     ./src/ui/trailitem.h \
     ./src/ui/traillineitem.h \
     ./src/ui/uavitem.h \
@@ -108,6 +110,7 @@ SOURCES += \
     ./src/providers/osrmrouteprovider.cpp \
     ./src/providers/amaprouteprovider.cpp \
     ./src/providers/iplocationprovider.cpp \
+    ./src/providers/mavlinktelemetryprovider.cpp \
     ./src/engine/mapservice.cpp \
     ./src/engine/mapengine.cpp \
     ./src/engine/navigationengine.cpp \
@@ -126,6 +129,7 @@ SOURCES += \
     ./src/ui/mapripper.cpp \
     ./src/ui/opmapwidget.cpp \
     ./src/ui/routeitem.cpp \
+    ./src/ui/geofenceitem.cpp \
     ./src/ui/trailitem.cpp \
     ./src/ui/traillineitem.cpp \
     ./src/ui/uavitem.cpp \

@@ -19,5 +19,7 @@
 #include "amaprouteprovider.h"
 #include "navigationengine.h"
 #include "routeitem.h"
+#include "geofenceitem.h"
+#include "mavlinktelemetryprovider.h"
 
 #endif // OPMAPCONTROL_H

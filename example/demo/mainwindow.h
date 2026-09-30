@@ -60,6 +60,7 @@ private slots:
     void onImportWaypointsClicked();
     void onExportWaypointsClicked();
     void onFlightClicked();   ///< 航点飞行：模拟遥测沿航点序列飞（开始/停止二态）
+    void onFenceClicked();    ///< 多边形围栏：取点 → 结束闭合 → 清除 三态
     void onWaypointListItemClicked(QListWidgetItem *item);
 
     // 导航面板
@@ -90,6 +91,10 @@ private slots:
     // 位置源（模拟 / 系统 GPS）
     void onPosSourceChanged(int index);
     void onGpsPositionUpdated(const QGeoPositionInfo &info);
+    // MAVLink UDP 遥测（真机/SITL 接入点）：库 provider 解析帧，demo 只处理结果
+    void onMavPositionUpdated(double lat, double lon, double altM, double headingDeg);
+    void onMavLinkAlive();
+    void onMavLinkTimeout();
     // IP 定位源（城市级兜底，桌面无 GPS 时仍能拿到大概位置）
     void onIpPollTimeout();         ///< 60s 轮询触发库请求 IP 定位
     // 库 IP 定位结果回调（OPMapWidget 的 ipLocationReady/ipLocationFailed 信号）
@@ -125,7 +130,8 @@ private:
         PickNone,
         PickWaypoint,
         PickOrigin,
-        PickDest
+        PickDest,
+        PickFence       ///< 围栏取点：连续多点模式，点"结束围栏"闭合
     };
 
     void setupMenus();
@@ -151,6 +157,7 @@ private:
     QPushButton *m_delWpBtn;
     QPushButton *m_flightBtn;               ///< 航点飞行开始/停止按钮
     WaypointFlightSimulator *m_flightSim;   ///< 航点飞行模拟数据源（真机接入时替换为遥测）
+    QComboBox *m_wpActionCombo;             ///< 下一个航点的到达动作（无/拍照/悬停30s）
 
     // 导航面板
     QLabel *m_originLabel;
@@ -170,6 +177,7 @@ private:
     QComboBox *m_speedCombo;
     QComboBox *m_posSourceCombo;     ///< 位置源：模拟 / 系统 GPS / IP 定位
     QGeoPositionInfoSource *m_gpsSource;   ///< 系统 GPS 源（惰性创建，可能为空）
+    opmap::MavlinkTelemetryProvider *m_mavProvider;   ///< MAVLink UDP 遥测源（真机/SITL 接入点）
     QTimer *m_ipTimer;                     ///< IP 定位轮询定时器（触发库的 RequestIpLocation）
     bool m_locatePending;                  ///< 定位按钮触发的 IP 兜底进行中
     QCheckBox *m_followCheck;
@@ -190,6 +198,8 @@ private:
     double m_wingmanAngle;           ///< 僚机当前方位角（度）
     int m_wingmanId;                 ///< 僚机 UAV id
     int m_lastDlPct;                 ///< 下载日志节流（上个 10% 档位）
+    QPushButton *m_fenceBtn;         ///< 多边形围栏三态按钮
+    QList<opmap::PointLatLng> m_fencePts;   ///< 围栏取点缓存（取点过程中逐点更新）
 
     PickMode m_pickMode;
     opmap::PointLatLng m_origin;     ///< 点选的起点（缺省用当前位置）

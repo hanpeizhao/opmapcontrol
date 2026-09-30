@@ -56,6 +56,7 @@ MainWindow::MainWindow()
       m_delWpBtn(new QPushButton(QString::fromUtf8("删除选中"), this)),
       m_flightBtn(new QPushButton(QString::fromUtf8("航点飞行"), this)),
       m_flightSim(0),
+      m_wpActionCombo(new QComboBox(this)),
       m_originLabel(new QLabel(QString::fromUtf8("起点：未设置（导航缺省用当前位置）"), this)),
       m_destLabel(new QLabel(QString::fromUtf8("目的地：未设置"), this)),
       m_providerCombo(new QComboBox(this)),
@@ -71,6 +72,7 @@ MainWindow::MainWindow()
       m_speedCombo(new QComboBox(this)),
       m_posSourceCombo(new QComboBox(this)),
       m_gpsSource(0),
+      m_mavProvider(0),
       m_ipTimer(new QTimer(this)),
       m_locatePending(false),
       m_followCheck(new QCheckBox(QString::fromUtf8("地图跟随车辆"), this)),
@@ -85,6 +87,7 @@ MainWindow::MainWindow()
       m_wingmanAngle(0),
       m_wingmanId(2),
       m_lastDlPct(-1),
+      m_fenceBtn(new QPushButton(QString::fromUtf8("绘制围栏"), this)),
       m_pickMode(PickNone),
       m_origin(0, 0),
       m_dest(0, 0),
@@ -224,6 +227,14 @@ void MainWindow::setupDocks()
     wpBtnRow3->addWidget(m_flightBtn);
     wpLayout->addLayout(wpBtnRow3);
     connect(m_flightBtn, &QPushButton::clicked, this, &MainWindow::onFlightClicked);
+    // 到达动作选择：点选添加的航点携带该动作，航点飞行到达时触发
+    QHBoxLayout *wpActionRow = new QHBoxLayout();
+    wpActionRow->addWidget(new QLabel(QString::fromUtf8("到达动作"), wpPanel));
+    m_wpActionCombo->addItems(QStringList() << QString::fromUtf8("无")
+                              << QString::fromUtf8("拍照") << QString::fromUtf8("悬停 30 秒"));
+    wpActionRow->addWidget(m_wpActionCombo);
+    wpActionRow->addStretch(1);
+    wpLayout->addLayout(wpActionRow);
     wpLayout->addWidget(m_wpList);
     connect(m_addWpBtn, SIGNAL(clicked()), this, SLOT(onAddWaypointClicked()));
     connect(m_delWpBtn, SIGNAL(clicked()), this, SLOT(onDeleteWaypointClicked()));
@@ -305,6 +316,7 @@ void MainWindow::setupDocks()
     m_posSourceCombo->addItem(QString::fromUtf8("行车模拟"));
     m_posSourceCombo->addItem(QString::fromUtf8("系统 GPS"));
     m_posSourceCombo->addItem(QString::fromUtf8("IP 定位（城市级）"));
+    m_posSourceCombo->addItem(QString::fromUtf8("MAVLink (UDP)"));
     posSourceRow->addWidget(m_posSourceCombo);
     simLayout->addLayout(posSourceRow);
     QHBoxLayout *speedRow = new QHBoxLayout();
@@ -479,6 +491,8 @@ void MainWindow::setupCapabilityDock()
     demoLayout->addWidget(wingBtn);
     QPushButton *geoBtn = new QPushButton(QString::fromUtf8("几何换算演示"), demoBox);
     demoLayout->addWidget(geoBtn);
+    demoLayout->addWidget(m_fenceBtn);   // 多边形地理围栏（取点 → 闭合 → 清除）
+    connect(m_fenceBtn, &QPushButton::clicked, this, &MainWindow::onFenceClicked);
     layout->addWidget(demoBox);
     layout->addStretch(1);
 
@@ -700,8 +714,16 @@ void MainWindow::onFlightClicked()
         return;
     }
     QList<opmap::PointLatLng> coords;
-    for (QMap<int, opmap::WayPointItem*>::const_iterator it = wps.constBegin(); it != wps.constEnd(); ++it)
+    QList<int> hoverSecs;
+    int photoCount = 0, hoverCount = 0;
+    for (QMap<int, opmap::WayPointItem*>::const_iterator it = wps.constBegin(); it != wps.constEnd(); ++it) {
         coords.append(it.value()->Coord());
+        hoverSecs.append(it.value()->HoverTime());
+        if (it.value()->Action() == opmap::WayPointItem::WayPointActionPhoto)
+            ++photoCount;
+        else if (it.value()->Action() == opmap::WayPointItem::WayPointActionHover)
+            ++hoverCount;
+    }
 
     // Home 返航点设在起飞位置并打开安全围栏圈（现实场景：飞机飞出返航点半径即告警）
     const opmap::PointLatLng start = m_map->HasVehiclePosition() ? m_map->VehiclePosition() : kHomePos;
@@ -731,6 +753,12 @@ void MainWindow::onFlightClicked()
         });
         connect(m_flightSim, &WaypointFlightSimulator::waypointPassed, this,
                 [this](int idx, int total) {
+            // 库只携带动作数据，实际拍照/悬停由上层在到达信号里响应（真机=下发任务指令）
+            opmap::WayPointItem *wp = m_map->WPAll().values().value(idx);
+            if (wp && wp->Action() == opmap::WayPointItem::WayPointActionPhoto)
+                logEvent(QString::fromUtf8("【动作】触发拍照 [航点 %1]").arg(idx));
+            else if (wp && wp->Action() == opmap::WayPointItem::WayPointActionHover)
+                logEvent(QString::fromUtf8("【动作】原地悬停 %1 秒 [航点 %2]").arg(wp->HoverTime()).arg(idx));
             logEvent(QString::fromUtf8("航点飞行：已到达 %1/%2（库侧 UAVReachedWayPoint 同步打勾）").arg(idx).arg(total));
         });
         connect(m_flightSim, &WaypointFlightSimulator::finished, this, [this]() {
@@ -739,8 +767,41 @@ void MainWindow::onFlightClicked()
         });
     }
 
-    m_flightSim->start(start, coords, 25.0);
-    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点，从 Home 位置起飞，巡航 25 m/s，安全围栏 3000 m").arg(coords.size()));
+    m_flightSim->start(start, coords, hoverSecs, 25.0);
+    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点（拍照 %2、悬停 %3），从 Home 位置起飞，巡航 25 m/s，安全围栏 3000 m")
+             .arg(coords.size()).arg(photoCount).arg(hoverCount));
+}
+
+/** 围栏按钮三态：绘制围栏 →（地图连续取点）→ 结束围栏 → 清除围栏 → 绘制围栏。 */
+void MainWindow::onFenceClicked()
+{
+    if (m_pickMode == PickFence) {          // 第二次点击：结束取点并闭合
+        setPickMode(PickNone);
+        if (m_fencePts.size() >= 3) {
+            m_map->SetGeofence(m_fencePts);
+            m_fenceBtn->setText(QString::fromUtf8("清除围栏"));
+            logEvent(QString::fromUtf8("多边形地理围栏生效：%1 个顶点，飞出边界触发 geofenceBreach 信号").arg(m_fencePts.size()));
+        } else {
+            m_fencePts.clear();
+            m_fenceBtn->setText(QString::fromUtf8("绘制围栏"));
+            logEvent(QString::fromUtf8("围栏顶点不足 3 个，已取消"));
+        }
+        return;
+    }
+
+    if (m_map->HasGeofence()) {             // 已有围栏：清除
+        m_map->ClearGeofence();
+        m_fencePts.clear();
+        m_fenceBtn->setText(QString::fromUtf8("绘制围栏"));
+        logEvent(QString::fromUtf8("地理围栏已清除"));
+        return;
+    }
+
+    // 开始取点：地图上依次点击放置顶点，完成后再次点击本按钮闭合
+    m_fencePts.clear();
+    setPickMode(PickFence);
+    m_fenceBtn->setText(QString::fromUtf8("结束围栏"));
+    statusBar()->showMessage(QString::fromUtf8("在地图上点击放置围栏顶点（至少 3 个），完成后点击“结束围栏”"), 10000);
 }
 
 void MainWindow::setupStatusBar()
@@ -1125,7 +1186,30 @@ void MainWindow::onPosSourceChanged(int index)
         return;
     }
 
+    if (index == 3) {           // MAVLink (UDP 14550)：真机/SITL 遥测接入点
+        stopGps();
+        m_ipTimer->stop();
+        if (!m_mavProvider) {
+            m_mavProvider = new opmap::MavlinkTelemetryProvider(this);
+            connect(m_mavProvider, SIGNAL(positionUpdated(double,double,double,double)),
+                    this, SLOT(onMavPositionUpdated(double,double,double,double)));
+            connect(m_mavProvider, SIGNAL(linkAlive()), this, SLOT(onMavLinkAlive()));
+            connect(m_mavProvider, SIGNAL(linkTimeout()), this, SLOT(onMavLinkTimeout()));
+            ensureUAV();        // 遥测喂车辆/UAV 图标，跟随/轨迹按面板开关生效
+        }
+        if (m_mavProvider->start(14550))
+            statusBar()->showMessage(QString::fromUtf8("MAVLink 遥测监听中（UDP 14550），等待飞控数据…"), 8000);
+        else
+            QMessageBox::warning(this, QString::fromUtf8("MAVLink 不可用"),
+                                 QString::fromUtf8("UDP 14550 端口监听失败（可能被占用），已保持当前模式"));
+        return;
+    }
+
     m_ipTimer->stop();
+
+    // 切回系统 GPS：停 MAVLink 遥测，避免双源同时喂点
+    if (m_mavProvider && m_mavProvider->isListening())
+        m_mavProvider->stop();
 
     if (!m_gpsSource) {
         // Windows 桌面默认 serialnmea 后端，无可用 GPS 时返回空指针
@@ -1159,6 +1243,27 @@ void MainWindow::stopGps()
 {
     if (m_gpsSource)
         m_gpsSource->stopUpdates();
+}
+
+// ————————————————— MAVLink 遥测源（真机/SITL 接入点） —————————————————
+
+void MainWindow::onMavPositionUpdated(double lat, double lon, double altM, double headingDeg)
+{
+    Q_UNUSED(altM);
+    // 链路对齐 QGeoCoordinate：lat/lon 直接对应 PointLatLng(Lat, Lng)
+    m_map->UpdateVehiclePosition(opmap::PointLatLng(lat, lon));
+    if (headingDeg >= 0)    // 库内 UpdateVehiclePosition 也按位移推算航向，飞控自带 hdg 优先
+        qDebug("[mavlink] pos update lat=%.6f lon=%.6f alt=%.1fm hdg=%.0f", lat, lon, altM, headingDeg);
+}
+
+void MainWindow::onMavLinkAlive()
+{
+    logEvent(QString::fromUtf8("MAVLink 链路建立：收到 GLOBAL_POSITION_INT 遥测"));
+}
+
+void MainWindow::onMavLinkTimeout()
+{
+    logEvent(QString::fromUtf8("MAVLink 链路超时：5 秒未收到遥测包，请检查飞控/模拟器"));
 }
 
 // ————————————————— IP 定位源（城市级兜底） —————————————————
@@ -1244,6 +1349,16 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
     {
         opmap::WayPointItem *wp = m_map->WPCreate(p, 100);
         wp->SetDescription(QString::fromUtf8("WP%1").arg(m_map->WPAll().size()));
+        // 携带面板选择的到达动作（库只存数据，飞行时上层响应）
+        const int act = m_wpActionCombo->currentIndex();
+        if (act == 1) {
+            wp->SetAction(opmap::WayPointItem::WayPointActionPhoto);
+            wp->SetDescription(wp->Description() + QString::fromUtf8("[拍照]"));
+        } else if (act == 2) {
+            wp->SetAction(opmap::WayPointItem::WayPointActionHover);
+            wp->SetHoverTime(30);
+            wp->SetDescription(wp->Description() + QString::fromUtf8("[悬停30s]"));
+        }
         refreshWaypointList();
         break;
     }
@@ -1257,8 +1372,16 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
         m_dest = p;
         m_hasDest = true;
         m_destLabel->setText(QString::fromUtf8("目的地：lat %1, lng %2")
-                             .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
+                               .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         break;
+    case PickFence:
+        // 围栏取点：逐点加入并实时重画多边形（<3 点不构成围栏），模式保持不退出
+        m_fencePts.append(p);
+        if (m_fencePts.size() >= 3)
+            m_map->SetGeofence(m_fencePts);
+        logEvent(QString::fromUtf8("围栏顶点 %1: lat %2, lng %3")
+                 .arg(m_fencePts.size()).arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
+        return;   // 保持 PickFence，直到点"结束围栏"
     default:
         break;
     }

@@ -24,9 +24,10 @@
 **库 API**（facade OPMapWidget）：
 - `WPInsert(坐标, 高度, 描述, 位置)` / `WPDelete` / `WPRenumber` / `WPAll()` / `WPSelected()`
 - 航点项：`SetDescription`（说明文字）、`SetAltitude`（该点高度）、`SetReached(bool)`（打勾）
+- 航点动作：`SetAction(WayPointAction)`——`WayPointActionNone`（无）/ `WayPointActionPhoto`（到达即拍照）/ `WayPointActionHover`（到达后悬停），配合 `SetHoverTime(秒)`；库只携带动作数据并在到达信号里转发，实际执行由上层在 `UAVReachedWayPoint` 处下发任务指令
 - 信号：`WPInserted` / `WPDeleted` / `WPNumberChanged` / `WPValuesChanged` / `WPReached`
 
-**demo 状态**：✅ 地图点选添加、删除、`.wp` 文件导入导出、中点插入、编号重排（航点面板）。
+**demo 状态**：✅ 地图点选添加、删除、`.wp` 文件导入导出、中点插入、编号重排（航点面板）；✅ 航点面板"到达动作"下拉（无/拍照/悬停 30 秒），点选航点前先选动作，飞行日志中显示"【动作】触发拍照 / 原地悬停 30 秒"。
 
 ## 3. UAVItem —— 遥测实时位置图标
 
@@ -38,7 +39,17 @@
 - 多机：`AddUAV(id)` / `DeleteUAV(id)` / `GetUAV(id)`（编队演示）
 - 轨迹尾迹自动绘制
 
-**demo 状态**：✅ 僚机绕飞（多机）、**航点飞行按钮**（航点面板）：点"航点飞行"后，UAV 从 Home 位置起飞、以 25 m/s 依次飞过全部航点，库自动打勾并发 `UAVReachedWayPoint`。将来接真机时，只需把模拟器的 `positionChanged` 换成真机遥测回调，喂点链路（`SetUAVPos`）完全不变。
+**demo 状态**：✅ 僚机绕飞（多机）、**航点飞行按钮**（航点面板）：点"航点飞行"后，UAV 从 Home 位置起飞、以 25 m/s 依次飞过全部航点，库自动打勾并发 `UAVReachedWayPoint`，拍照/悬停航点同步触发动作日志。将来接真机时，只需把模拟器的 `positionChanged` 换成真机遥测回调，喂点链路（`SetUAVPos`）完全不变。
+
+### 3.1 真机遥测接入：MavlinkTelemetryProvider
+
+**是什么**：库内置的 MAVLink v1/v2 UDP 遥测接收器（`src/providers/mavlinktelemetryprovider.h/.cpp`），监听 UDP 14550 端口（地面站标准端口），解析 `GLOBAL_POSITION_INT`（msgid 33）帧，CRC16-CCITT X.25 校验后发出位置信号——这是飞控（Pixhawk/ArduPilot/PX4、Mission Planner SITL 模拟）向地面站回传位置的行业默认链路。
+
+**库 API**：
+- `start(端口=14550)` / `stop()` / `isListening()`
+- 信号：`positionUpdated(lat, lon, altM, headingDeg)`（hdg 无效值 65535 → -1）、`linkAlive()`（首包到达）、`linkTimeout()`（5 秒无包，只发一次）
+
+**demo 状态**：✅ 行车模拟面板"位置源"新增"MAVLink (UDP)"项，选择后开始监听 14550，位置喂入 `UpdateVehiclePosition`（与模拟/GPS 源互斥）。**测试无需真机**：装 Mission Planner 开 SITL 模拟，或任意 MAVLink 遥测源指向本机 14550 即可在地图上看到飞机动起来。
 
 ## 4. Home 返航点 + 安全围栏
 
@@ -47,11 +58,22 @@
 **现实场景**：
 - 失联保护：飞机飞出安全半径告警，提醒飞手它离返航点过远
 - 真实地面站的"一键返航"（RTL）就基于 Home 位置
-- 这是**圆形围栏**；多边形地理围栏（禁飞区轮廓）库未内置，需上层基于同一信号机制扩展
+- 这是**圆形围栏**；不规则形状的禁飞区轮廓用多边形地理围栏（库已内置，见 4.1 节）
 
 **库 API**：`m_map->Home->SetCoord()` / `SetSafeArea(米)` / `SetShowSafeArea(bool)`；信号 `UAVLeftSafetyBouble(PointLatLng)`。
 
 **demo 状态**：✅ 航点飞行起飞时自动把 Home 设在起飞位置并打开 3000 m 安全圈；僚机演示用 400 m 圈。
+
+### 4.1 多边形地理围栏 GeofenceItem
+
+**是什么**：**禁飞区/作业区轮廓**围栏——在地图上取 3 个以上顶点围成多边形，语义为"多边形内部为允许飞行区"。与 Home 的圆形 SafeArea 互补：圆形围栏回答"飞得离我多远"，多边形围栏回答"有没有飞进不该去的地方"（河湖、机场净空区、军事区边界都是不规则形状）。
+
+**库 API**（facade OPMapWidget）：
+- `SetGeofence(QList<PointLatLng>)`（<3 点视作清除）/ `ClearGeofence()` / `HasGeofence()`
+- 越界判定内置在 `UpdateVehiclePosition` 喂点链路里（射线法，奇偶规则），对所有位置源（模拟/GPS/MAVLink）统一生效；出界发一次 `geofenceBreach(PointLatLng)` 信号，回到界内自动复位、再次出界可再次触发
+- 地图上以红色虚线边界 + 半透明红色填充绘制，随地图拖动/缩放自动换算
+
+**demo 状态**：✅ 演示面板"绘制围栏"按钮三态：绘制围栏（地图连续取点）→ 结束围栏（≥3 点闭合生效）→ 清除围栏。配合行车模拟或 MAVLink 遥测，飞机飞出多边形即触发 `geofenceBreach` 信号（事件日志可见）。
 
 ## 5. 框选区域 —— 离线地图下载
 
@@ -65,7 +87,7 @@
 
 | 功能 | 现状 | 补充价值 |
 |------|------|---------|
-| 真机接入（MAVLink 遥测） | demo 用模拟器 | 接串口/4G 遥测后即为真实地面站 |
-| 多边形地理围栏 | 仅圆形安全围栏 | 禁飞区场景需要；可基于 `UAVLeftSafetyBouble` 思路扩展 |
-| 航点动作触发（拍照/悬停） | 航点仅位置+高度 | 测绘/巡线场景需要，可在 waypointPassed 处扩展 |
+| 真机接入（MAVLink 遥测） | ✅ 已完成：库内置 `MavlinkTelemetryProvider`（UDP 14550，v1/v2 帧 + CRC 校验），demo 位置源接入，见 3.1 节 | 接串口/4G 遥测后即为真实地面站 |
+| 多边形地理围栏 | ✅ 已完成：库内置 `GeofenceItem` + facade 越界判定信号，demo 三态按钮取点，见 4.1 节 | 禁飞区场景需要；与圆形 SafeArea 互补 |
+| 航点动作触发（拍照/悬停） | ✅ 已完成：`WayPointItem::SetAction/SetHoverTime` 携带动作数据，demo 到达信号处触发日志，见第 2 节 | 测绘/巡线场景需要 |
 | GPSItem（GPS 定位标记） | 库内已实现，未演示 | 单点定位可视化，价值一般 |

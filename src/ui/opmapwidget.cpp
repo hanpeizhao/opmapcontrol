@@ -33,6 +33,7 @@
 #include "geoutils.h"
 #include "osrmrouteprovider.h"
 #include "iplocationprovider.h"
+#include "geofenceitem.h"
 #include "navigationengine.h"
 #include "routeitem.h"
 
@@ -54,6 +55,8 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     navEngine(0),
     routeItem(0),
     ipLocator(0),
+    geofenceItem(0),
+    geofenceBreached(false),
     vehiclePosValid(false)
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
@@ -283,6 +286,7 @@ void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
     vehiclePos = pos;
     vehiclePosValid = true;
     navEngine->UpdatePosition(pos);
+    CheckGeofence(pos);   // 围栏判定对所有位置源（模拟/GPS/MAVLink）统一生效
 }
 
 void OPMapWidget::StopNavigation()
@@ -305,6 +309,49 @@ bool OPMapWidget::IsIpLocationBusy() const
 opmap::NavigationEngine *OPMapWidget::GetNavigationEngine() const
 {
     return navEngine;
+}
+
+// ———————— 多边形地理围栏 ————————
+
+void OPMapWidget::SetGeofence(QList<opmap::PointLatLng> const& vertices)
+{
+    if (vertices.size() < 3) {
+        // 顶点不足构不成多边形：视作清除
+        ClearGeofence();
+        return;
+    }
+    if (!geofenceItem) {
+        geofenceItem = new GeofenceItem(map, map);   // 挂为 map 子项，随地图变换
+        geofenceBreached = false;
+    }
+    geofenceItem->SetVertices(vertices);
+}
+
+void OPMapWidget::ClearGeofence()
+{
+    delete geofenceItem;   // 父子挂载，自动移出场景
+    geofenceItem = 0;
+    geofenceBreached = false;
+}
+
+bool OPMapWidget::HasGeofence() const
+{
+    return geofenceItem != 0;
+}
+
+void OPMapWidget::CheckGeofence(opmap::PointLatLng const& position)
+{
+    if (!geofenceItem)
+        return;
+    const bool inside = GeofenceItem::Contains(geofenceItem->Vertices(), position);
+    if (!inside && !geofenceBreached) {
+        geofenceBreached = true;    // 越界沿沿只发一次，回界内复位
+        emit geofenceBreach(position);
+    }
+    else if (inside && geofenceBreached)
+    {
+        geofenceBreached = false;
+    }
 }
 
 void OPMapWidget::SetShowRoute(bool const& value)

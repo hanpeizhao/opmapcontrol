@@ -102,6 +102,24 @@ public:
     void SetReached(bool const& value);
 
     /**
+    * @brief 航点动作：到达该点时由上层执行的任务动作（库只携带数据并转发，
+    *        实际拍照/悬停由上层在 UAVReachedWayPoint 信号里响应）
+    */
+    enum WayPointAction
+    {
+        WayPointActionNone,    ///< 无动作（普通途经点）
+        WayPointActionPhoto,   ///< 到达即触发拍照
+        WayPointActionHover    ///< 到达后悬停
+    };
+
+    WayPointAction Action() const { return action; }
+    void SetAction(WayPointAction const& value) { action = value; }
+
+    /// 悬停动作持续时长（秒，仅 WayPointActionHover 生效）
+    int HoverTime() const { return hovertime; }
+    void SetHoverTime(int const& value) { hovertime = value; }
+
+    /**
     * @brief Returns the WayPoint number
     *
     */
@@ -193,6 +211,8 @@ protected:
     QTransform transf;
     opmap::PointLatLng coord;//coordinates of this WayPoint
     bool reached;
+    WayPointAction action = WayPointActionNone;   ///< 到达动作（默认无）
+    int hovertime = 0;                            ///< 悬停时长（秒）
     QString description;
     bool shownumber;
     bool isDragging;

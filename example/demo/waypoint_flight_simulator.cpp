@@ -24,7 +24,9 @@ WaypointFlightSimulator::WaypointFlightSimulator(QObject *parent)
       m_timer(new QTimer(this)),
       m_pos(0, 0),
       m_speedMps(25.0),
+      m_lastHeading(0.0),
       m_target(0),
+      m_hoverTicksLeft(0),
       m_active(false)
 {
     connect(m_timer, SIGNAL(timeout()), this, SLOT(onTick()));
@@ -32,15 +34,19 @@ WaypointFlightSimulator::WaypointFlightSimulator(QObject *parent)
 
 void WaypointFlightSimulator::start(const opmap::PointLatLng &startPos,
                                     const QList<opmap::PointLatLng> &waypoints,
+                                    const QList<int> &hoverSeconds,
                                     double speedMps)
 {
     if (waypoints.isEmpty())
         return;
 
     m_waypoints = waypoints;
+    m_hoverSeconds = hoverSeconds;
     m_pos = startPos;
     m_speedMps = speedMps > 0 ? speedMps : 25.0;
+    m_lastHeading = 0.0;
     m_target = 0;
+    m_hoverTicksLeft = 0;
     m_active = true;
     emit positionChanged(m_pos, 0.0, 0, m_waypoints.size());
     m_timer->start(kTickMs);
@@ -58,6 +64,14 @@ void WaypointFlightSimulator::onTick()
     {
         stop();
         emit finished();
+        return;
+    }
+
+    // 悬停中：原地保持遥测输出，直到悬停时间用尽
+    if (m_hoverTicksLeft > 0)
+    {
+        --m_hoverTicksLeft;
+        emit positionChanged(m_pos, m_lastHeading, m_target, m_waypoints.size());
         return;
     }
 
@@ -85,6 +99,10 @@ void WaypointFlightSimulator::onTick()
             emit finished();
             return;
         }
+        // 到达悬停点：启动倒计时（期间原地心跳），下一 tick 进入悬停分支
+        const int idx = m_target - 1;   // 刚到达的航点下标
+        if (idx < m_hoverSeconds.size() && m_hoverSeconds.at(idx) > 0)
+            m_hoverTicksLeft = m_hoverSeconds.at(idx) * (1000 / kTickMs);
     }
     else
     {
@@ -93,5 +111,6 @@ void WaypointFlightSimulator::onTick()
                                    m_pos.Lng() + (target.Lng() - m_pos.Lng()) * ratio);
     }
 
+    m_lastHeading = heading;
     emit positionChanged(m_pos, heading, m_target, m_waypoints.size());
 }

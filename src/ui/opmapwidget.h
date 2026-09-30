@@ -62,6 +62,7 @@ class GPSItem;
 class HomeItem;
 class AbstractRouteProvider;
 class IpLocationProvider;
+class GeofenceItem;
 class NavigationEngine;
 class RouteItem;
 
@@ -525,6 +526,8 @@ private:
     opmap::NavigationEngine *navEngine;            ///< 导航状态机
     opmap::RouteItem *routeItem;                   ///< 路线绘制项（随 map 析构）
     opmap::IpLocationProvider *ipLocator;          ///< IP 定位服务（城市级兜底）
+    opmap::GeofenceItem *geofenceItem;             ///< 多边形地理围栏（多边形内为允许区）
+    bool geofenceBreached;                         ///< 当前是否处于越界状态（沿沿只发一次信号）
     opmap::PointLatLng vehiclePos;                 ///< 最近喂入的车位置
     bool vehiclePosValid;
 
@@ -686,6 +689,7 @@ signals:
     void ipLocationReady(opmap::PointLatLng pos, QString city);
     /** @brief IP 定位失败（双源均不可用或返回异常） */
     void ipLocationFailed(QString reason);
+    void geofenceBreach(opmap::PointLatLng position);   ///< UAV 飞出多边形围栏
 
     // ———————— 离线下载进度信号（转发自 MapRipper）————————
     /** @brief 抓取进度百分比（0-100） */
@@ -723,6 +727,14 @@ public slots:
 
     /// 是否有 IP 定位请求在途
     bool IsIpLocationBusy() const;
+
+    // —— 多边形地理围栏（多边形内部为允许飞行区）——
+    /// 设置/更新围栏顶点（<3 个顶点时相当于清除）；顶点即屏幕上绘制的多边形
+    void SetGeofence(QList<opmap::PointLatLng> const& vertices);
+    void ClearGeofence();                                  ///< 移除围栏
+    bool HasGeofence() const;                              ///< 是否已设置有效围栏
+    /// 喂点后调用：判定位置是否越界，越界沿沿第一次发出 geofenceBreach
+    void CheckGeofence(opmap::PointLatLng const& position);
 
     /// 导航引擎访问器（调整偏航阈值/到达阈值/重规划参数等引擎默认行为）
     opmap::NavigationEngine *GetNavigationEngine() const;

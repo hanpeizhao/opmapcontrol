@@ -28,9 +28,11 @@ public:
     bool isActive() const { return m_active; }
 
 public slots:
-    /// 从 startPos（通常是 Home 返航点）出发，依次飞往 waypoints（米/秒）
+    /// 从 startPos（通常是 Home 返航点）出发依次飞往 waypoints；
+    /// hoverSeconds 按序号给出各航点悬停时长（秒，0/缺省不悬停）；speedMps 为巡航速度
     void start(const opmap::PointLatLng &startPos,
                const QList<opmap::PointLatLng> &waypoints,
+               const QList<int> &hoverSeconds,
                double speedMps);
     void stop();
 
@@ -48,9 +50,12 @@ private slots:
 private:
     QTimer *m_timer;
     QList<opmap::PointLatLng> m_waypoints;
+    QList<int> m_hoverSeconds;     ///< 各航点悬停时长（秒，0=不悬停）
     opmap::PointLatLng m_pos;      ///< 当前遥测位置
     double m_speedMps;             ///< 巡航速度（米/秒）
+    double m_lastHeading;          ///< 上一周期航向（悬停期间沿用）
     int m_target;                  ///< 当前目标航点下标（0 起）
+    int m_hoverTicksLeft;          ///< 悬停剩余 tick 数（悬停期间不推进）
     bool m_active;
 };
 
