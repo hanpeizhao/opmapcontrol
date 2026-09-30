@@ -3,6 +3,7 @@
 
 #include <QtCore>
 #include <QtGui>
+#include <QtWidgets>
 
 #include <opmapwidget.h>
 

@@ -1,6 +1,7 @@
 
 #include <QtCore>
 #include <QtGui>
+#include <QtWidgets>
 #include <QMenu>
 
 #include "UAS_types.h"
@@ -68,6 +69,10 @@ static MapType_Data g_arrMapType[] =
 
     MAPTYPE_STRUCT(YandexMapRu),
     MAPTYPE_STRUCT(Statkart_Topo2),
+
+    MAPTYPE_STRUCT(AutoNaviRoad),
+    MAPTYPE_STRUCT(AutoNaviSatellite),
+    MAPTYPE_STRUCT(AutoNaviHybrid),
 
     {"NULL", -1}
 };
@@ -352,7 +357,7 @@ void WaypointEdit_Dialog::setupUi(void)
     tableWaypoints = new QTableWidget(this);
     tableWaypoints->setObjectName(QString::fromUtf8("tableWaypoints"));
     tableWaypoints->verticalHeader()->hide();
-    tableWaypoints->horizontalHeader()->setResizeMode(QHeaderView::Interactive);
+    tableWaypoints->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
     tableWaypoints->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
     tableWaypoints->setColumnCount(3);
     QStringList slHeader;
@@ -425,14 +430,14 @@ MapWidget::MapWidget(QWidget *parent) :
 {
     m_conf = NULL;
 
-    configuration->SetAccessMode(core::AccessMode::CacheOnly);
+    configuration->SetAccessMode(core::AccessMode::ServerAndCache);
     configuration->SetTileMemorySize(200);
     configuration->SetCacheLocation("./data/");
 
     SetZoom(4);
     SetMinZoom(4);
     SetMaxZoom(18);
-    SetMapType(MapType::GoogleHybrid);
+    SetMapType(MapType::AutoNaviRoad);
 
     // set initial values
     m_bSelectArea = 0;
@@ -469,9 +474,9 @@ void MapWidget::setConf(QSettings *conf)
 
         // load settings
         accessMode    = (core::AccessMode::Types) m_conf->value("mapWidget_accessMode",
-                                                                (int)(core::AccessMode::CacheOnly)).toInt();
+                                                                (int)(core::AccessMode::ServerAndCache)).toInt();
         mapType       = (MapType::Types) m_conf->value("mapWidget_mapType",
-                                                       (int)(MapType::GoogleSatellite)).toInt();
+                                                       (int)(MapType::AutoNaviRoad)).toInt();
         cacheLocation = m_conf->value("mapWidget_cacheLocation", "./data/").toString();
 
         // set configurations

@@ -1,6 +1,7 @@
 
-QT       += core gui network sql declarative
-CONFIG   += staticlib
+QT       += core gui network sql widgets
+CONFIG   += staticlib release
+CONFIG   -= debug_and_release
 TEMPLATE  = lib
 
 TARGET    = opmapwidget
@@ -21,6 +22,7 @@ HEADERS += \
     ./core/alllayersoftype.h \
     ./core/cache.h \
     ./core/cacheitemqueue.h \
+    ./core/coordtransform.h \
     ./core/debugheader.h \
     ./core/diagnostics.h \
     ./core/geodecoderstatus.h \
@@ -74,6 +76,7 @@ SOURCES += \
     ./core/alllayersoftype.cpp \
     ./core/cache.cpp \
     ./core/cacheitemqueue.cpp \
+    ./core/coordtransform.cpp \
     ./core/diagnostics.cpp \
     ./core/kibertilecache.cpp \
     ./core/languagetype.cpp \
