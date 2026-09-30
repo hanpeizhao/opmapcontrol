@@ -162,6 +162,7 @@ private:
     QNetworkAccessManager *m_ipNam;        ///< IP 定位请求
     QNetworkReply *m_ipReply;              ///< 当前在途的 IP 请求（挂死时超时 abort）
     bool m_locatePending;                  ///< 定位按钮触发的 IP 兜底进行中
+    bool m_ipFallback;                     ///< true 时用 ipwho.is 回退源，false 用 ip-api.com 主源
     QCheckBox *m_followCheck;
     QCheckBox *m_trailCheck;
     QLabel *m_simInfo;

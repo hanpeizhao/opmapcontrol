@@ -249,13 +249,13 @@ public:
      * @brief Returns the minimum zoom for the map
      *
      */
-    int MinZoom()const{return map->minZoom;}
+    int MinZoom()const{return map->MinZoom();}
     /**
      * @brief Sets the minimum zoom for the map
      *
      * @param value
      */
-    void SetMinZoom(int const& value){map->minZoom = value;}
+    void SetMinZoom(int const& value){map->SetMinZoom(value);}
 
     opmap::MouseWheelZoomType::Types GetMouseWheelZoomType() {
         return  map->core->GetMouseWheelZoomType();

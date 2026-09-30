@@ -70,6 +70,7 @@ MainWindow::MainWindow()
       m_ipNam(new QNetworkAccessManager(this)),
       m_ipReply(0),
       m_locatePending(false),
+      m_ipFallback(false),
       m_followCheck(new QCheckBox(QString::fromUtf8("地图跟随车辆"), this)),
       m_trailCheck(new QCheckBox(QString::fromUtf8("显示行车轨迹"), this)),
       m_simInfo(new QLabel(QString::fromUtf8("空闲"), this)),
@@ -168,9 +169,17 @@ void MainWindow::setupMenus()
     // 工具栏（缩放与定位）
     QToolBar *toolBar = addToolBar(QString::fromUtf8("视图"));
     QAction *zoomIn = toolBar->addAction(QString::fromUtf8("放大 +"));
-    connect(zoomIn, &QAction::triggered, [this]() { m_map->SetZoom(m_map->ZoomTotal() + 1); });
+    zoomIn->setShortcut(QKeySequence(QString::fromUtf8("Ctrl++")));
+    connect(zoomIn, &QAction::triggered, [this]() {
+        m_map->SetZoom(m_map->ZoomTotal() + 1);
+        qDebug("[zoom] total=%d min=%d max=%d", (int)m_map->ZoomTotal(), m_map->MinZoom(), m_map->MaxZoom());
+    });
     QAction *zoomOut = toolBar->addAction(QString::fromUtf8("缩小 −"));
-    connect(zoomOut, &QAction::triggered, [this]() { m_map->SetZoom(m_map->ZoomTotal() - 1); });
+    zoomOut->setShortcut(QKeySequence(QString::fromUtf8("Ctrl+-")));
+    connect(zoomOut, &QAction::triggered, [this]() {
+        m_map->SetZoom(m_map->ZoomTotal() - 1);
+        qDebug("[zoom] total=%d min=%d max=%d", (int)m_map->ZoomTotal(), m_map->MinZoom(), m_map->MaxZoom());
+    });
     QAction *homeAct = toolBar->addAction(QString::fromUtf8("回到初始位置"));
     connect(homeAct, &QAction::triggered, [this]() {
         m_map->SetCurrentPosition(kHomePos);
@@ -739,9 +748,13 @@ void MainWindow::onIpFetchTimeout()
 {
     if (m_ipReply)          // 上一请求还在途（可能正被超时兜底），跳过本轮
         return;
-    // ipwho.is 免费无 key，HTTPS 直连，返回 WGS-84 城市级坐标（latitude/longitude/city）
-    qDebug("[locate] fetching ipwho.is ...");
-    m_ipReply = m_ipNam->get(QNetworkRequest(QUrl(QLatin1String("https://ipwho.is/"))));
+    // 主源 ip-api.com：纯 IPv4 出口、其库对国内城市识别准（本机实测返回长沙）；
+    // 备源 ipwho.is：HTTPS 直连，但对部分 IPv6 出口的库定位偏差大（本机曾误判岳阳）
+    const QUrl url = m_ipFallback
+            ? QUrl(QLatin1String("https://ipwho.is/"))
+            : QUrl(QLatin1String("http://ip-api.com/json/?fields=status,lat,lon,city"));
+    qDebug("[locate] fetching %s ...", qPrintable(url.toString()));
+    m_ipReply = m_ipNam->get(QNetworkRequest(url));
     // 注意：必须连 reply 自己的 finished()。若连 QNAM 的 finished(QNetworkReply*)，
     // 槽内 sender() 是 QNAM 而非 reply，qobject_cast 恒为 null，结果永远无人处理
     connect(m_ipReply, SIGNAL(finished()), this, SLOT(onIpReplyFinished()));
@@ -753,11 +766,9 @@ void MainWindow::onIpTimeout()
     if (!m_ipReply)
         return;
     qDebug("[locate] request timeout, abort");
-    statusBar()->showMessage(QString::fromUtf8("IP 定位超时，请检查网络后重试"), 6000);
-    m_locatePending = false;
-    QNetworkReply *r = m_ipReply;
-    m_ipReply = 0;          // 先清指针再 abort，避免重入 onIpReplyFinished 弹窗
-    r->abort();
+    statusBar()->showMessage(QString::fromUtf8("IP 定位超时，正在尝试备用源"), 6000);
+    m_ipTimeout->stop();
+    m_ipReply->abort();     // abort 会触发 finished，由 onIpReplyFinished 统一走回退或报错
 }
 
 void MainWindow::onIpReplyFinished()
@@ -770,6 +781,11 @@ void MainWindow::onIpReplyFinished()
     reply->deleteLater();
     qDebug("[locate] reply error=%d pending=%d", (int)reply->error(), (int)m_locatePending);
     if (reply->error() != QNetworkReply::NoError) {
+        if (!m_ipFallback) {
+            m_ipFallback = true;    // 主源失败，静默切备用源重试一次
+            onIpFetchTimeout();
+            return;
+        }
         if (m_locatePending) {
             m_locatePending = false;
             QMessageBox::warning(this, QString::fromUtf8("定位失败"),
@@ -779,7 +795,29 @@ void MainWindow::onIpReplyFinished()
         return;
     }
     QJsonObject obj = QJsonDocument::fromJson(reply->readAll()).object();
-    if (!obj.value(QLatin1String("success")).toBool()) {
+    // ip-api 主源字段：{"status":"success","lat":..,"lon":..,"city":..}
+    // ipwho.is 备源字段：{"success":true,"latitude":..,"longitude":..,"city":..}
+    bool ok;
+    double lat;
+    double lon;
+    QString city;
+    if (m_ipFallback) {
+        ok = obj.value(QLatin1String("success")).toBool();
+        lat = obj.value(QLatin1String("latitude")).toDouble();
+        lon = obj.value(QLatin1String("longitude")).toDouble();
+        city = obj.value(QLatin1String("city")).toString();
+    } else {
+        ok = (obj.value(QLatin1String("status")).toString() == QLatin1String("success"));
+        lat = obj.value(QLatin1String("lat")).toDouble();
+        lon = obj.value(QLatin1String("lon")).toDouble();
+        city = obj.value(QLatin1String("city")).toString();
+    }
+    if (!ok || (lat == 0.0 && lon == 0.0)) {
+        if (!m_ipFallback) {
+            m_ipFallback = true;    // 主源返回异常，切备用源重试一次
+            onIpFetchTimeout();
+            return;
+        }
         statusBar()->showMessage(QString::fromUtf8("IP 定位失败：服务返回异常"), 8000);
         if (m_locatePending) {
             m_locatePending = false;
@@ -788,9 +826,6 @@ void MainWindow::onIpReplyFinished()
         }
         return;
     }
-    const double lat = obj.value(QLatin1String("latitude")).toDouble();
-    const double lon = obj.value(QLatin1String("longitude")).toDouble();
-    const QString city = obj.value(QLatin1String("city")).toString();
     ensureUAV();
     m_map->UpdateVehiclePosition(opmap::PointLatLng(lat, lon));
     statusBar()->showMessage(QString::fromUtf8("IP 定位（城市级，精度约数公里）：%1 (%2, %3)")

@@ -151,6 +151,9 @@ public:
     int MaxZoom()const{return maxzoom;}
     void SetMaxZoom(int mz) {maxzoom = mz;}
 
+    int MinZoom()const{return minzoom;}
+    void SetMinZoom(int mz) {minzoom = mz;}
+
     void UpdateBounds();
 
     MapType::Types GetMapType(){return mapType;}
@@ -274,6 +277,7 @@ private:
     int tilesToload;
 
     int maxzoom;
+    int minzoom;   ///< 地图源可用最低缩放（低于该级瓦片服务器返回空白占位图）
     QMutex MrunningThreads;
     int runningThreads;
     diagnostics diag;

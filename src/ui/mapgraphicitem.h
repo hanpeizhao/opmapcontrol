@@ -167,13 +167,6 @@ private:
 
     void DrawMap2D(QPainter *painter);
 
-    /**
-        * @brief Minimum possible zoom
-        *
-        * @var minZoom
-        */
-    int minZoom;
-
     opmap::RectLatLng selectedArea;
     opmap::PointLatLng selectionStart;
     opmap::PointLatLng selectionEnd;
@@ -211,7 +204,8 @@ private:
         *
         * @return int
         */
-    int MinZoom()const{return minZoom;}
+    int MinZoom()const{return core->MinZoom();}
+    void SetMinZoom(int mz) {core->SetMinZoom(mz); }
 
     opmap::MouseWheelZoomType::Types GetMouseWheelZoomType(){return core->GetMouseWheelZoomType();}
     opmap::RectLatLng BoundsOfMap;

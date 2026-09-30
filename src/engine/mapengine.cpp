@@ -51,6 +51,7 @@ MapEngine::MapEngine(opmap::MapService *mapService) :
     TooltipTextPadding(10,10),
     loaderLimit(5),
     maxzoom(21),
+    minzoom(0),
     runningThreads(0),
     service(mapService),
     started(false)
@@ -308,6 +309,7 @@ void MapEngine::SetMapType(const MapType::Types &value)
                 SetProjection(new PlateCarreeProjection());
             }
             maxzoom=13;
+            minzoom=0;
         }
             break;
 
@@ -321,6 +323,8 @@ void MapEngine::SetMapType(const MapType::Types &value)
             }
             // 高德瓦片服务器最高支持 z=18，再往上返回空白占位图
             maxzoom=18;
+            // 高德在 z<=2 时同样只返回空白占位图（实测 z2 瓦片仅 179 字节）
+            minzoom=3;
         }
             break;
 
@@ -332,6 +336,7 @@ void MapEngine::SetMapType(const MapType::Types &value)
                 SetProjection(new MercatorProjection());
             }
             maxzoom=19;
+            minzoom=0;
         }
             break;
 
@@ -345,6 +350,7 @@ void MapEngine::SetMapType(const MapType::Types &value)
                 SetProjection(new MercatorProjection());
             }
             maxzoom=20;
+            minzoom=0;
         }
             break;
 
@@ -355,6 +361,7 @@ void MapEngine::SetMapType(const MapType::Types &value)
                 SetProjection(new MercatorProjection());
             }
             maxzoom=21;
+            minzoom=0;
         }
             break;
         }
@@ -365,6 +372,12 @@ void MapEngine::SetMapType(const MapType::Types &value)
 
         if(started)
         {
+            // 新地图源的最小/最大缩放可能比当前缩放更紧，先钳制再刷新瓦片
+            if(Zoom() < minzoom)
+                SetZoom(minzoom);
+            else if(Zoom() > maxzoom)
+                SetZoom(maxzoom);
+
             CancelAsyncTasks();
             OnMapSizeChanged(Width, Height);
             GoToCurrentPosition();

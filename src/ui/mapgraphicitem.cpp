@@ -39,7 +39,6 @@ MapGraphicItem::MapGraphicItem(opmap::MapEngine *core, Configuration *configurat
     core(core),
     config(configuration),
     MapRenderTransform(1),
-    minZoom(2),
     zoomReal(0),
     rotation(0),
     zoomDigi(0),
