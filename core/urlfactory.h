@@ -66,7 +66,6 @@ namespace core {
         int GetServerNum(const core::Point &pos,const int &max) const;
         void TryCorrectGoogleVersions();
         bool isCorrectedGoogleVersions;
-        QString TileXYToQuadKey(const int &tileX,const int &tileY,const int &levelOfDetail) const;
         bool CorrectGoogleVersions;
         bool UseGeocoderCache; //TODO GetSet
         bool UsePlacemarkCache;//TODO GetSet

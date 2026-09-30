@@ -28,51 +28,16 @@ static MapType_Data g_arrMapType[] =
     MAPTYPE_STRUCT(GoogleTerrain),
     MAPTYPE_STRUCT(GoogleHybrid),
 
-    MAPTYPE_STRUCT(GoogleMapChina),
-    MAPTYPE_STRUCT(GoogleSatelliteChina),
-    MAPTYPE_STRUCT(GoogleLabelsChina),
-    MAPTYPE_STRUCT(GoogleTerrainChina),
-    MAPTYPE_STRUCT(GoogleHybridChina),
-
     MAPTYPE_STRUCT(OpenStreetMap),
-    MAPTYPE_STRUCT(OpenStreetOsm),
-    MAPTYPE_STRUCT(OpenStreetMapSurfer),
-    MAPTYPE_STRUCT(OpenStreetMapSurferTerrain),
-
-    MAPTYPE_STRUCT(YahooMap),
-    MAPTYPE_STRUCT(YahooSatellite),
-    MAPTYPE_STRUCT(YahooLabels),
-    MAPTYPE_STRUCT(YahooHybrid),
-
-    MAPTYPE_STRUCT(BingMap),
-    MAPTYPE_STRUCT(BingSatellite),
-    MAPTYPE_STRUCT(BingHybrid),
 
     MAPTYPE_STRUCT(ArcGIS_Map),
     MAPTYPE_STRUCT(ArcGIS_Satellite),
-    MAPTYPE_STRUCT(ArcGIS_ShadedRelief),
-    MAPTYPE_STRUCT(ArcGIS_Terrain),
     MAPTYPE_STRUCT(ArcGIS_WorldTopo),
-
-    MAPTYPE_STRUCT(ArcGIS_MapsLT_Map),
-    MAPTYPE_STRUCT(ArcGIS_MapsLT_OrtoFoto),
-    MAPTYPE_STRUCT(ArcGIS_MapsLT_Map_Labels),
-    MAPTYPE_STRUCT(ArcGIS_MapsLT_Map_Hybrid),
-
-    MAPTYPE_STRUCT(PergoTurkeyMap),
-    MAPTYPE_STRUCT(SigPacSpainMap),
-
-    MAPTYPE_STRUCT(GoogleMapKorea),
-    MAPTYPE_STRUCT(GoogleSatelliteKorea),
-    MAPTYPE_STRUCT(GoogleLabelsKorea),
-    MAPTYPE_STRUCT(GoogleHybridKorea),
-
-    MAPTYPE_STRUCT(YandexMapRu),
-    MAPTYPE_STRUCT(Statkart_Topo2),
 
     MAPTYPE_STRUCT(AutoNaviRoad),
     MAPTYPE_STRUCT(AutoNaviSatellite),
     MAPTYPE_STRUCT(AutoNaviHybrid),
+    MAPTYPE_STRUCT(AutoNaviLabels),
 
     {"NULL", -1}
 };

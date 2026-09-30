@@ -28,19 +28,9 @@
 
 
 namespace core {
-    const QString ProviderStrings::levelsForSigPacSpainMap[] = {"0", "1", "2", "3", "4",
-                                                                "MTNSIGPAC",
-                                                                "MTN2000", "MTN2000", "MTN2000", "MTN2000", "MTN2000",
-                                                                "MTN200", "MTN200", "MTN200",
-                                                                "MTN25", "MTN25",
-                                                                "ORTOFOTOS","ORTOFOTOS","ORTOFOTOS","ORTOFOTOS"};
 
     ProviderStrings::ProviderStrings()
     {
-//        VersionGoogleMap = "m@132";
-//        VersionGoogleSatellite = "71";
-//        VersionGoogleLabels = "h@132";
-//        VersionGoogleTerrain = "t@125,r@132";
         // Google version strings
         VersionGoogleMap = "m@284";
         VersionGoogleSatellite = "163";
@@ -48,41 +38,11 @@ namespace core {
         VersionGoogleTerrain = "t@132,r@284";
         SecGoogleWord = "Galileo";
 
-        // Google (China) version strings
-        VersionGoogleMapChina = "m@132";
-        VersionGoogleSatelliteChina = "s@71";
-        VersionGoogleLabelsChina = "h@132";
-        VersionGoogleTerrainChina = "t@125,r@132";
-
-        // Google (Korea) version strings
-        VersionGoogleMapKorea = "kr1.12";
-        VersionGoogleSatelliteKorea = "66";
-        VersionGoogleLabelsKorea = "kr1t.12";
-
         /// <summary>
         /// Google Maps API generated using http://greatmaps.codeplex.com/
         /// from http://code.google.com/intl/en-us/apis/maps/signup.html
         /// </summary>
         GoogleMapsAPIKey = "ABQIAAAA5Q6wxQ6lxKS8haLVdUJaqhSjosg_0jiTTs2iXtkDVG0n0If1mBRHzhWw5VqBZX-j4NuzoVpU-UaHVg";
-
-        // Yahoo version strings
-        VersionYahooMap = "4.3";
-        VersionYahooSatellite = "1.9";
-        VersionYahooLabels = "4.3";
-
-        // BingMaps
-        VersionBingMaps = "563";
-
-        // YandexMap
-        VersionYandexMap = "2.16.0";
-        //VersionYandexSatellite = "1.19.0";
-        ////////////////////
-
-        /// <summary>
-        /// Bing Maps Customer Identification, more info here
-        /// http://msdn.microsoft.com/en-us/library/bb924353.aspx
-        /// </summary>
-        BingMapsClientToken = "";
 
     }
 }

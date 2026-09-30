@@ -42,13 +42,9 @@
 #include "tilematrix.h"
 #include <QQueue>
 #include "loadtask.h"
-#include "copyrightstrings.h"
 #include "rectlatlng.h"
-#include "../internals/projections/lks94projection.h"
 #include "../internals/projections/mercatorprojection.h"
-#include "../internals/projections/mercatorprojectionyandex.h"
 #include "../internals/projections/platecarreeprojection.h"
-#include "../internals/projections/platecarreeprojectionpergo.h"
 #include "../core/geodecoderstatus.h"
 #include "../core/opmaps.h"
 #include "../core/diagnostics.h"

@@ -40,7 +40,6 @@ HEADERS += \
     ./core/size.h \
     ./core/tilecachequeue.h \
     ./core/urlfactory.h \
-    ./internals/copyrightstrings.h \
     ./internals/core.h \
     ./internals/debugheader.h \
     ./internals/loadtask.h \
@@ -65,11 +64,8 @@ HEADERS += \
     ./mapwidget/uavtrailtype.h \
     ./mapwidget/waypointitem.h \
     ./mapwidget/waypointlineitem.h \
-    ./internals/projections/lks94projection.h \
     ./internals/projections/mercatorprojection.h \
-    ./internals/projections/mercatorprojectionyandex.h \
     ./internals/projections/platecarreeprojection.h \
-    ./internals/projections/platecarreeprojectionpergo.h \
 
 
 SOURCES += \
@@ -113,11 +109,8 @@ SOURCES += \
     ./mapwidget/uavitem.cpp \
     ./mapwidget/waypointitem.cpp \
     ./mapwidget/waypointlineitem.cpp \
-    ./internals/projections/lks94projection.cpp \
     ./internals/projections/mercatorprojection.cpp \
-    ./internals/projections/mercatorprojectionyandex.cpp \
     ./internals/projections/platecarreeprojection.cpp \
-    ./internals/projections/platecarreeprojectionpergo.cpp \
 
     
 FORMS       += ./mapwidget/mapripform.ui

@@ -133,8 +133,7 @@ QByteArray OPMaps::GetImageFrom(const MapType::Types &type,const Point &pos,cons
             QString url=MakeImageUrl(type,pos,zoom,LanguageStr);
 #ifdef DEBUG_TIMINGS
             qDebug()<<"opmaps after make image url"<<time.elapsed();
-#endif		//url	"http://vec02.maps.yandex.ru/tiles?l=map&v=2.10.2&x=7&y=5&z=3"	string
-            //"http://map3.pergo.com.tr/tile/02/000/000/007/000/000/002.png"
+#endif
             qheader.setUrl(QUrl(url));
             qheader.setRawHeader("User-Agent",UserAgent);
             qheader.setRawHeader("Accept","*/*");
@@ -152,66 +151,12 @@ QByteArray OPMaps::GetImageFrom(const MapType::Types &type,const Point &pos,cons
             }
                 break;
 
-            case MapType::GoogleMapChina:
-            case MapType::GoogleSatelliteChina:
-            case MapType::GoogleLabelsChina:
-            case MapType::GoogleTerrainChina:
-            case MapType::GoogleHybridChina:
-            {
-                qheader.setRawHeader("Referrer", "http://ditu.google.cn/");
-            }
-                break;
-
-            case MapType::BingHybrid:
-            case MapType::BingMap:
-            case MapType::BingSatellite:
-            {
-                qheader.setRawHeader("Referrer", "http://www.bing.com/maps/");
-            }
-                break;
-
-            case MapType::YahooHybrid:
-            case MapType::YahooLabels:
-            case MapType::YahooMap:
-            case MapType::YahooSatellite:
-            {
-                qheader.setRawHeader("Referrer", "http://maps.yahoo.com/");
-            }
-                break;
-
-            case MapType::ArcGIS_MapsLT_Map_Labels:
-            case MapType::ArcGIS_MapsLT_Map:
-            case MapType::ArcGIS_MapsLT_OrtoFoto:
-            case MapType::ArcGIS_MapsLT_Map_Hybrid:
-            {
-                qheader.setRawHeader("Referrer", "http://www.maps.lt/map_beta/");
-            }
-                break;
-
-            case MapType::OpenStreetMapSurfer:
-            case MapType::OpenStreetMapSurferTerrain:
-            {
-                qheader.setRawHeader("Referrer", "http://www.mapsurfer.net/");
-            }
-                break;
-
             case MapType::OpenStreetMap:
-            case MapType::OpenStreetOsm:
             {
                 qheader.setRawHeader("Referrer", "http://www.openstreetmap.org/");
             }
                 break;
 
-            case MapType::YandexMapRu:
-            {
-                qheader.setRawHeader("Referrer", "http://maps.yandex.ru/");
-            }
-                break;
-            case MapType::Statkart_Topo2:
-            {
-                qheader.setRawHeader("Referrer", "http://www.norgeskart.no/");
-            }
-                break;
             default:
                 break;
             }
