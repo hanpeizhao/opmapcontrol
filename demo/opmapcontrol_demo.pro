@@ -30,9 +30,12 @@ SOURCES += \
 # opmapcontrol
 ################################################################################
 OPMAPCONTROL_DIR = ..
-INCLUDEPATH +=  $$OPMAPCONTROL_DIR \
-                $$OPMAPCONTROL_DIR/core \
-                $$OPMAPCONTROL_DIR/internals \
-                $$OPMAPCONTROL_DIR/mapwidget
+INCLUDEPATH +=  $$OPMAPCONTROL_DIR/src \
+                $$OPMAPCONTROL_DIR/src/platform \
+                $$OPMAPCONTROL_DIR/src/cache \
+                $$OPMAPCONTROL_DIR/src/providers \
+                $$OPMAPCONTROL_DIR/src/engine \
+                $$OPMAPCONTROL_DIR/src/engine/projections \
+                $$OPMAPCONTROL_DIR/src/ui
 LIBS += $$OPMAPCONTROL_DIR/libopmapwidget.a
-RESOURCES   += $$OPMAPCONTROL_DIR/mapwidget/mapresources.qrc
+RESOURCES   += $$OPMAPCONTROL_DIR/src/ui/mapresources.qrc

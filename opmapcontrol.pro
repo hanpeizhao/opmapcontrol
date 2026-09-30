@@ -1,4 +1,15 @@
 
+# ============================================================
+# opmapcontrol 地图控件静态库
+# ------------------------------------------------------------
+# 分层结构（依赖方向自上而下，禁止反向依赖）：
+#   src/ui        Qt 界面控件（OPMapWidget 及地图 item）
+#   src/engine    地图引擎（核心调度/瓦片矩阵/投影）
+#   src/providers 地图源（MapType/UrlFactory/语言与版本串）
+#   src/cache     瓦片缓存（内存 LRU + SQLite 磁盘缓存 + 下载队列）
+#   src/platform  基础类型（几何点/矩形、坐标系转换、诊断）
+# ============================================================
+
 QT       += core gui network sql widgets
 CONFIG   += staticlib release
 CONFIG   -= debug_and_release
@@ -11,105 +22,104 @@ UI_DIR       = ./build
 MOC_DIR      = ./build
 OBJECTS_DIR  = ./build
 
-INCLUDEPATH += . ./core ./internals ./internals/projections ./mapwidget
+INCLUDEPATH += ./src ./src/platform ./src/cache ./src/providers ./src/engine ./src/engine/projections ./src/ui
 
 DEFINES     += OPMAPWIDGET_LIBRARY EXTERNAL_USE
 
 
 HEADERS += \
-    opmapcontrol.h \
-    ./core/accessmode.h \
-    ./core/alllayersoftype.h \
-    ./core/cache.h \
-    ./core/cacheitemqueue.h \
-    ./core/coordtransform.h \
-    ./core/debugheader.h \
-    ./core/diagnostics.h \
-    ./core/kibertilecache.h \
-    ./core/languagetype.h \
-    ./core/maptype.h \
-    ./core/memorycache.h \
-    ./core/opmaps.h \
-    ./core/point.h \
-    ./core/providerstrings.h \
-    ./core/pureimage.h \
-    ./core/pureimagecache.h \
-    ./core/rawtile.h \
-    ./core/size.h \
-    ./core/tilecachequeue.h \
-    ./core/urlfactory.h \
-    ./internals/core.h \
-    ./internals/debugheader.h \
-    ./internals/loadtask.h \
-    ./internals/mousewheelzoomtype.h \
-    ./internals/pointlatlng.h \
-    ./internals/pureprojection.h \
-    ./internals/rectangle.h \
-    ./internals/rectlatlng.h \
-    ./internals/sizelatlng.h \
-    ./internals/tile.h \
-    ./internals/tilematrix.h \
-    ./mapwidget/gpsitem.h \
-    ./mapwidget/homeitem.h \
-    ./mapwidget/mapgraphicitem.h \
-    ./mapwidget/mapripform.h \
-    ./mapwidget/mapripper.h \
-    ./mapwidget/opmapwidget.h \
-    ./mapwidget/trailitem.h \
-    ./mapwidget/traillineitem.h \
-    ./mapwidget/uavitem.h \
-    ./mapwidget/uavmapfollowtype.h \
-    ./mapwidget/uavtrailtype.h \
-    ./mapwidget/waypointitem.h \
-    ./mapwidget/waypointlineitem.h \
-    ./internals/projections/mercatorprojection.h \
-    ./internals/projections/platecarreeprojection.h \
+    ./src/opmapcontrol.h \
+    ./src/platform/point.h \
+    ./src/platform/size.h \
+    ./src/platform/pointlatlng.h \
+    ./src/platform/rectlatlng.h \
+    ./src/platform/sizelatlng.h \
+    ./src/platform/rectangle.h \
+    ./src/platform/coordtransform.h \
+    ./src/platform/diagnostics.h \
+    ./src/platform/mousewheelzoomtype.h \
+    ./src/platform/debugheader.h \
+    ./src/cache/rawtile.h \
+    ./src/cache/pureimage.h \
+    ./src/cache/kibertilecache.h \
+    ./src/cache/pureimagecache.h \
+    ./src/cache/tilecachequeue.h \
+    ./src/cache/cacheitemqueue.h \
+    ./src/cache/accessmode.h \
+    ./src/cache/cache.h \
+    ./src/cache/memorycache.h \
+    ./src/providers/maptype.h \
+    ./src/providers/urlfactory.h \
+    ./src/providers/providerstrings.h \
+    ./src/providers/languagetype.h \
+    ./src/engine/opmaps.h \
+    ./src/engine/core.h \
+    ./src/engine/tile.h \
+    ./src/engine/tilematrix.h \
+    ./src/engine/loadtask.h \
+    ./src/engine/pureprojection.h \
+    ./src/engine/alllayersoftype.h \
+    ./src/engine/projections/mercatorprojection.h \
+    ./src/engine/projections/platecarreeprojection.h \
+    ./src/ui/gpsitem.h \
+    ./src/ui/homeitem.h \
+    ./src/ui/mapgraphicitem.h \
+    ./src/ui/mapripform.h \
+    ./src/ui/mapripper.h \
+    ./src/ui/opmapwidget.h \
+    ./src/ui/trailitem.h \
+    ./src/ui/traillineitem.h \
+    ./src/ui/uavitem.h \
+    ./src/ui/uavmapfollowtype.h \
+    ./src/ui/uavtrailtype.h \
+    ./src/ui/waypointitem.h \
+    ./src/ui/waypointlineitem.h \
+    ./src/ui/omapconfiguration.h \
 
 
 SOURCES += \
-    ./core/alllayersoftype.cpp \
-    ./core/cache.cpp \
-    ./core/cacheitemqueue.cpp \
-    ./core/coordtransform.cpp \
-    ./core/diagnostics.cpp \
-    ./core/kibertilecache.cpp \
-    ./core/languagetype.cpp \
-    ./core/memorycache.cpp \
-    ./core/opmaps.cpp \
-    ./core/point.cpp \
-    ./core/providerstrings.cpp \
-    ./core/pureimage.cpp \
-    ./core/pureimagecache.cpp \
-    ./core/rawtile.cpp \
-    ./core/size.cpp \
-    ./core/tilecachequeue.cpp \
-    ./core/urlfactory.cpp \
-    ./internals/core.cpp \
-    ./internals/loadtask.cpp \
-    ./internals/MouseWheelZoomType.cpp \
-    ./internals/pointlatlng.cpp \
-    ./internals/pureprojection.cpp \
-    ./internals/rectangle.cpp \
-    ./internals/rectlatlng.cpp \
-    ./internals/sizelatlng.cpp \
-    ./internals/tile.cpp \
-    ./internals/tilematrix.cpp \
-    ./mapwidget/configuration.cpp \
-    ./mapwidget/gpsitem.cpp \
-    ./mapwidget/homeitem.cpp \
-    ./mapwidget/mapgraphicitem.cpp \
-    ./mapwidget/mapripform.cpp \
-    ./mapwidget/mapripper.cpp \
-    ./mapwidget/opmapwidget.cpp \
-    ./mapwidget/trailitem.cpp \
-    ./mapwidget/traillineitem.cpp \
-    ./mapwidget/uavitem.cpp \
-    ./mapwidget/waypointitem.cpp \
-    ./mapwidget/waypointlineitem.cpp \
-    ./internals/projections/mercatorprojection.cpp \
-    ./internals/projections/platecarreeprojection.cpp \
+    ./src/platform/point.cpp \
+    ./src/platform/size.cpp \
+    ./src/platform/pointlatlng.cpp \
+    ./src/platform/rectlatlng.cpp \
+    ./src/platform/sizelatlng.cpp \
+    ./src/platform/rectangle.cpp \
+    ./src/platform/coordtransform.cpp \
+    ./src/platform/diagnostics.cpp \
+    ./src/platform/mousewheelzoomtype.cpp \
+    ./src/cache/rawtile.cpp \
+    ./src/cache/pureimage.cpp \
+    ./src/cache/kibertilecache.cpp \
+    ./src/cache/pureimagecache.cpp \
+    ./src/cache/tilecachequeue.cpp \
+    ./src/cache/cacheitemqueue.cpp \
+    ./src/cache/cache.cpp \
+    ./src/cache/memorycache.cpp \
+    ./src/providers/urlfactory.cpp \
+    ./src/providers/providerstrings.cpp \
+    ./src/providers/languagetype.cpp \
+    ./src/engine/opmaps.cpp \
+    ./src/engine/core.cpp \
+    ./src/engine/tile.cpp \
+    ./src/engine/tilematrix.cpp \
+    ./src/engine/loadtask.cpp \
+    ./src/engine/pureprojection.cpp \
+    ./src/engine/alllayersoftype.cpp \
+    ./src/engine/projections/mercatorprojection.cpp \
+    ./src/engine/projections/platecarreeprojection.cpp \
+    ./src/ui/configuration.cpp \
+    ./src/ui/gpsitem.cpp \
+    ./src/ui/homeitem.cpp \
+    ./src/ui/mapgraphicitem.cpp \
+    ./src/ui/mapripform.cpp \
+    ./src/ui/mapripper.cpp \
+    ./src/ui/opmapwidget.cpp \
+    ./src/ui/trailitem.cpp \
+    ./src/ui/traillineitem.cpp \
+    ./src/ui/uavitem.cpp \
+    ./src/ui/waypointitem.cpp \
+    ./src/ui/waypointlineitem.cpp \
 
-    
-FORMS       += ./mapwidget/mapripform.ui
-RESOURCES   += ./mapwidget/mapresources.qrc
 
+FORMS       += ./src/ui/mapripform.ui
+RESOURCES   += ./src/ui/mapresources.qrc
