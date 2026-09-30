@@ -32,9 +32,8 @@
 #include <QPen>
 #include <QString>
 #include <QFont>
-#include "opmaps.h"
+#include "mapservice.h"
 #include "accessmode.h"
-#include "cache.h"
 namespace mapcontrol
 {
     
@@ -91,6 +90,8 @@ public:
     */
     Qt::MouseButton DragButton;
 
+    core::MapService *mapService;   ///< 地图数据服务（OPMapWidget 注入，不接管所有权）
+
     /**
     * @brief Sets the access mode for the map (cache only, server and cache...)
     *
@@ -129,14 +130,14 @@ public:
     *
     * @return
     */
-    bool UseMemoryCache(){return core::OPMaps::Instance()->UseMemoryCache();}
+    bool UseMemoryCache(){return mapService->UseMemoryCache();}
 
     /**
     * @brief  Returns the currently used memory for tiles
     *
     * @return
     */
-    double TileMemoryUsed()const{return core::OPMaps::Instance()->TilesInMemory.MemoryCacheSize();}
+    double TileMemoryUsed()const{return mapService->TilesInMemory.MemoryCacheSize();}
 
     /**
     * @brief  Sets the size of the memory for tiles
@@ -144,7 +145,7 @@ public:
     * @param  value size in Mb to use for tiles
     * @return
     */
-    void SetTileMemorySize(int const& value){core::OPMaps::Instance()->TilesInMemory.setMemoryCacheCapacity(value);}
+    void SetTileMemorySize(int const& value){mapService->TilesInMemory.setMemoryCacheCapacity(value);}
 
     /**
     * @brief Sets the location for the SQLite Database used for caching and the geocoding cache files
@@ -153,7 +154,7 @@ public:
     */
     void SetCacheLocation(QString const& dir)
     {
-        core::Cache::Instance()->setCacheLocation(dir);
+        mapService->setCacheLocation(dir);
 
     }
 
@@ -163,7 +164,7 @@ public:
     * @param days
     * @return
     */
-    void DeleteTilesOlderThan(int const& days){core::Cache::Instance()->ImageCache.deleteOlderTiles(days);}
+    void DeleteTilesOlderThan(int const& days){mapService->ImageCache.deleteOlderTiles(days);}
 
     /**
     * @brief  Exports tiles from one DB to another. Only new tiles are added.
@@ -178,7 +179,14 @@ public:
     *
     * @return
     */
-    QString CacheLocation(){return core::Cache::Instance()->CacheLocation();}
+    QString CacheLocation(){return mapService->CacheLocation();}
+
+    /**
+    * @brief 注入地图数据服务（由 OPMapWidget 构造时调用）
+    *
+    * @param service 地图数据服务指针，不接管所有权
+    */
+    void SetMapService(core::MapService *service){mapService=service;}
 
 
 };

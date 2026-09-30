@@ -35,15 +35,15 @@
 #include <QObject>
 #include <QMutexLocker>
 #include "pureimagecache.h"
-#include "cache.h"
 
 
 namespace core {
+    /// 后台线程：把网络下载的瓦片异步写入磁盘缓存（SQLite）
     class TileCacheQueue:public QThread
     {
         Q_OBJECT
     public:
-        TileCacheQueue();
+        explicit TileCacheQueue(PureImageCache *imageCache);
         ~TileCacheQueue();
         void EnqueueCacheTask(CacheItemQueue *task);
 
@@ -51,6 +51,7 @@ namespace core {
         QQueue<CacheItemQueue*> tileCacheQueue;
     private:
         void run();
+        PureImageCache *imageCache;   ///< 目标磁盘缓存（归 MapService 所有）
         QMutex mutex;
         QMutex waitmutex;
         QWaitCondition waitc;

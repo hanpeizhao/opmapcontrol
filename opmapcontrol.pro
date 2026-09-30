@@ -46,13 +46,11 @@ HEADERS += \
     ./src/cache/tilecachequeue.h \
     ./src/cache/cacheitemqueue.h \
     ./src/cache/accessmode.h \
-    ./src/cache/cache.h \
-    ./src/cache/memorycache.h \
     ./src/providers/maptype.h \
     ./src/providers/urlfactory.h \
     ./src/providers/providerstrings.h \
     ./src/providers/languagetype.h \
-    ./src/engine/opmaps.h \
+    ./src/engine/mapservice.h \
     ./src/engine/core.h \
     ./src/engine/tile.h \
     ./src/engine/tilematrix.h \
@@ -93,12 +91,10 @@ SOURCES += \
     ./src/cache/pureimagecache.cpp \
     ./src/cache/tilecachequeue.cpp \
     ./src/cache/cacheitemqueue.cpp \
-    ./src/cache/cache.cpp \
-    ./src/cache/memorycache.cpp \
     ./src/providers/urlfactory.cpp \
     ./src/providers/providerstrings.cpp \
     ./src/providers/languagetype.cpp \
-    ./src/engine/opmaps.cpp \
+    ./src/engine/mapservice.cpp \
     ./src/engine/core.cpp \
     ./src/engine/tile.cpp \
     ./src/engine/tilematrix.cpp \

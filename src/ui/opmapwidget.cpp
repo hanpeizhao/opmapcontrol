@@ -48,7 +48,9 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
-    core=new internals::Core;
+    service=new core::MapService;
+    configuration->SetMapService(service);
+    core=new internals::Core(service);
     map=new MapGraphicItem(core, config);
     mscene.addItem(map);
     this->setScene(&mscene);
@@ -240,9 +242,11 @@ OPMapWidget::~OPMapWidget()
     }
 
     delete Home;
+    // 先停引擎（等待瓦片加载线程池结束），再释放服务（等待写库线程结束）
     delete map;
     delete core;
     delete configuration;
+    delete service;
 
     foreach(QGraphicsItem* i,this->items()) {
         delete i;

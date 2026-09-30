@@ -37,7 +37,7 @@ using namespace projections;
 
 namespace internals {
 
-Core::Core() :
+Core::Core(core::MapService *mapService) :
     MouseWheelZooming(false),
     currentPosition(0,0),
     currentPositionPixel(0,0),
@@ -51,7 +51,8 @@ Core::Core() :
     loaderLimit(5),
     maxzoom(21),
     runningThreads(0),
-    started(false)
+    started(false),
+    service(mapService)
 {
     mousewheelzoomtype=MouseWheelZoomType::MousePositionAndCenter;
     SetProjection(new MercatorProjection());
@@ -61,7 +62,6 @@ Core::Core() :
     dragPoint=Point(0,0);
     CanDragMap=true;
     tilesToload=0;
-    OPMaps::Instance();
 }
 
 Core::~Core()
@@ -104,7 +104,7 @@ void Core::run()
     MtileLoadQueue.unlock();
 
     if(task.HasValue())
-        if(loaderLimit.tryAcquire(1,OPMaps::Instance()->Timeout))
+        if(loaderLimit.tryAcquire(1,service->Timeout()))
         {
             MtileToload.lock();
             --tilesToload;
@@ -128,7 +128,7 @@ void Core::run()
 #endif //DEBUG_CORE
 
                         Tile* t = new Tile(task.Zoom, task.Pos);
-                        QVector<MapType::Types> layers= OPMaps::Instance()->GetAllLayersOfType(GetMapType());
+                        QVector<MapType::Types> layers= service->GetAllLayersOfType(GetMapType());
 
                         foreach(MapType::Types tl,layers)
                         {
@@ -140,7 +140,7 @@ void Core::run()
 #ifdef DEBUG_CORE
                                 qDebug()<<"start getting image"<<" ID="<<debug;
 #endif //DEBUG_CORE
-                                img = OPMaps::Instance()->GetImageFrom(tl, task.Pos, task.Zoom);
+                                img = service->GetImageFrom(tl, task.Pos, task.Zoom);
 #ifdef DEBUG_CORE
                                 qDebug()<<"Core::run:gotimage size:"<<img.count()<<" ID="<<debug<<" time="<<t.elapsed();
 #endif //DEBUG_CORE
@@ -159,7 +159,7 @@ void Core::run()
 
                                     break;
                                 }
-                                else if(OPMaps::Instance()->RetryLoadTile > 0)
+                                else if(service->RetryLoadTile > 0)
                                 {
 #ifdef DEBUG_CORE
                                     qDebug()<<"ProcessLoadTask: " << task.ToString()<< " -> empty tile, retry " << retry<<" ID="<<debug;;
@@ -172,7 +172,7 @@ void Core::run()
                                     }
                                 }
                             }
-                            while(++retry < OPMaps::Instance()->RetryLoadTile);
+                            while(++retry < service->RetryLoadTile);
                         }
 
                         if(t->Overlays.count() > 0)
@@ -203,9 +203,9 @@ void Core::run()
                     // last buddy cleans stuff ;}
                     if(last)
                     {
-                        OPMaps::Instance()->kiberCacheLock.lockForWrite();
-                        OPMaps::Instance()->TilesInMemory.RemoveMemoryOverload();
-                        OPMaps::Instance()->kiberCacheLock.unlock();
+                        service->kiberCacheLock.lockForWrite();
+                        service->TilesInMemory.RemoveMemoryOverload();
+                        service->kiberCacheLock.unlock();
 
                         MtileDrawingList.lock();
                         {
@@ -234,7 +234,7 @@ void Core::run()
 diagnostics Core::GetDiagnostics()
 {
     MrunningThreads.lock();
-    diag=OPMaps::Instance()->GetDiagnostics();
+    diag=service->GetDiagnostics();
     diag.runningThreads=runningThreads;
     MrunningThreads.unlock();
     return diag;

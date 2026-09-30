@@ -30,7 +30,7 @@
 
 namespace mapcontrol {
 
-Configuration::Configuration()
+Configuration::Configuration() : mapService(0)
 {
     EmptytileBrush = Qt::cyan;
     MissingDataFont = QFont ("Times", 10, QFont::Bold);
@@ -43,27 +43,27 @@ Configuration::Configuration()
 
 void Configuration::SetAccessMode(core::AccessMode::Types const& type)
 {
-    core::OPMaps::Instance()->setAccessMode(type);
+    mapService->setAccessMode(type);
 }
 
 core::AccessMode::Types Configuration::AccessMode()
 {
-    return core::OPMaps::Instance()->GetAccessMode();
+    return mapService->GetAccessMode();
 }
 
 void Configuration::SetLanguage(core::LanguageType::Types const& type)
 {
-    core::OPMaps::Instance()->setLanguage(type);
+    mapService->setLanguage(type);
 }
 
 core::LanguageType::Types Configuration::Language()
 {
-    return core::OPMaps::Instance()->GetLanguage();
+    return mapService->GetLanguage();
 }
 
 void Configuration::SetUseMemoryCache(bool const& value)
 {
-    core::OPMaps::Instance()->setUseMemoryCache(value);
+    mapService->setUseMemoryCache(value);
 }
 
 } // end of namespace mapcontrol

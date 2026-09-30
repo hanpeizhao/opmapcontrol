@@ -45,7 +45,7 @@
 #include "rectlatlng.h"
 #include "mercatorprojection.h"
 #include "platecarreeprojection.h"
-#include "opmaps.h"
+#include "mapservice.h"
 #include "diagnostics.h"
 
 #include <QSemaphore>
@@ -69,8 +69,11 @@ class Core:public QObject, public QRunnable
     friend class mapcontrol::MapGraphicItem;
 
 public:
-    Core();
+    explicit Core(core::MapService *mapService);
     ~Core();
+
+    /// 所属的地图数据服务（MapRipper 等经此访问缓存与下载）
+    core::MapService *Service()const{return service;}
 
     void run();
 
@@ -274,6 +277,8 @@ private:
     QMutex MrunningThreads;
     int runningThreads;
     diagnostics diag;
+
+    core::MapService *service;   ///< 地图数据服务（OPMapWidget 所有，注入）
 
 protected:
     bool started;

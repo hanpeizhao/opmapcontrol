@@ -34,7 +34,7 @@
 namespace core {
 
 
-TileCacheQueue::TileCacheQueue()
+TileCacheQueue::TileCacheQueue(PureImageCache *cache) : imageCache(cache)
 {
 
 }
@@ -96,7 +96,7 @@ void TileCacheQueue::run()
 #ifdef DEBUG_TILECACHEQUEUE
             qDebug()<<"Cache engine Put:"<<task->GetPosition().X()<<","<<task->GetPosition().Y();
 #endif //DEBUG_TILECACHEQUEUE
-            Cache::Instance()->ImageCache.PutImageToCache(task->GetImg(),task->GetMapType(),task->GetPosition(),task->GetZoom());
+            imageCache->PutImageToCache(task->GetImg(),task->GetMapType(),task->GetPosition(),task->GetZoom());
             usleep(44);
             delete task;
         }
