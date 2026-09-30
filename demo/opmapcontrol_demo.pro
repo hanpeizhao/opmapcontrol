@@ -11,6 +11,7 @@ QT    += core gui widgets opengl sql svg network
 
 UI_DIR       = ./build
 MOC_DIR      = ./build
+RCC_DIR      = ./build
 OBJECTS_DIR  = ./build
 
 

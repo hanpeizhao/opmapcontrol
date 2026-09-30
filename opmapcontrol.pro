@@ -20,6 +20,7 @@ TARGET    = opmapwidget
 DESTDIR      = .
 UI_DIR       = ./build
 MOC_DIR      = ./build
+RCC_DIR      = ./build
 OBJECTS_DIR  = ./build
 
 INCLUDEPATH += ./src ./src/platform ./src/cache ./src/providers ./src/engine ./src/engine/projections ./src/ui
