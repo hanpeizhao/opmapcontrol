@@ -7,7 +7,7 @@ TEMPLATE = app
 TARGET = opmapcontrol_example
 CONFIG  += release
 CONFIG  -= debug_and_release
-QT    += core gui widgets opengl sql svg network
+QT    += core gui widgets opengl sql svg network positioning
 
 
 UI_DIR       = ./build

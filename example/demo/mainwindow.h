@@ -24,6 +24,8 @@
 
 class WaypointStore;
 class NavigationSimulator;
+class QGeoPositionInfoSource;
+class QGeoPositionInfo;
 
 /**
 * @brief 示例程序主窗口（车载导航式调用库）
@@ -79,6 +81,10 @@ private slots:
     void onSimStatus(int current, int total, const QString &message);
     void onSimFinished();
 
+    // 位置源（模拟 / 系统 GPS）
+    void onPosSourceChanged(int index);
+    void onGpsPositionUpdated(const QGeoPositionInfo &info);
+
     // 离线下载
     void onRipMapClicked();
 
@@ -101,6 +107,7 @@ private:
     void refreshWaypointList();
     opmap::UAVItem* ensureUAV();
     void applyProviderFromUI();   ///< 按面板选择创建/更新库内路由 provider
+    void stopGps();               ///< 停止系统 GPS 位置源（若有）
     void setBanner(const QString &headline, const QString &subText, const QString &bgColor);
     void repositionBanner();
 
@@ -127,6 +134,8 @@ private:
     QPushButton *m_simStopBtn;
     QPushButton *m_yawBtn;
     QComboBox *m_speedCombo;
+    QComboBox *m_posSourceCombo;     ///< 位置源：模拟 / 系统 GPS
+    QGeoPositionInfoSource *m_gpsSource;   ///< 系统 GPS 源（惰性创建，可能为空）
     QCheckBox *m_followCheck;
     QCheckBox *m_trailCheck;
     QLabel *m_simInfo;

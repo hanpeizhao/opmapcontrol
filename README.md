@@ -1,6 +1,6 @@
 # opmapcontrol_ex
 
-基于 OpenPilot GCS `opmapcontrol` 的 Qt 地图控件库，已重构迁移至 **Qt 5.12**，并重组为分层架构。支持多地图源切换、WGS-84 坐标自动纠偏、瓦片三级缓存与离线地图下载，内置 UAV 位置显示与航点编辑能力，附完整 example。
+基于 OpenPilot GCS `opmapcontrol` 的 Qt 地图控件库，已重构迁移至 **Qt 5.12**，并重组为分层架构。支持多地图源切换、WGS-84 坐标自动纠偏、瓦片三级缓存与离线地图下载，内置 UAV 位置显示、航点编辑与车载导航（路径规划/转向指引/偏航重规划）能力，附完整 example。
 
 ## 特性
 
@@ -9,6 +9,7 @@
 - **瓦片三级缓存**：内存 LRU 缓存 → SQLite 磁盘缓存 → 网络下载，离线数据与在线浏览共用同一缓存
 - **离线下载**：框选区域后一键抓取指定缩放级别的全部瓦片
 - **地图元素**：UAV 位置/航迹、航点（增删改/导入导出）、Home 点、GPS 轨迹
+- **车载导航**：内置路径规划（OSRM/高德）、中文转向指引、偏航检测与自动重规划、到达判定；车辆位置由外部喂入（模拟器或系统 GPS），路线自动绘制在地图上
 - **界面可配置**：网格线显示、缩放范围、旋转、空瓦片样式、内存缓存容量等
 
 ## 目录结构
@@ -31,7 +32,7 @@ src/
 
 ## 构建
 
-依赖：Qt 5.12（需 core gui widgets network sql svg opengl 模块）、MinGW（Windows）或 GCC（Linux）。地图瓦片下载使用 HTTPS，Windows 下需要 OpenSSL 运行库（example/demo 目录已附带 `libssl-1_1-x64.dll` / `libcrypto-1_1-x64.dll`）。
+依赖：Qt 5.12（库需 core gui widgets network sql svg opengl 模块，example 另需 positioning 模块）、MinGW（Windows）或 GCC（Linux）。地图瓦片下载使用 HTTPS，Windows 下需要 OpenSSL 运行库（example/demo 目录已附带 `libssl-1_1-x64.dll` / `libcrypto-1_1-x64.dll`）。
 
 ```bash
 # 编译静态库

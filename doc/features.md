@@ -93,14 +93,47 @@
 | `WPInserted` / `WPDeleted` / `WPNumberChanged` / `WPValuesChanged` / `WPReached` | 航点增删/改号/改值/到达 | — |
 | `UAVReachedWayPoint` / `UAVLeftSafetyBouble` | UAV 到点/出安全圈 | — |
 
-## 8. example 未覆盖的能力汇总
+## 8. 车载导航（路径规划 / NavigationEngine / RouteItem）
 
-example 是原作者的测试窗口，仅演示了基础链路（切源、缩放、框选下载、单 UAV 位置、航点增删）。以下能力为库完整提供但 example 未使用：
+内置完整车载导航链路：异步路径规划 → 沿线转向指引 → 偏航检测与自动重规划 → 到达判定。路线绘制（已走灰/未走蓝 + 起终点标记）由控件内部完成，车辆位置由外部程序喂入（行车模拟器、系统 GPS、车载串口等任意来源均可）。
+
+| 功能 | API | example |
+|------|:---:|:----:|
+| 更换路径规划源（OSRM/高德，可自定义扩展） | `SetRouteProvider(AbstractRouteProvider*)` | ✅ |
+| 规划并开始导航（起点缺省为当前车辆位置） | 槽 `NavigateTo(目的地)` | ✅ |
+| 喂入车辆实时位置（同步 UAV 图标 + 驱动引擎） | 槽 `UpdateVehiclePosition(PointLatLng)` | ✅ |
+| 停止导航 | 槽 `StopNavigation()` | ✅ |
+| 是否导航中 | `IsNavigating()` | — |
+| 当前导航路线 | `CurrentNavigationRoute()` | — |
+| 路线显示开关（默认导航时自动显示） | `SetShowRoute(bool)` / `ShowRoute()` | — |
+
+导航信号：
+
+| 信号 | 触发时机 | example |
+|------|----------|:----:|
+| `navigationRouteReady(opmap::Route)` | 规划成功，开始导航 | ✅ |
+| `navigationProgress(剩余米, 剩余秒, 转向指令)` | 每次喂点后更新 | ✅ |
+| `offRouteDetected(位置, 偏离米)` | 连续 3 次偏离超过 50m | ✅ |
+| `rerouteReady(opmap::Route)` | 偏航自动重规划成功 | ✅ |
+| `navigationArrived()` | 距目的地 ≤30m，自动停止 | ✅ |
+| `navigationFailed(原因)` | 路线规划失败 | ✅ |
+
+说明：
+
+- 路径规划源：`OsrmRouteProvider`（OSRM 演示服务器，免 key 默认）、`AmapRouteProvider`（高德 Web 服务，需 key）；继承 `AbstractRouteProvider` 并实现 `requestRoute`/`isBusy` 即可接入自定义规划服务
+- `opmap::Route` 携带 WGS-84 折线、分步中文转向指令、总距离/总时长
+- 引擎默认参数：偏航阈值 50m × 连续 3 次、到达阈值 30m、重规划最小间隔 5s、自动重规划开启（调整入口为 `NavigationEngine` 的 `SetOffRouteThresholdM` 等方法）
+- `geoutils`（platform 层）提供 haversine 距离、方位角等几何工具，模拟器与引擎共用
+
+## 9. example 未覆盖的能力汇总
+
+example 已覆盖主要链路（切源、缩放、框选下载、航点增删/导入导出、车载导航全流程、行车模拟与模拟偏航、系统 GPS 位置源）。以下能力为库完整提供但 example 未使用：
 
 - 地图旋转、OpenGL 渲染、缩放级别限制、访问模式控制
-- 多机 UAV 同时显示、轨迹样式、安全圈报警、到点事件
+- 多机 UAV 同时显示、安全圈报警、到点事件
 - 航点插入/重编号、连线、值变化信号
 - 缓存目录/容量管理、旧瓦片清理、缓存库间导出
 - 全部瓦片加载生命周期信号与几何换算工具
+- 导航状态查询（`IsNavigating`/`CurrentNavigationRoute`）、路线显示开关、引擎参数调整
 
 如需这些能力，直接包含 `src/opmapcontrol.h` 调用对应 API 即可，无需改动库代码。

@@ -20,6 +20,8 @@
 #include <QtWidgets/QFileDialog>
 #include <QtCore/QTimer>
 #include <QtGui/QResizeEvent>
+#include <QtPositioning/QGeoPositionInfoSource>
+#include <QtPositioning/QGeoPositionInfo>
 
 #include "waypoint_store.h"
 #include "navigation_simulator.h"
@@ -54,6 +56,8 @@ MainWindow::MainWindow()
       m_simStopBtn(new QPushButton(QString::fromUtf8("停止"), this)),
       m_yawBtn(new QPushButton(QString::fromUtf8("模拟偏航"), this)),
       m_speedCombo(new QComboBox(this)),
+      m_posSourceCombo(new QComboBox(this)),
+      m_gpsSource(0),
       m_followCheck(new QCheckBox(QString::fromUtf8("地图跟随车辆"), this)),
       m_trailCheck(new QCheckBox(QString::fromUtf8("显示行车轨迹"), this)),
       m_simInfo(new QLabel(QString::fromUtf8("空闲"), this)),
@@ -205,6 +209,12 @@ void MainWindow::setupDocks()
     simBtnRow->addWidget(m_simPauseBtn);
     simBtnRow->addWidget(m_simStopBtn);
     simLayout->addLayout(simBtnRow);
+    QHBoxLayout *posSourceRow = new QHBoxLayout();
+    posSourceRow->addWidget(new QLabel(QString::fromUtf8("位置源："), simPanel));
+    m_posSourceCombo->addItem(QString::fromUtf8("行车模拟"));
+    m_posSourceCombo->addItem(QString::fromUtf8("系统 GPS"));
+    posSourceRow->addWidget(m_posSourceCombo);
+    simLayout->addLayout(posSourceRow);
     QHBoxLayout *speedRow = new QHBoxLayout();
     speedRow->addWidget(new QLabel(QString::fromUtf8("速度："), simPanel));
     m_speedCombo->addItem(QString::fromUtf8("慢 5 m/s"));
@@ -223,6 +233,7 @@ void MainWindow::setupDocks()
     connect(m_simStopBtn, SIGNAL(clicked()), this, SLOT(onSimStopClicked()));
     connect(m_yawBtn, SIGNAL(clicked()), this, SLOT(onYawClicked()));
     connect(m_speedCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onSpeedChanged(int)));
+    connect(m_posSourceCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onPosSourceChanged(int)));
     connect(m_followCheck, SIGNAL(toggled(bool)), this, SLOT(onFollowToggled(bool)));
     connect(m_trailCheck, SIGNAL(toggled(bool)), this, SLOT(onTrailToggled(bool)));
 
@@ -534,6 +545,52 @@ void MainWindow::onSimStatus(int current, int total, const QString &message)
 void MainWindow::onSimFinished()
 {
     statusBar()->showMessage(QString::fromUtf8("跟车模拟到达路线终点"), 5000);
+}
+
+// ————————————————— 位置源（模拟 / 系统 GPS） —————————————————
+
+void MainWindow::onPosSourceChanged(int index)
+{
+    if (index == 0) {           // 行车模拟：停 GPS，喂点交还模拟器
+        stopGps();
+        return;
+    }
+
+    // 系统 GPS：先停模拟器，避免双源同时喂点
+    m_simulator->stop();
+
+    if (!m_gpsSource) {
+        // Windows 桌面默认 serialnmea 后端，无可用 GPS 时返回空指针
+        m_gpsSource = QGeoPositionInfoSource::createDefaultSource(this);
+        if (!m_gpsSource) {
+            QMessageBox::warning(this, QString::fromUtf8("系统 GPS 不可用"),
+                                 QString::fromUtf8("未找到可用的系统定位源，已回退到行车模拟"));
+            m_posSourceCombo->blockSignals(true);
+            m_posSourceCombo->setCurrentIndex(0);
+            m_posSourceCombo->blockSignals(false);
+            return;
+        }
+        connect(m_gpsSource, SIGNAL(positionUpdated(QGeoPositionInfo)),
+                this, SLOT(onGpsPositionUpdated(QGeoPositionInfo)));
+        ensureUAV();            // GPS 模式下按面板开关应用跟随/轨迹设置
+    }
+    m_gpsSource->startUpdates();
+    statusBar()->showMessage(QString::fromUtf8("已切换到系统 GPS 位置源"), 5000);
+}
+
+void MainWindow::onGpsPositionUpdated(const QGeoPositionInfo &info)
+{
+    if (!info.isValid())
+        return;
+    const QGeoCoordinate c = info.coordinate();
+    // QGeoCoordinate 为 (纬度, 经度)，与 PointLatLng(Lat, Lng) 顺序一致
+    m_map->UpdateVehiclePosition(opmap::PointLatLng(c.latitude(), c.longitude()));
+}
+
+void MainWindow::stopGps()
+{
+    if (m_gpsSource)
+        m_gpsSource->stopUpdates();
 }
 
 // ————————————————— 离线下载 —————————————————
