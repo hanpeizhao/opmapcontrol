@@ -1326,11 +1326,8 @@ void MainWindow::onMavLinkTimeout()
 void MainWindow::onLocateClicked()
 {
     qDebug("[locate] onLocateClicked fired, hasVehicle=%d", (int)m_map->HasVehiclePosition());
-    if (m_map->HasVehiclePosition()) {
-        CenterOnVehicle();
-        return;
-    }
-    // 无车辆位置：自动走一次 IP 定位兜底（车载导航式的一键定位）
+    // 定位按钮语义 = 刷新"我的真实位置"并居中，每次都重新请求 IP 定位：
+    // 车辆位置可能是手选的导航起点（假想位置），不能当作"我在哪"
     statusBar()->showMessage(QString::fromUtf8("正在通过 IP 定位当前位置…"), 10000);
     m_locatePending = true;
     m_map->RequestIpLocation();
