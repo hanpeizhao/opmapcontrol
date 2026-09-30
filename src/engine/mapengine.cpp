@@ -307,8 +307,45 @@ void MapEngine::SetMapType(const MapType::Types &value)
             if(Projection()->Type()!="PlateCarreeProjection")
             {
                 SetProjection(new PlateCarreeProjection());
-                maxzoom=13;
             }
+            maxzoom=13;
+        }
+            break;
+
+        case MapType::AutoNaviRoad:
+        case MapType::AutoNaviSatellite:
+        case MapType::AutoNaviLabels:
+        {
+            if(Projection()->Type()!="MercatorProjection")
+            {
+                SetProjection(new MercatorProjection());
+            }
+            // 高德瓦片服务器最高支持 z=18，再往上返回空白占位图
+            maxzoom=18;
+        }
+            break;
+
+        case MapType::OpenStreetMap:
+        case MapType::ArcGIS_WorldTopo:
+        {
+            if(Projection()->Type()!="MercatorProjection")
+            {
+                SetProjection(new MercatorProjection());
+            }
+            maxzoom=19;
+        }
+            break;
+
+        case MapType::GoogleMap:
+        case MapType::GoogleSatellite:
+        case MapType::GoogleLabels:
+        case MapType::GoogleTerrain:
+        {
+            if(Projection()->Type()!="MercatorProjection")
+            {
+                SetProjection(new MercatorProjection());
+            }
+            maxzoom=20;
         }
             break;
 
@@ -317,8 +354,8 @@ void MapEngine::SetMapType(const MapType::Types &value)
             if(Projection()->Type()!="MercatorProjection")
             {
                 SetProjection(new MercatorProjection());
-                maxzoom=21;
             }
+            maxzoom=21;
         }
             break;
         }

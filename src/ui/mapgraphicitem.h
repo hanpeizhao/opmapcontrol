@@ -168,12 +168,6 @@ private:
     void DrawMap2D(QPainter *painter);
 
     /**
-        * @brief Maximum possible zoom
-        *
-        * @var maxZoom
-        */
-    int maxZoom;
-    /**
         * @brief Minimum possible zoom
         *
         * @var minZoom
