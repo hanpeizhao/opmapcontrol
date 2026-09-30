@@ -201,6 +201,8 @@ private:
     opmap::WayPointItem *m_destMarker;      ///< 导航目的地标记
     QPoint m_pressScreenPos;         ///< 左键按下屏幕位置（选点防抖：抬起时位移小才算点）
     int m_flightSpeedMps;            ///< 航点飞行巡航速度（m/s，右键菜单可调）
+    bool m_hasRealPos;               ///< 是否有过真实位置源（GPS/IP/MAVLink/模拟）喂入的位置
+    opmap::PointLatLng m_lastRealPos;///< 最近一次真实位置（导航起点等假想喂点不参与记录）
 
     PickMode m_pickMode;
     opmap::PointLatLng m_origin;     ///< 点选的起点（缺省用当前位置）

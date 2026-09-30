@@ -90,6 +90,8 @@ MainWindow::MainWindow()
       m_destMarker(0),
       m_pressScreenPos(),
       m_flightSpeedMps(80),
+      m_hasRealPos(false),
+      m_lastRealPos(0, 0),
       m_pickMode(PickNone),
       m_origin(0, 0),
       m_dest(0, 0),
@@ -1291,7 +1293,9 @@ void MainWindow::onGpsPositionUpdated(const QGeoPositionInfo &info)
         return;
     const QGeoCoordinate c = info.coordinate();
     // QGeoCoordinate 为 (纬度, 经度)，与 PointLatLng(Lat, Lng) 顺序一致
-    m_map->UpdateVehiclePosition(opmap::PointLatLng(c.latitude(), c.longitude()));
+    m_lastRealPos = opmap::PointLatLng(c.latitude(), c.longitude());
+    m_hasRealPos = true;
+    m_map->UpdateVehiclePosition(m_lastRealPos);
 }
 
 void MainWindow::stopGps()
@@ -1306,7 +1310,9 @@ void MainWindow::onMavPositionUpdated(double lat, double lon, double altM, doubl
 {
     Q_UNUSED(altM);
     // 链路对齐 QGeoCoordinate：lat/lon 直接对应 PointLatLng(Lat, Lng)
-    m_map->UpdateVehiclePosition(opmap::PointLatLng(lat, lon));
+    m_lastRealPos = opmap::PointLatLng(lat, lon);
+    m_hasRealPos = true;
+    m_map->UpdateVehiclePosition(m_lastRealPos);
     if (headingDeg >= 0)    // 库内 UpdateVehiclePosition 也按位移推算航向，飞控自带 hdg 优先
         qDebug("[mavlink] pos update lat=%.6f lon=%.6f alt=%.1fm hdg=%.0f", lat, lon, altM, headingDeg);
 }
@@ -1325,10 +1331,21 @@ void MainWindow::onMavLinkTimeout()
 
 void MainWindow::onLocateClicked()
 {
-    qDebug("[locate] onLocateClicked fired, hasVehicle=%d", (int)m_map->HasVehiclePosition());
-    // 定位按钮语义 = 刷新"我的真实位置"并居中，每次都重新请求 IP 定位：
-    // 车辆位置可能是手选的导航起点（假想位置），不能当作"我在哪"
-    statusBar()->showMessage(QString::fromUtf8("正在通过 IP 定位当前位置…"), 10000);
+    qDebug("[locate] onLocateClicked fired, hasVehicle=%d realPos=%d",
+           (int)m_map->HasVehiclePosition(), (int)m_hasRealPos);
+    // 定位按钮语义 = 回到"当前真实位置"，按位置源优先级取用，IP 定位仅兜底：
+    // 1) 真实位置流活跃（模拟/GPS/MAVLink）→ 车辆位置即实时位置，直接居中
+    // 2) 曾有真实位置记录 → 居中该位置（开始导航喂的手选起点等假想位置不参与记录）
+    // 3) 从未有真实位置 → IP 定位兜底（城市级），拿到后喂入并居中
+    if (m_simulator->isRunning()) {
+        CenterOnVehicle();
+        return;
+    }
+    if (m_hasRealPos) {
+        m_map->SetCurrentPosition(m_lastRealPos);
+        return;
+    }
+    statusBar()->showMessage(QString::fromUtf8("无实时位置源，正在通过 IP 定位兜底…"), 10000);
     m_locatePending = true;
     m_map->RequestIpLocation();
 }
@@ -1353,6 +1370,8 @@ void MainWindow::onIpPollTimeout()
 
 void MainWindow::onIpLocationReady(opmap::PointLatLng pos, QString city)
 {
+    m_lastRealPos = pos;    // IP 兜底结果也计入真实位置记录（城市级精度）
+    m_hasRealPos = true;
     ensureUAV();
     if (opmap::UAVItem *u = m_map->GetUAV(0))
         u->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));   // 定位=位置标记图标
