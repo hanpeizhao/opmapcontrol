@@ -222,6 +222,15 @@ double UAVItem::Distance3D(const opmap::PointLatLng &coord, const int &altitude)
 void UAVItem::SetUavPic(QString UAVPic)
 {
     pic.load(":/uavs/images/"+UAVPic);
+    prepareGeometryChange();
+    update();
+}
+
+void UAVItem::SetIcon(QString const& iconPath)
+{
+    pic.load(iconPath);
+    prepareGeometryChange();
+    update();
 }
 
 } // end of namespace opmap

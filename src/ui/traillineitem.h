@@ -42,7 +42,7 @@ class MapGraphicItem;
         Q_OBJECT
         Q_INTERFACES(QGraphicsItem)
     public:
-                enum { Type = UserType + 7 };
+                enum { Type = UserType + 10 };   ///< 7 已被 WayPointLineItem 占用，同值会导致 cast 互串
         TrailLineItem(opmap::PointLatLng const& coord1,opmap::PointLatLng const& coord2, QBrush color, QGraphicsItem* parent);
         int type() const;
       //  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,

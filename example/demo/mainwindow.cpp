@@ -659,6 +659,9 @@ void MainWindow::onFlightClicked()
     if (m_flightSim && m_flightSim->isActive()) {
         m_flightSim->stop();
         m_flightBtn->setText(QString::fromUtf8("航点飞行"));
+        // 恢复位置源图标语义（大头针=位置标记，四旋翼=飞行目标）
+        if (opmap::UAVItem *u = m_map->GetUAV(0))
+            u->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));
         logEvent(QString::fromUtf8("航点飞行已手动停止"));
         return;
     }
@@ -700,6 +703,7 @@ void MainWindow::onFlightClicked()
     opmap::UAVItem *uav = ensureUAV();
     uav->SetAutoSetReached(true);
     uav->SetAutoSetDistance(15);
+    uav->SetIcon(QString::fromUtf8(":/uavs/images/mapquad.png"));   // 飞行=四旋翼图标
     uav->SetUAVPos(start, 120);
     uav->SetUAVHeading(0);
     m_map->SetCurrentPosition(start);   // 地图跳到起飞点（Home 图标处），起飞位置一目了然
@@ -708,9 +712,11 @@ void MainWindow::onFlightClicked()
         m_flightSim = new WaypointFlightSimulator(this);
         connect(m_flightSim, &WaypointFlightSimulator::positionChanged, this,
                 [this](opmap::PointLatLng p, double heading, int idx, int total) {
-            opmap::UAVItem *u = ensureUAV();   // 真机接入点：替换为遥测回调喂 SetUAVPos 即可
-            u->SetUAVPos(p, 120);
-            u->SetUAVHeading(heading);
+            // 真机接入点：替换为遥测回调喂 SetUAVPos 即可（facade 槽，围栏越界判定在库内生效）
+            m_map->SetUAVPos(0, p, 120);
+            opmap::UAVItem *u = m_map->GetUAV(0);
+            if (u)
+                u->SetUAVHeading(heading);
             m_flightBtn->setText(QString::fromUtf8("停止飞行（目标 %1/%2）")
                                  .arg(qMin(idx + 1, total)).arg(total));
         });
@@ -830,10 +836,13 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     if (chosen == addWp) {
         const opmap::PointLatLng p = m_map->currentMousePosition();
         m_map->WPCreate(p, 0, QString::fromUtf8("航点 %1").arg(m_map->WPAll().count() + 1));
+        refreshWaypointList();
     } else if (chosen == delWp) {
         QList<opmap::WayPointItem*> sel = m_map->WPSelected();
         for (int i = 0; i < sel.count(); ++i)
             m_map->WPDelete(sel.at(i));
+        if (!sel.isEmpty())
+            refreshWaypointList();
     } else if (chosen == setHome) {
         m_map->Home->SetCoord(m_map->currentMousePosition());
         m_map->Home->update();
@@ -1198,6 +1207,9 @@ void MainWindow::onSimFinished()
 
 void MainWindow::onPosSourceChanged(int index)
 {
+    // 图标语义区分：位置源=绿色大头针（位置标记），航点飞行=四旋翼无人机图标
+    if (opmap::UAVItem *u = m_map->GetUAV(0))
+        u->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));
     if (index == 0) {           // 行车模拟：停 GPS / IP，喂点交还模拟器
         stopGps();
         m_ipTimer->stop();
@@ -1330,6 +1342,8 @@ void MainWindow::onIpPollTimeout()
 void MainWindow::onIpLocationReady(opmap::PointLatLng pos, QString city)
 {
     ensureUAV();
+    if (opmap::UAVItem *u = m_map->GetUAV(0))
+        u->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));   // 定位=位置标记图标
     m_map->UpdateVehiclePosition(pos);
     statusBar()->showMessage(QString::fromUtf8("IP 定位（城市级，精度约数公里）：%1 (%2, %3)")
                              .arg(city).arg(pos.Lat(), 0, 'f', 4).arg(pos.Lng(), 0, 'f', 4), 10000);

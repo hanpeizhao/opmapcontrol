@@ -289,6 +289,15 @@ void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
     CheckGeofence(pos);   // 围栏判定对所有位置源（模拟/GPS/MAVLink）统一生效
 }
 
+void OPMapWidget::SetUAVPos(int const& id, opmap::PointLatLng const& pos, int const& alt)
+{
+    UAVItem *uav = GetUAV(id);
+    if (!uav)
+        uav = AddUAV(id);
+    uav->SetUAVPos(pos, alt);
+    CheckGeofence(pos);   // 任务飞行喂点同样接入围栏越界判定
+}
+
 void OPMapWidget::StopNavigation()
 {
     navEngine->Stop();

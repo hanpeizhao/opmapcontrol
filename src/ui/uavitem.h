@@ -221,6 +221,8 @@ public:
     int type() const;
 
     void SetUavPic(QString UAVPic);
+    /// 按完整资源路径换图标（SetUavPic 只认 /uavs 前缀；此接口可换任意 qrc 资源）
+    void SetIcon(QString const& iconPath);
 
 protected:
     QPixmap pic;

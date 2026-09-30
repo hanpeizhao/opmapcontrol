@@ -716,6 +716,12 @@ public slots:
      */
     void UpdateVehiclePosition(opmap::PointLatLng const& pos);
 
+    /**
+     * @brief 喂入 UAV 实时位置（WGS-84）：驱动轨迹/到达判定/围栏越界判定
+     *        （与 UpdateVehiclePosition 的区别：此路径带围栏判定，供任务飞行喂点）
+     */
+    void SetUAVPos(int const& id, opmap::PointLatLng const& pos, int const& alt);
+
     /// 停止导航并清除路线绘制
     void StopNavigation();
 
