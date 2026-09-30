@@ -681,14 +681,14 @@ void MainWindow::onFlightClicked()
             ++hoverCount;
     }
 
-    // Home 返航点设在起飞位置并打开安全围栏圈（现实场景：飞机飞出返航点半径即告警）
-    const opmap::PointLatLng start = m_map->HasVehiclePosition() ? m_map->VehiclePosition() : kHomePos;
-    if (m_map->Home) {
-        m_map->Home->SetCoord(start);
+    // 起飞点 = Home 返航点（右键"设置 Home 位置/安全围栏半径"生效；不覆盖用户设置）
+    opmap::PointLatLng start;
+    if (m_map->Home)
+        start = m_map->Home->Coord();
+    else
+        start = m_map->HasVehiclePosition() ? m_map->VehiclePosition() : kHomePos;
+    if (m_map->Home)
         m_map->Home->SetShowSafeArea(true);
-        m_map->Home->SetSafeArea(3000);
-        m_map->Home->update();
-    }
 
     // 地图跟随会让 UAV 永远钉在屏幕中央、看起来"原地不动"，飞行观察期间自动暂停
     if (m_followCheck->isChecked()) {

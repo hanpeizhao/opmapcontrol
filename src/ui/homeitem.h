@@ -53,14 +53,16 @@ public:
     int type() const;
     void RefreshPos();
     bool ShowSafeArea()const{return showsafearea;}
-    void SetShowSafeArea(bool const& value){showsafearea=value;}
     int SafeArea()const{return safearea;}
-    void SetSafeArea(int const& value){safearea=value;}
     bool safe;
-    void SetCoord(opmap::PointLatLng const& value){coord=value;}
+    /// 设置返航点坐标（立即重算屏幕位置，无需等地图拖动）
+    void SetCoord(opmap::PointLatLng const& value);
     opmap::PointLatLng Coord()const{return coord;}
     void SetAltitude(int const& value){altitude=value;}
     int Altitude()const{return altitude;}
+    /// 设置安全围栏半径（米，立即重算圈大小）
+    void SetSafeArea(int const& value);
+    void SetShowSafeArea(bool const& value);
 
 private:
     MapGraphicItem* map;

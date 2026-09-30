@@ -40,7 +40,8 @@ HomeItem::HomeItem(MapGraphicItem* map,OPMapWidget* parent) :
     localposition=map->FromLatLngToLocal(mapwidget->CurrentPosition());
     this->setPos(localposition.X(),localposition.Y());
     this->setZValue(4);
-    coord=opmap::PointLatLng(50, 50);
+    // 默认坐标与初始显示位置一致（历史值 (50,50) 与显示位置脱节，首次拖图会跳点）
+    coord=mapwidget->CurrentPosition();
 
     //        this->setFlag(QGraphicsItem::ItemIsMovable,true);
     //        this->setFlag(QGraphicsItem::ItemIgnoresTransformations,true);
@@ -77,6 +78,28 @@ QRectF HomeItem::boundingRect()const
 int HomeItem::type()const
 {
     return Type;
+}
+
+void HomeItem::SetCoord(opmap::PointLatLng const& value)
+{
+    coord = value;
+    RefreshPos();   // 立即重算屏幕位置与安全圈半径，不等地图拖动
+    update();
+}
+
+void HomeItem::SetSafeArea(int const& value)
+{
+    safearea = value;
+    RefreshPos();
+    update();
+}
+
+void HomeItem::SetShowSafeArea(bool const& value)
+{
+    showsafearea = value;
+    prepareGeometryChange();
+    RefreshPos();
+    update();
 }
 
 void HomeItem::RefreshPos()
