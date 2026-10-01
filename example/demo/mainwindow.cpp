@@ -795,6 +795,10 @@ void MainWindow::onFlightClicked()
         statusBar()->showMessage(QString::fromUtf8("请先在地图点选添加航点"), 5000);
         return;
     }
+    if (!m_swarm.isEmpty()) {   // 编队演示占用 0 号机，双源同时驱动会互抢位置
+        logEvent(QString::fromUtf8("航点飞行与多机编队演示冲突（0 号机被占用），请先关闭多机编队演示"));
+        return;
+    }
     int photoCount = 0, hoverCount = 0;
     for (QMap<int, opmap::WayPointItem*>::const_iterator it = wps.constBegin(); it != wps.constEnd(); ++it) {
         if (it.value()->Action() == opmap::WayPointItem::WayPointActionPhoto)
@@ -1131,8 +1135,14 @@ void MainWindow::onPeerTick()
 void MainWindow::onMigrationToggled(bool on)
 {
     if (on) {
-        if (!m_peerMarkers.isEmpty()) {   // 迁徙与多人位置演示共用标记层，防互删
+        if (!m_migrantMarkers.isEmpty()) {   // 迁徙与多人位置演示共用标记层，防互删
             logEvent(QString::fromUtf8("迁徙演示与多人位置演示共用标记层，请先关闭多人位置演示"));
+            if (QPushButton *b = qobject_cast<QPushButton*>(sender()))
+                b->setChecked(false);
+            return;
+        }
+        if (!m_swarm.isEmpty()) {   // 编队演示占用 0 号机与弧线层，混开互删弧线会崩
+            logEvent(QString::fromUtf8("迁徙演示与多机编队演示冲突（0 号机/弧线层被占用），请先关闭多机编队演示"));
             if (QPushButton *b = qobject_cast<QPushButton*>(sender()))
                 b->setChecked(false);
             return;
@@ -1178,7 +1188,12 @@ void MainWindow::onMigrationToggled(bool on)
         m_migrantTimer->stop();
         m_map->ClearMarkers();
         m_migrantMarkers.clear();
-        m_map->ClearArcLines();   // 清各段弧线航线
+        // 只删迁徙自己的弧线（RemoveArcLine 单删）：编队演示的弧线不受影响
+        for (int i = 0; i < m_migrants.size(); ++i) {
+            const QList<opmap::ArcLineItem *> &arcs = m_migrants.at(i).arcLines;
+            for (int j = 0; j < arcs.size(); ++j)
+                m_map->RemoveArcLine(arcs.at(j));
+        }
         m_migrants.clear();
         logEvent(QString::fromUtf8("候鸟迁徙演示停止，标记与航线已清除"));
     }
@@ -1226,9 +1241,10 @@ void MainWindow::onSwarmToggled(bool on)
                 b->setChecked(false);
             return;
         }
-        // 迁徙演示互斥：ClearArcLines 会清掉迁徙航线，避免相互破坏画面
-        if (m_migrantTimer->isActive()) {
-            logEvent(QString::fromUtf8("多机编队演示与迁徙演示共用弧线航线层，请先关闭候鸟迁徙演示"));
+        // 迁徙演示互斥：标记层/弧线层未清（含飞完后的残留态）都拒绝，
+        // 防止任一方关闭时误删对方正在使用的弧线（悬空指针崩溃）
+        if (m_migrantTimer->isActive() || !m_migrantMarkers.isEmpty()) {
+            logEvent(QString::fromUtf8("多机编队演示与迁徙演示冲突（标记/弧线层被占用），请先关闭候鸟迁徙演示"));
             if (QPushButton *b = qobject_cast<QPushButton*>(sender()))
                 b->setChecked(false);
             return;
@@ -1265,9 +1281,9 @@ void MainWindow::onSwarmToggled(bool on)
         m_swarmTimer->stop();
         for (int i = 0; i < m_swarm.size(); ++i) {
             m_map->StopTrailRecording(m_swarm.at(i).uavId);
-            m_map->DeleteUAV(m_swarm.at(i).uavId);   // 图标与轨迹线随图元删除
+            m_map->RemoveArcLine(m_swarm.at(i).arc);   // 只删编队自己的弧线
+            m_map->DeleteUAV(m_swarm.at(i).uavId);     // 图标与轨迹线随图元删除
         }
-        m_map->ClearArcLines();   // 编队与迁徙互斥，此处清弧线不会误伤迁徙航线
         m_swarm.clear();
         logEvent(QString::fromUtf8("多机编队演示停止：UAV 图标与航线已清除（各机轨迹缓冲保留，可保存/回放）"));
     }
