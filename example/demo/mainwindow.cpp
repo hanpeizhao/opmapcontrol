@@ -1834,10 +1834,14 @@ void MainWindow::onStopNavClicked()
 {
     m_simulator->stop();
     m_map->StopNavigation();
+    // 导航结束=行程结束：库只清路线和端点图钉，车辆大头针+轨迹在此一并清除，
+    // 避免"路线没了大头针还在"的残留（后续点定位只剩 GPS 图标=当前位置）
+    m_map->DeleteUAV(0);
     m_banner->hide();
     m_navInfo->setText(QString::fromUtf8("已停止"));
     refreshNavState();
-    statusBar()->showMessage(QString::fromUtf8("导航已停止"), 5000);
+    statusBar()->showMessage(QString::fromUtf8("导航已停止：路线与车辆标记已清除"), 5000);
+    logEvent(QString::fromUtf8("导航已停止：路线、车辆大头针及其轨迹已清除"));
 }
 
 void MainWindow::onProviderChanged(int index)
