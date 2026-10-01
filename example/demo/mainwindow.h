@@ -18,6 +18,9 @@
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QPushButton>
+#include <QtCore/QTimer>
+#include <QtCore/QHash>
+#include <QtCore/QVector>
 #include <QtGui/QMouseEvent>
 
 #include "opmapcontrol.h"
@@ -102,6 +105,10 @@ private slots:
     void onIpLocationFailed(QString reason);
     // 工具栏定位：库内一键定位（有车辆位置直接居中，无则 IP 兜底只居中）
     void onLocateClicked();
+
+    // 多人共享位置演示：成员上线创建标记，模拟报文驱动 SetCoord 实时移动
+    void onPeersDemoToggled(bool on);
+    void onPeerTick();
 
     // 地图右键菜单：切换地图源 / 航点增删
     void onMapContextMenu(const QPoint &pos);
@@ -189,6 +196,18 @@ private:
     bool m_hasDest;
     bool m_providerIsAmap;       ///< 当前库内 provider 是否为高德
     opmap::Route m_navRoute;     ///< 最近一次导航路线（喂跟车模拟器）
+
+    // 多人共享位置演示
+    struct PeerSim {             ///< 模拟成员运动参数（绕圆心匀速转圈）
+        QString name;
+        double cLat, cLng;       // 圆心
+        double rLat, rLng;       // 转圈半径（度）
+        double phase;            // 初始相位
+    };
+    QVector<PeerSim> m_peerSims;                            ///< 成员运动参数表
+    QHash<QString, opmap::MapMarkerItem *> m_peerMarkers;   ///< 成员名 → 地图标记
+    QTimer *m_peerTimer;         ///< 模拟位置报文定时器
+    double m_peerAngle;          ///< 演示公转角（rad，随 tick 递增）
 };
 
 #endif // MAINWINDOW_H

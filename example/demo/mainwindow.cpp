@@ -35,6 +35,7 @@
 #include "homeitem.h"
 #include "waypointitem.h"
 #include "mapmarkeritem.h"
+#include <QtMath>
 
 namespace {
 
@@ -89,7 +90,9 @@ MainWindow::MainWindow()
       m_dest(0, 0),
       m_hasOrigin(false),
       m_hasDest(false),
-      m_providerIsAmap(false)
+      m_providerIsAmap(false),
+      m_peerTimer(new QTimer(this)),
+      m_peerAngle(0)
 {
     setWindowTitle(QString::fromUtf8("opmapcontrol 示例 — 地图/航点/车载导航"));
     resize(1200, 800);
@@ -127,6 +130,9 @@ MainWindow::MainWindow()
     connect(m_simulator, SIGNAL(statusUpdated(int,int,QString)),
             this, SLOT(onSimStatus(int,int,QString)));
     connect(m_simulator, SIGNAL(finished()), this, SLOT(onSimFinished()));
+
+    // 多人共享位置演示：定时器驱动模拟位置报文
+    connect(m_peerTimer, SIGNAL(timeout()), this, SLOT(onPeerTick()));
 
     setupMenus();
     setupDocks();
@@ -201,6 +207,11 @@ void MainWindow::setupMenus()
     QAction *locateAct = toolBar->addAction(QString::fromUtf8("定位当前位置"));
     locateAct->setShortcut(QKeySequence(QString::fromUtf8("Ctrl+L")));
     connect(locateAct, SIGNAL(triggered()), this, SLOT(onLocateClicked()));
+
+    // 多人共享位置演示：点击开始/停止（成员标记实时移动）
+    QAction *peersAct = toolBar->addAction(QString::fromUtf8("多人位置演示"));
+    peersAct->setCheckable(true);
+    connect(peersAct, SIGNAL(toggled(bool)), this, SLOT(onPeersDemoToggled(bool)));
 }
 
 void MainWindow::setupDocks()
@@ -921,6 +932,63 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     } else if (chosen == clearMarkers) {
         m_map->ClearMarkers();
         logEvent(QString::fromUtf8("已清除所有标记"));
+    }
+}
+
+// ————————————————— 多人共享位置演示 —————————————————
+
+void MainWindow::onPeersDemoToggled(bool on)
+{
+    if (on) {
+        // 3 名模拟成员：头像图钉 + 名字标签，绕西安附近各自圆心匀速转圈。
+        // 真实接入时只需：收到共享报文 → m_peerMarkers[id]->SetCoord(newPos)
+        struct Seed { const char *name; double dLat, dLng, rLat, rLng, phase; };
+        const Seed seeds[] = {
+            { "张三",  0.002,  0.003, 0.004, 0.005, 0.0   },
+            { "李四", -0.003, -0.002, 0.003, 0.004, 2.094 },
+            { "王五",  0.001, -0.004, 0.005, 0.003, 4.189 },
+        };
+        m_peerSims.clear();
+        m_peerMarkers.clear();
+        for (int i = 0; i < 3; ++i) {
+            PeerSim s;
+            s.name = QString::fromUtf8(seeds[i].name);
+            s.cLat = kHomePos.Lat() + seeds[i].dLat;
+            s.cLng = kHomePos.Lng() + seeds[i].dLng;
+            s.rLat = seeds[i].rLat;
+            s.rLng = seeds[i].rLng;
+            s.phase = seeds[i].phase;
+            opmap::MapMarkerItem *m = m_map->AddMarker(
+                opmap::PointLatLng(s.cLat, s.cLng),
+                QString::fromUtf8(":/markers/images/marker.png"));
+            m->SetImageSize(24, 24);
+            m->SetText(s.name);
+            m_peerSims.append(s);
+            m_peerMarkers.insert(s.name, m);
+        }
+        m_peerAngle = 0.0;
+        m_map->SetCurrentPosition(kHomePos);   // 视野带回成员聚集区
+        m_peerTimer->start(200);               // 5Hz 模拟位置报文
+        logEvent(QString::fromUtf8("多人共享位置演示开始：3 名成员每 200ms 上报一次位置"));
+    } else {
+        m_peerTimer->stop();
+        m_map->ClearMarkers();
+        m_peerMarkers.clear();
+        m_peerSims.clear();
+        logEvent(QString::fromUtf8("多人共享位置演示停止，标记已清除"));
+    }
+}
+
+void MainWindow::onPeerTick()
+{
+    // 模拟位置报文到达：各成员绕圆心匀速转动，一行 SetCoord 即实时移动
+    m_peerAngle += 0.15;
+    for (int i = 0; i < m_peerSims.size(); ++i) {
+        const PeerSim &s = m_peerSims.at(i);
+        const double a = m_peerAngle + s.phase;
+        m_peerMarkers.value(s.name)->SetCoord(
+            opmap::PointLatLng(s.cLat + s.rLat * qSin(a),
+                               s.cLng + s.rLng * qCos(a)));
     }
 }
 
