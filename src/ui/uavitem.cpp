@@ -140,6 +140,7 @@ void UAVItem::SetUAVPos(const opmap::PointLatLng &position, const int &altitude,
                 if(mapwidget->Home->safe!=true) {
                     mapwidget->Home->safe=true;
                     mapwidget->Home->update();
+                    emit UAVEnteredSafetyBouble(this->coord);   // 与飞出成对：回圈也通知
                 }
             }
         }

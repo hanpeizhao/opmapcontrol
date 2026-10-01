@@ -572,6 +572,11 @@ void MainWindow::connectEventLog()
                 logEvent(QString::fromUtf8("警告：飞出安全圈 @ (%1, %2)")
                          .arg(pos.Lat(), 0, 'f', 5).arg(pos.Lng(), 0, 'f', 5));
             });
+    connect(m_map, &opmap::OPMapWidget::UAVEnteredSafetyBouble,
+            [this](const opmap::PointLatLng &pos) {
+                logEvent(QString::fromUtf8("提示：已回到安全圈 @ (%1, %2)")
+                         .arg(pos.Lat(), 0, 'f', 5).arg(pos.Lng(), 0, 'f', 5));
+            });
 
     // —— 多边形围栏越界：日志 + 状态栏警示 + 横幅 5 秒 ——
     connect(m_map, &opmap::OPMapWidget::geofenceBreach,
@@ -752,8 +757,9 @@ void MainWindow::onFlightClicked()
     m_map->StartWaypointMission(wps.values(), 15.0);
     if (opmap::UAVItem *u = m_map->GetUAV(0))
         u->SetIcon(QString::fromUtf8(":/uavs/images/mapquad.png"));   // 飞行=四旋翼图标（展示语义，库默认大头针）
-    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点（拍照 %2、悬停 %3），从 Home 图标处起飞，巡航 %4 m/s，安全围栏 3000 m，跟随已自动暂停")
-             .arg(wps.size()).arg(photoCount).arg(hoverCount).arg(m_flightSpeedMps));
+    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点（拍照 %2、悬停 %3），从 Home 图标处起飞，巡航 %4 m/s，安全围栏 %5 m，跟随已自动暂停")
+             .arg(wps.size()).arg(photoCount).arg(hoverCount).arg(m_flightSpeedMps)
+             .arg(m_map->Home ? m_map->Home->SafeArea() : 0));
 }
 
 /** 围栏按钮三态：绘制围栏 →（库内连续取点+橡皮筋预览）→ 结束围栏 → 清除围栏 → 绘制围栏。 */
@@ -1254,7 +1260,8 @@ void MainWindow::onPositionLinkTimeout()
 
 void MainWindow::onLocateClicked()
 {
-    // 一键定位已下沉库：有车辆位置直接居中，无则库内自动 IP 定位兜底（只居中不喂车）
+    // 一键定位已下沉库：活位置流（10 秒内有喂点）直接居中，否则库内自动 IP 定位兜底（只居中不喂车）
+    statusBar()->showMessage(QString::fromUtf8("定位中…（无实时位置时走 IP 兜底，约需数秒）"), 6000);
     m_map->LocateCurrentPosition();
 }
 

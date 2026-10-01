@@ -69,6 +69,7 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     routeToMarker(0)
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+    vehiclePosAge.start();   // 未喂点状态从构造时刻起算（防无效计时器）
 
     service=new opmap::MapService;
     configuration->SetMapService(service);
@@ -105,7 +106,7 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     connect(ipLocator, SIGNAL(locationReady(opmap::PointLatLng,QString)),
             this, SLOT(onIpLocated(opmap::PointLatLng,QString)));
     connect(ipLocator, SIGNAL(locationFailed(QString)),
-            this, SIGNAL(ipLocationFailed(QString)));
+            this, SLOT(onIpLocationFailed(QString)));
 
     // —— 位置源管理：统一互斥切换；位置点自动喂车 + 分发 positionUpdated ——
     posSourceManager = new PositionSourceManager(this);
@@ -180,6 +181,7 @@ UAVItem* OPMapWidget::AddUAV(int id)
     UAVS.insert(id, newUAV);
     QGraphicsItemGroup* waypointLine = new QGraphicsItemGroup(map);
     waypointLines.insert(id, waypointLine);
+    ConnectUAV(newUAV);
 
     return newUAV;
 }
@@ -190,6 +192,20 @@ void OPMapWidget::AddUAV(int id, UAVItem* uav)
     QGraphicsItemGroup* waypointLine = new QGraphicsItemGroup(map);
     waypointLines.insert(id, waypointLine);
     UAVS.insert(id, uav);
+    ConnectUAV(uav);
+}
+
+/// UAV 事件 → facade 信号转发（到达航点/飞出安全圈/回到安全圈）。
+/// 三条创建路径（AddUAV 两个重载、SetShowUAV）统一走这里，
+/// EnsureUAV 惰性建出的 UAV 同样能向客户代码发事件
+void OPMapWidget::ConnectUAV(UAVItem *uav)
+{
+    connect(uav, SIGNAL(UAVReachedWayPoint(int,WayPointItem*)),
+            this,  SIGNAL(UAVReachedWayPoint(int,WayPointItem*)));
+    connect(uav, SIGNAL(UAVLeftSafetyBouble(opmap::PointLatLng)),
+            this,  SIGNAL(UAVLeftSafetyBouble(opmap::PointLatLng)));
+    connect(uav, SIGNAL(UAVEnteredSafetyBouble(opmap::PointLatLng)),
+            this,  SIGNAL(UAVEnteredSafetyBouble(opmap::PointLatLng)));
 }
 
 void OPMapWidget::DeleteUAV(int id)
@@ -238,11 +254,7 @@ void OPMapWidget::SetShowUAV(const bool &value)
     if( value && UAV==0 ) {
         UAV = new UAVItem(map,this);
         UAV->setParentItem(map);
-
-        // FIXME XXX The map widget is here actually handling
-        // safety and mission logic - might be worth some refactoring
-        connect(this,SIGNAL(UAVLeftSafetyBouble(opmap::PointLatLng)),UAV,SIGNAL(UAVLeftSafetyBouble(opmap::PointLatLng)));
-        connect(this,SIGNAL(UAVReachedWayPoint(int,WayPointItem*)),UAV,SIGNAL(UAVReachedWayPoint(int,WayPointItem*)));
+        ConnectUAV(UAV);
     } else if(!value) {
         if(UAV!=0) {
             UAV->DeleteTrail();
@@ -334,6 +346,7 @@ void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
 
     vehiclePos = pos;
     vehiclePosValid = true;
+    vehiclePosAge.restart();   // 活性计时：定位按钮据此区分"位置流"与"一次性摆位"
     navEngine->UpdatePosition(pos);
     CheckGeofence(pos);   // 围栏判定对所有位置源（模拟/GPS/MAVLink）统一生效
     if (missionEngine && missionEngine->IsMissionActive())
@@ -417,7 +430,10 @@ bool OPMapWidget::IsIpLocationBusy() const
 
 void OPMapWidget::LocateCurrentPosition()
 {
-    if (vehiclePosValid) {
+    // vehiclePos 只在"活的位置流"下作权威（10 秒内有喂点）：
+    // 一次性摆位（如开始导航把车瞬移到起点）过了时效就不算，
+    // 此时点定位应去找真实/IP 位置而不是回到陈旧摆位点
+    if (vehiclePosValid && vehiclePosAge.elapsed() < 10000) {
         SetCurrentPosition(vehiclePos);
         if (ZoomTotal() < 15.0)
             SetZoom(15.0);          // 定位时切到街区级缩放
@@ -436,6 +452,12 @@ void OPMapWidget::onIpLocated(opmap::PointLatLng pos, QString city)
             SetZoom(15.0);
     }
     emit ipLocationReady(pos, city);
+}
+
+void OPMapWidget::onIpLocationFailed(QString reason)
+{
+    locatePending = false;   // 兜底请求已终结，防残留标记误居中后续无关结果
+    emit ipLocationFailed(reason);
 }
 
 // ———————— 位置源管理（互斥切换） ————————
@@ -465,6 +487,7 @@ void OPMapWidget::StartWaypointMission(QList<WayPointItem*> const& waypoints,
     UAVItem *uav = EnsureUAV(0);
     uav->SetAutoSetReached(true);
     uav->SetAutoSetDistance(arrivalRadiusMeters);
+    uav->DeleteTrail();   // 任务（重）启动=轨迹从头记录，否则上次飞行终点会与新起飞点拉出跨场连线
     if (Home)
         Home->SetShowSafeArea(true);   // 起飞点安全圈可见
     // 起飞点取位：Home 返航点优先，其次车辆位置；有则摆好机位并跳转视图

@@ -255,6 +255,7 @@ public slots:
 signals:
     void UAVReachedWayPoint(int const& waypointnumber,WayPointItem* waypoint);
     void UAVLeftSafetyBouble(opmap::PointLatLng const& position);
+    void UAVEnteredSafetyBouble(opmap::PointLatLng const& position);
 };
 
 }

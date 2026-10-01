@@ -31,6 +31,7 @@
 
 
 #include <QObject>
+#include <QElapsedTimer>
 #include <QtOpenGL/QGLWidget>
 
 // Qt4 or Qt5
@@ -526,6 +527,7 @@ public:
 
 private:
     UAVItem *EnsureUAV(int id);   ///< 惰性取用 UAV：不存在则创建并套用默认样式
+    void ConnectUAV(UAVItem *uav);   ///< UAV 事件 → facade 信号转发（到达/飞出安全圈/回圈）
     void HandlePickClick(opmap::PointLatLng const& pos);   ///< 一次有效选点：累积+发信号+单发自动收尾
     void EndPick();               ///< 结束当前取点（围栏收尾 + pickFinished）
     WayPointItem *EnsureRouteMarker(WayPointItem *&marker, opmap::PointLatLng const& pos, QString const& text);   ///< 惰性取用路线端点图钉（auxiliary 装饰航点）
@@ -554,6 +556,7 @@ private:
     bool geofenceBreached;                         ///< 当前是否处于越界状态（沿沿只发一次信号）
     opmap::PointLatLng vehiclePos;                 ///< 最近喂入的车位置
     bool vehiclePosValid;
+    QElapsedTimer vehiclePosAge;                   ///< 距上次喂点的时长（定位按钮判断"活位置流"用）
     bool followVehicle;                            ///< 地图跟随车辆开关（喂点时自动居中）
     bool locatePending;                            ///< 定位按钮触发的 IP 兜底在途（结果只居中）
 
@@ -583,6 +586,8 @@ private slots:
     void onMissionFinished();
     /// IP 定位结果：先处理一键定位兜底（只居中），再转发 ipLocationReady
     void onIpLocated(opmap::PointLatLng pos, QString city);
+    /// IP 定位失败：清一键定位兜底标记再转发（防残留 locatePending 误居中后续结果）
+    void onIpLocationFailed(QString reason);
 
 protected:
     MapGraphicItem *map;
@@ -665,6 +670,7 @@ signals:
      * @param position the position of the UAV
      */
     void UAVLeftSafetyBouble(opmap::PointLatLng const& position);
+    void UAVEnteredSafetyBouble(opmap::PointLatLng const& position);
 
     /**
      * @brief Fires when map position changes
