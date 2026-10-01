@@ -221,9 +221,14 @@ private:
     MapType::Types GetMapType(){return core->GetMapType();}
     void SetMapType(MapType::Types const& value){core->SetMapType(value);}
 
+public slots:
+    /// 全场景子项屏幕位置重算（地理锚定项按各自 coord 重新落点）。
+    /// 拖拽/缩放经 OnMapDrag/OnMapZoomChanged 自动触发；
+    /// 编程式跳中心（SetCurrentPosition）不经过该信号链，需由调用方手动触发
+    void ChildPosRefresh();
+
 private slots:
     void Core_OnNeedInvalidation();
-    void ChildPosRefresh();
 
 public slots:
     /**

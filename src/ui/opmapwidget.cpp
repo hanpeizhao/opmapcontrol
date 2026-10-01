@@ -424,6 +424,7 @@ WayPointItem *OPMapWidget::EnsureRouteMarker(WayPointItem *&marker, opmap::Point
 {
     if (!marker) {
         marker = new WayPointItem(pos, 0, text, map);
+        --WayPointItem::snumber;   // 图钉不占任务航点号段（构造器消耗的号立即归还）
         marker->SetAuxiliary(true);
         marker->SetShowNumber(false);
         marker->setFlag(QGraphicsItem::ItemIsMovable, false);

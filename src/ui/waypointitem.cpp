@@ -356,7 +356,10 @@ int WayPointItem::type() const
 
 WayPointItem::~WayPointItem()
 {
-    --WayPointItem::snumber;
+    // auxiliary 图钉创建时已归还消耗的号（见 EnsureRouteMarker），
+    // 这里不再归还，否则号段被来回扰动造成任务航点撞号/跳号
+    if (!auxiliary)
+        --WayPointItem::snumber;
 }
 
 void WayPointItem::RefreshPos()

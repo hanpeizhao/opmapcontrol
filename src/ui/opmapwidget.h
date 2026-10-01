@@ -305,6 +305,9 @@ public:
     }
     void SetCurrentPosition(opmap::PointLatLng const& value) {
         map->core->SetCurrentPosition(value);
+        // 编程式跳中心不经过 OnMapDrag/OnMapZoomChanged 信号链，
+        // 必须手动重算子项屏幕位置，否则航点/UAV 等图标与地图脱节
+        map->ChildPosRefresh();
     }
 
     double ZoomReal()  {return map->Zoom();}
