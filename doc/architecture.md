@@ -108,5 +108,5 @@ OPMapWidget (QGraphicsView)
   1. `MapType::Types` 添加枚举值（勿改既有数值）；
   2. `UrlFactory` 的 URL 工厂添加对应 case；
   3. `MapType::DatumByType()` 声明该源的瓦片坐标系。
-- **新增地图元素**：继承 `MapGraphicItem`（基类提供拖动、旋转、缩放联动），参考 `WayPointItem`/`UAVItem` 的实现。
+- **新增地图元素**：继承 QGraphicsItem 并实现 `MapAnchoredItem` 接口（`RefreshPos()` 内做 `FromLatLngToLocal` 换算）——地图拖动/缩放时由 MapGraphicItem 统一分派自动跟随，无需修改分派链；同时需 `enum { Type = UserType+N }` + 重写 `type()`（qgraphicsitem_cast 依据）。参考 `GeofenceItem`/`MarkerTrailItem`；完全自绘的元素也可继承 `MapGraphicItem`（基类提供拖动、旋转、缩放联动），参考 `WayPointItem`/`UAVItem` 的实现。
 - **更换投影**：继承 `PureProjection` 并在 `MapGraphicItem` 中替换。

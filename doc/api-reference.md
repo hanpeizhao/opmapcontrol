@@ -129,6 +129,17 @@ map->SetUAVPos(0, pos, 120);       // 任务飞行喂点（带围栏判定）
 
 **HomeItem**（经 `Home` 指针）：`SetCoord(PointLatLng)`（返航点位置）/ `SetSafeArea(米)`（圆形安全围栏半径，超出发 `UAVLeftSafetyBouble`）/ `SetShowSafeArea(bool)`。
 
+**通用标记 MapMarkerItem**（纯装饰图元：任意图片/文字钉在坐标上，不进任务序列/导航/围栏，与航点编号互不干扰）：
+
+| 方法 | 功能 |
+|------|------|
+| `AddMarker(pos, 图片路径=空)` → `MapMarkerItem*` | 创建标记并返回句柄；可选中（青色虚线框反馈，供"删除选中标记"类操作），不可拖动 |
+| `RemoveMarker(marker)` / `ClearMarkers()` | 删除单个 / 清除全部 |
+| `marker->SetImage(路径)` / `SetImageSize(宽, 高)` | 图片内容与显示尺寸（任一维 0 = 等比/原始；文件或 qrc 路径） |
+| `marker->SetText(文本)` / `SetFontSize(磅)` | 文字标签（锚点下方，黑描边白字，亮暗底图可读） |
+| `marker->SetCoord(pos)` | 移动标记到新坐标（开启轨迹后每次移动自动记录足迹） |
+| `marker->SetShowTrail(bool)` | 移动轨迹显示开关：足迹连为橙色折线（独立轨迹图元，随地图拖动/缩放/旋转跟随，上限 1000 点，随标记删除清除） |
+
 ## 5. 车载导航（一行式已达成）
 
 规划、画线、沿路中文转向指引、偏航自动重规划、到达判定、已走/未走着色**全部在库内**。上层只做三件事：规划 → 喂点 → 听信号。
@@ -136,6 +147,7 @@ map->SetUAVPos(0, pos, 120);       // 任务飞行喂点（带围栏判定）
 | 方法 | 参数 | 功能 |
 |------|------|------|
 | `PlanRoute(from, to)` | 两点 | **仅规划画线**（看距离/时间），不进导航状态机、不喂点 |
+| `SelectRoute(int index)` | `routeAlternativesReady` 给出的索引，0=推荐 | 切换备选路线：画布立即换线并发 `routeSelected`，之后的导航/偏航重规划沿选中的走 |
 | `NavigateTo(PointLatLng dest)` | 目的地 | **规划并开始导航**：起点=最近喂入的车位置（无则地图中心），成功后自动沿路指引 |
 | `StopNavigation()` | — | 停止并清除路线绘制 |
 | `IsNavigating()` / `CurrentNavigationRoute()` | — | 状态查询 |
@@ -153,7 +165,7 @@ map->SetUAVPos(0, pos, 120);       // 任务飞行喂点（带围栏判定）
 | `SetArrivalThresholdM(double)` | 30 | 到达半径，到点自动停止 |
 | `SetMinRerouteIntervalMs(int)` | 5000 | 两次重规划最小间隔 |
 
-**导航信号**：`navigationRouteReady(Route)` / `navigationProgress(剩余米, 剩余秒, 中文转向指令)` / `offRouteDetected(位置, 偏离米)` / `rerouteReady(Route)` / `navigationArrived()` / `navigationFailed(原因)`。
+**导航信号**：`navigationRouteReady(Route)` / `navigationProgress(剩余米, 剩余秒, 中文转向指令)` / `offRouteDetected(位置, 偏离米)` / `rerouteReady(Route)` / `navigationArrived()` / `navigationFailed(原因)` / `routeAlternativesReady(备选路线全集)` / `routeSelected(索引, 路线)`。
 
 `opmap::Route` 数据结构：`polyline`（WGS-84 完整折线）、`steps`（分步转向指令，`startIndex` 指向折线）、`totalDistanceMeters`、`totalDurationSeconds`、`isValid()`。
 
@@ -201,7 +213,8 @@ map->StartWaypointMission(map->WPAll().values(), 15.0);  // 15m 到达半径
 
 | 方法 | 功能 |
 |------|------|
-| `RequestIpLocation()` 槽 | 发起一次（在途重复调用被忽略） |
+| `RequestIpLocation()` 槽 | 发起一次（在途重复调用被忽略），结果经信号返回 |
+| `RequestIpLocation(IpLocationCallback)` | 回调式一步到位：完成/失败自动回调一次 `cb(ok, pos, city)`，信号仍并行发射，两种消费方式任选 |
 | `IsIpLocationBusy()` | 是否在途 |
 
 信号：`ipLocationReady(pos, city)` / `ipLocationFailed(reason)`。坐标为城市级精度（约数公里），**只可作显示/兜底，不可喂导航引擎**。
@@ -248,7 +261,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 扩展点 | 用法 |
 |--------|------|
 | 自定义路径规划服务 | 继承 `AbstractRouteProvider`，实现 `requestRoute(from, to)` + `isBusy()`，完成后发 `routeReady(Route)` / `routeFailed(reason)`；`SetRouteProvider()` 注入 |
-| 自定义地理锚定图元 | `GetMap()` 取内部画布；QGraphicsItem 子类三件套：`enum { Type = UserType+N }` + 重写 `type()` + 实现 `FromLatLngToLocal` 换算并纳入 `ChildPosRefresh` 分派链（参考 `GeofenceItem`） |
+| 自定义地理锚定图元 | `GetMap()` 取内部画布；QGraphicsItem 子类实现 `MapAnchoredItem` 接口（`RefreshPos()` 内做 `FromLatLngToLocal` 换算）即自动跟随地图拖动/缩放，**无需改 MapGraphicItem 分派链**；仍需 `enum { Type = UserType+N }` + 重写 `type()`（qgraphicsitem_cast 依据，参考 `GeofenceItem` / `MarkerTrailItem`） |
 | 坐标纠偏 | 声明新地图源时在 `MapType::DatumByType` 登记 `TileDatum`（WGS84/GCJ02），其余自动 |
 
 ## 11. 信号总表
@@ -259,7 +272,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 瓦片加载 | `OnTileLoadStart`、`OnTileLoadComplete`、`OnTilesStillToLoad(n)`、`OnEmptyTileError` |
 | 航点 | `WPInserted` / `WPDeleted` / `WPNumberChanged` / `WPValuesChanged` / `WPReached` |
 | UAV | `UAVReachedWayPoint`、`UAVLeftSafetyBouble` |
-| 导航 | `navigationRouteReady` / `navigationProgress` / `offRouteDetected` / `rerouteReady` / `navigationArrived` / `navigationFailed` |
+| 导航 | `navigationRouteReady` / `navigationProgress` / `offRouteDetected` / `rerouteReady` / `navigationArrived` / `navigationFailed` / `routeAlternativesReady` / `routeSelected` |
 | 任务 | `missionStarted` / `missionCurrentWaypointChanged` / `missionWaypointReached` / `missionHoverStateChanged` / `missionActionTriggered` / `missionFinished` |
 | 围栏 | `geofenceBreach` / `geofenceEntered` |
 | IP 定位 | `ipLocationReady` / `ipLocationFailed` |

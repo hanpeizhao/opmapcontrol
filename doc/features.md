@@ -57,6 +57,7 @@
 | 到达航点事件 | 信号 `UAVReachedWayPoint()` | ✅（事件日志订阅） |
 | GPS 轨迹元素 | `GPSItem` | — |
 | 诊断信息叠显（线程/缓存状态） | `SetShowDiagnostics()` | ✅ |
+| 通用标记：图片/文字钉在任意坐标（可选中、可移动轨迹） | `AddMarker` / `RemoveMarker` / `ClearMarkers`；句柄 `SetImage` / `SetText` / `SetCoord` / `SetShowTrail` | ✅（右键贴图/多人共享位置轨迹） |
 
 ## 5. 离线地图下载
 
@@ -95,6 +96,8 @@
 | `WPInserted` / `WPDeleted` / `WPNumberChanged` / `WPValuesChanged` / `WPReached` | 航点增删/改号/改值/到达 | ✅（事件日志） |
 | `UAVReachedWayPoint` / `UAVLeftSafetyBouble` | UAV 到点/出安全圈 | ✅（事件日志） |
 
+其余业务信号（导航、任务、围栏、IP 定位、位置源、取点、下载）见第 8/9 节及 [api-reference.md](api-reference.md) 第 11 节总表。
+
 ## 8. 车载导航（路径规划 / NavigationEngine / RouteItem）
 
 内置完整车载导航链路：异步路径规划 → 沿线转向指引 → 偏航检测与自动重规划 → 到达判定。路线绘制（已走灰/未走蓝 + 起终点标记）由控件内部完成，车辆位置由外部程序喂入（行车模拟器、系统 GPS 等任意来源均可，见第 9 节的 IP 定位兜底）。
@@ -110,6 +113,7 @@
 | 是否导航中 | `IsNavigating()` | ✅（导航状态行） |
 | 当前导航路线 | `CurrentNavigationRoute()` | ✅（导航状态行） |
 | 路线显示开关（默认导航时自动显示） | `SetShowRoute(bool)` / `ShowRoute()` | ✅ |
+| 切换备选路线（规划返回多条时） | `SelectRoute(index)`，索引来自 `routeAlternativesReady`，0=推荐 | ✅（循环切换按钮） |
 | 导航引擎参数调整 | `GetNavigationEngine()` → `SetOffRouteThresholdM` 等 | ✅（偏航/到达阈值调节） |
 
 导航信号：
@@ -122,6 +126,8 @@
 | `rerouteReady(opmap::Route)` | 偏航自动重规划成功 | ✅ |
 | `navigationArrived()` | 距目的地 ≤30m，自动停止 | ✅ |
 | `navigationFailed(原因)` | 路线规划失败 | ✅ |
+| `routeAlternativesReady(备选路线全集)` | 规划成功给出全部备选（第 0 条=推荐，与画布同步） | ✅ |
+| `routeSelected(索引, 路线)` | 备选路线切换（`SelectRoute`）：上层据此同步面板距离/时间 | ✅ |
 
 说明：
 
@@ -137,6 +143,7 @@
 | 功能 | API | example |
 |------|:---:|:----:|
 | 发起一次 IP 定位（在途时重复调用被忽略） | 槽 `RequestIpLocation()` | ✅ |
+| 回调式一步到位（完成/失败自动回调 `cb(ok, pos, city)`，信号仍并行发射） | `RequestIpLocation(IpLocationCallback)` | — |
 | 查询是否有请求在途 | `IsIpLocationBusy()` | ✅（轮询日志） |
 
 IP 定位信号：
