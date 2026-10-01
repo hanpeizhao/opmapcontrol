@@ -44,13 +44,14 @@ map->SetUAVPos(0, pos, 120);       // 任务飞行喂点（带围栏判定）
 | `SetCanDragMap(bool)` | — | 拖动开关（默认可拖） |
 | `SetShowTileGridLines(bool)` | — | 瓦片网格线（调试用） |
 | `SetShowCompass(bool)` | — | 指北针（默认显示） |
+| `SetShowScale(bool)` / `ShowScale()` | — | 比例尺（左下角，按缩放级别+中心纬度实时换算 1/2/5×10ⁿ 整距离；默认显示） |
 | `SetShowDiagnostics(bool)` | — | 叠显线程/缓存诊断信息 |
 | `SetFollowMouse(bool)` | — | 鼠标跟随模式 |
 | `SetMouseWheelZoomType(Types)` | `MousePositionAndCenter` / `Center` | 滚轮缩放锚点 |
 | `SetUseOpenGL(bool)` | — | OpenGL 渲染开关 |
 | `ReloadMap()` | — | 清空内存缓存强制重载 |
 | `isStarted()` | — | 引擎是否已启动 |
-| `SetSelectedArea(RectLatLng)` / `SelectedArea()` | WGS-84 矩形 | 框选区域（供离线下载，见 §8） |
+| `SetSelectedArea(RectLatLng)` / `SelectedArea()` | WGS-84 矩形 | 框选区域（供离线下载，见 §9） |
 
 **地图源枚举**（`opmap::MapType`，数值是缓存索引不可改）：
 
@@ -207,7 +208,41 @@ map->StartWaypointMission(map->WPAll().values(), 15.0);  // 15m 到达半径
 
 信号：`geofenceBreach(位置)`（出界，状态翻转才发一次）/ `geofenceEntered(位置)`（回界内复位）。
 
-## 8. IP 定位兜底 / MAVLink 遥测 / 离线下载
+## 8. 地图测距与运动轨迹（记录/保存/回放）
+
+**多点测距**（复用取点模式机制，防抖/橡皮筋预览/每段与总距离标注全在库内）：
+
+```cpp
+map->SetPickMode(opmap::OPMapWidget::PickMeasure);  // 进入：逐点点击画折线
+// 右键 / SetPickMode(PickNone) 结束一段 → measureFinished 发结果，画面保留可继续追加
+map->ClearMeasurements();                           // 清除全部测距折线
+```
+
+| 成员 | 功能 |
+|------|------|
+| `PickMeasure`（PickMode 枚举值） | 测距模式：每段大圆距离（Haversine）实时标注，右键结束一段 |
+| `ClearMeasurements()` / `HasMeasurements()` | 清除全部 / 是否有测距内容 |
+| 信号 `measureFinished(totalMeters, points)` | 一段测距结束（总距离米 + 顶点序列） |
+
+**运动轨迹记录与回放**（engine 层 `TrailRecorder`，纯数据 + 定时回放）：
+
+```cpp
+map->StartTrailRecording();               // 开始：所有位置源喂点自动入库（含时间戳）
+map->StopTrailRecording();                // 停止（缓冲保留）
+map->SaveTrailToFile("flight.json");      // 存盘（opmap-trail JSON：位置+高度+相对毫秒）
+map->LoadTrailFromFile("flight.json");    // 加载
+map->StartTrailReplay(2.0);               // 2 倍速回放：插值喂 SetUAVPos，图标/轨迹/围栏全联动
+```
+
+| 方法 | 功能 |
+|------|------|
+| `StartTrailRecording()` / `StopTrailRecording()` / `IsTrailRecording()` | 记录控制（与回放互斥） |
+| `ClearTrailRecording()` / `TrailPointCount()` | 清空缓冲 / 采样点数 |
+| `SaveTrailToFile(path, *error)` / `LoadTrailFromFile(path, *error)` | JSON 文件存取（格式 `opmap-trail`，人类可读） |
+| `StartTrailReplay(speed=1.0)` / `StopTrailReplay()` / `IsTrailReplaying()` | 时间轴变速回放（播完自动停） |
+| 信号 `trailReplayFinished()` | 回放自然播完（主动中止不发） |
+
+## 9. IP 定位兜底 / MAVLink 遥测 / 离线下载
 
 **IP 定位**（城市级兜底，双源自动回退 + 8 秒超时，库内置）：
 
@@ -242,7 +277,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | `RipMap()` 槽 | 抓取框选区域瓦片入 SQLite 缓存 |
 | 信号 `mapDownloadProgress(百分比)` / `mapDownloadTiles(总数, 已完成)` / `mapDownloadFinished()` | 下载进度 |
 
-## 9. 缓存与配置（Configuration）
+## 10. 缓存与配置（Configuration）
 
 构造时注入或经 `map->configuration` 访问。
 
@@ -256,7 +291,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | `SetLanguage(LanguageType::Types)` | 瓦片语言 |
 | 外观类：`EmptytileBrush` / `EmptyTileBorders` / `EmptyTileText` / `MissingDataFont` / `SelectionPen` / `ScalePen` / `DragButton` | 样式定制（低频） |
 
-## 10. 扩展点
+## 11. 扩展点
 
 | 扩展点 | 用法 |
 |--------|------|
@@ -264,7 +299,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 自定义地理锚定图元 | `GetMap()` 取内部画布；QGraphicsItem 子类实现 `MapAnchoredItem` 接口（`RefreshPos()` 内做 `FromLatLngToLocal` 换算）即自动跟随地图拖动/缩放，**无需改 MapGraphicItem 分派链**；仍需 `enum { Type = UserType+N }` + 重写 `type()`（qgraphicsitem_cast 依据，参考 `GeofenceItem` / `MarkerTrailItem`） |
 | 坐标纠偏 | 声明新地图源时在 `MapType::DatumByType` 登记 `TileDatum`（WGS84/GCJ02），其余自动 |
 
-## 11. 信号总表
+## 12. 信号总表
 
 | 分类 | 信号 |
 |------|------|
@@ -278,16 +313,17 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | IP 定位 | `ipLocationReady` / `ipLocationFailed` |
 | 位置源 | `positionUpdated(pos, altM, headingDeg, source)` / `positionSourceError(reason, fatal)` / `positionLinkAlive` / `positionLinkTimeout` |
 | 取点 | `positionPicked(mode, pos)` / `pickFinished(mode, points)` / `mapContextMenuRequested(pos)` |
+| 测距/轨迹 | `measureFinished(总米数, 点列表)` / `trailReplayFinished` |
 | 跟随 | `mapFollowChanged(on)` |
 | 下载 | `mapDownloadProgress` / `mapDownloadTiles` / `mapDownloadFinished` |
 
 ---
 
-## 12. 简化用法差距分析（已全部实施）
+## 13. 简化用法差距分析（已全部实施）
 
 目标形态：**传一个参数库做大部分工作**——调用一个方法显示地图、传两个点路径规划。逐条对照：
 
-### 12.1 已达成的一行式
+### 13.1 已达成的一行式
 
 | 需求 | 现状 |
 |------|------|
@@ -296,7 +332,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 一键导航 | `NavigateTo(dest)` ✅ |
 | 航点任务 | `StartWaypointMission(WPAll().values())` ✅（图标/起飞点跳转/到达参数均由库自动编排） |
 
-### 12.2 demo 目前替库干的活（已下沉）
+### 13.2 demo 目前替库干的活（已下沉）
 
 | # | demo 现状（位置/行数） | 问题 | 建议的库 API |
 |---|----------------------|------|-------------|
@@ -307,7 +343,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 5 | **航点飞行前奏**：`onFlightClicked` 105 行里约一半在铺 UI 前置（挑起飞点、图标切换、SetAutoSetReached、地图跳起飞点、暂停跟随）（mainwindow.cpp:671-776） | 状态机已下沉（912e002），剩下的都是"启动一次任务的通用编排" | `StartWaypointMission` 增加默认行为：自动 `ensureUAV`+设到达参数、自动跳转起飞点；库内加 `SetFollowVehicle(bool)`（每次喂点居中，替代 demo 自实现的跟随复选框）。demo 保留的只剩：按钮文案、模拟遥测源 connect、动作日志 |
 | 6 | **起终点临时标记**：选点阶段手动 `new WayPointItem` + 关拖拽/选中标志（applyPickPoint 内） | 预览起终点是路线功能的自然组成 | `PlanRoute`/`NavigateTo` 时自动挂起终点图钉（`WayPointItem` 新增 auxiliary 标志：装饰航点不进任务序列、WPAll/WPDeleteAll 跳过、不可拖选；`StopNavigation` 自动清理）。demo 删 m_originMarker/m_destMarker |
 
-### 12.3 建议不下沉（保持在上层）
+### 13.3 建议不下沉（保持在上层）
 
 | 内容 | 理由 |
 |------|------|
@@ -315,7 +351,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 业务动作响应（拍照=下发相机指令、悬停=下发悬停指令） | 库只发 `missionActionTriggered` 信号，动作的物理执行因机型而异 |
 | 事件日志/状态栏/横幅等 UI 反馈 | 上层自有 UI 风格，库不该绑死表现层 |
 
-### 12.4 下沉后的用法（实际形态）
+### 13.4 下沉后的用法（实际形态）
 
 ```cpp
 // 全部业务 = 4 行 connect + 1 行喂点

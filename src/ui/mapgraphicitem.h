@@ -120,6 +120,13 @@ public:
     double ZoomTotal();
 
     /**
+        * @brief 当前视野中心点的经纬度（WGS-84）
+        *
+        * @return opmap::PointLatLng 中心坐标
+        */
+    opmap::PointLatLng CurrentPosition()const{return core->CurrentPosition();}
+
+    /**
         * @brief The area currently selected by the user
         *
         * @return The rectangle in lat/lon coordinates currently selected

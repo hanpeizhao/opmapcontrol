@@ -70,6 +70,9 @@ class GeofenceItem;
 class NavigationEngine;
 class WaypointMissionEngine;
 class RouteItem;
+class ScaleBarItem;
+class MeasureItem;
+class TrailRecorder;
 
 /**
     * @brief Collection of static functions to help dealing with various enums used
@@ -218,7 +221,8 @@ public:
         PickOrigin,     ///< 点选导航起点（单发）
         PickDest,       ///< 点选导航目的地（单发）
         PickFence,      ///< 围栏取点：多点累积 + 橡皮筋预览，右键/再设 PickNone 闭合
-        PickPosition    ///< 点选喂位置：点哪喂哪（连续取点，右键/再设 PickNone 结束）
+        PickPosition,   ///< 点选喂位置：点哪喂哪（连续取点，右键/再设 PickNone 结束）
+        PickMeasure     ///< 多点测距：逐点画折线实时标每段/总距离，右键结束一段（段间可继续）
     };
 
     /**
@@ -484,6 +488,37 @@ public:
 
     void SetShowCompass(bool const& value);
 
+    // ———————— 比例尺 ————————
+    /** @brief 显示/隐藏比例尺（视野左下角，按缩放级别与中心纬度实时换算整距离标尺） */
+    void SetShowScale(bool const& value);
+    bool ShowScale() const { return scaleBar != 0; }
+
+    // ———————— 地图测距（PickMeasure 模式）————————
+    /** @brief 清除全部测距折线（含进行中的一段；完成段在右键结束前不落笔） */
+    void ClearMeasurements();              ///< 清除全部测距折线（含进行中的一段）
+    bool HasMeasurements() const;          ///< 是否存在测距内容（完成段或进行中段）
+
+    // ———————— 运动轨迹记录与回放 ————————
+    /** @brief 开始记录位置流（UpdateVehiclePosition/SetUAVPos 的每个喂点，
+     *         含所有位置源：模拟/GPS/IP/MAVLink/回放），自动停止回放 */
+    void StartTrailRecording();
+    void StopTrailRecording();             ///< 停止记录（缓冲保留，可存盘/回放）
+    bool IsTrailRecording() const;         ///< 是否记录中
+    void ClearTrailRecording();            ///< 清空轨迹缓冲（自动停止记录/回放）
+    int TrailPointCount() const;           ///< 当前轨迹缓冲采样点数
+    /** @brief 轨迹缓冲存为 JSON 文件（opmap-trail 格式，保留原始时序）
+     *  @return 成功 true；失败 false 并填充 *error */
+    bool SaveTrailToFile(const QString &path, QString *error = 0);
+    /** @brief 从 JSON 轨迹文件加载（接管缓冲，加载后即可 StartTrailReplay）
+     *  @return 成功 true；失败 false 并填充 *error */
+    bool LoadTrailFromFile(const QString &path, QString *error = 0);
+    /** @brief 按时间轴回放轨迹：插值喂 SetUAVPos（图标/轨迹/围栏/任务机全联动），
+     *         speed 为倍速（1=原速），播完发 trailReplayFinished
+     *  @return 缓冲有效（≥2 点）返回 true */
+    bool StartTrailReplay(double speed = 1.0);
+    void StopTrailReplay();                ///< 中止回放（不发 trailReplayFinished）
+    bool IsTrailReplaying() const;         ///< 是否回放中
+
     // FIXME XXX Move to protected namespace
     UAVItem* UAV;
     QMap<int, QGraphicsItemGroup*> waypointLines;
@@ -576,7 +611,8 @@ public:
 private:
     UAVItem *EnsureUAV(int id);   ///< 惰性取用 UAV：不存在则创建并套用默认样式
     void ConnectUAV(UAVItem *uav);   ///< UAV 事件 → facade 信号转发（到达/飞出安全圈/回圈）
-    void ShowRealLocation(opmap::PointLatLng const& pos);   ///< "我的位置"落到地图：GPS 图标+居中+街区缩放
+    void ShowRealLocation(opmap::PointLatLng const& pos);   ///< "我的位置"落到地图：GPS 图标+居中+街区级缩放
+    void RepositionScaleBar();    ///< 比例尺重排到左下角（窗口 resize 时）
     void HandlePickClick(opmap::PointLatLng const& pos);   ///< 一次有效选点：累积+发信号+单发自动收尾
     void EndPick();               ///< 结束当前取点（围栏收尾 + pickFinished）
     WayPointItem *EnsureRouteMarker(WayPointItem *&marker, opmap::PointLatLng const& pos, QString const& text);   ///< 惰性取用路线端点图钉（auxiliary 装饰航点）
@@ -590,6 +626,9 @@ private:
     opmap::PointLatLng currentmouseposition;
     bool followmouse;
     QGraphicsSvgItem *compass;
+    ScaleBarItem *scaleBar;                 ///< 比例尺（场景级叠加，左下角）
+    MeasureItem *measureItem;               ///< 测距折线（地图子项，随图跟随）
+    TrailRecorder *trailRecorder;           ///< 轨迹记录/回放引擎（engine 层）
     bool showuav;
     bool showhome;
     QTimer *diagTimer;
@@ -647,6 +686,8 @@ private slots:
     void onIpLocationFailed(QString reason);
     /// 位置源喂点：记录真实源（GPS/MAVLink）位置供一键定位取用，并同步 GPS 图标
     void onPositionUpdate(opmap::PointLatLng pos, double altM, double headingDeg, int source);
+    /// 轨迹回放插值点 → SetUAVPos（图标/轨迹/围栏/任务机全联动）
+    void onTrailReplayPosition(opmap::PointLatLng pos, int altM);
 
 protected:
     MapGraphicItem *map;
@@ -818,6 +859,12 @@ signals:
     void missionFinished();                             ///< 全部航点完成
     void geofenceEntered(opmap::PointLatLng position);  ///< UAV 回到多边形围栏内
     void mapFollowChanged(bool following);              ///< 地图跟随车辆开关变化（供 UI 复选框同步）
+
+    // —— 地图测距 / 轨迹回放信号 ——
+    /** @brief 一段测距结束（右键/模式退出）：totalMeters 为大圆总距离（米），
+     *         points 为该段顶点序列；段间可继续测量，画面保留 */
+    void measureFinished(double totalMeters, QList<opmap::PointLatLng> points);
+    void trailReplayFinished();                         ///< 轨迹回放自然播完（StopTrailReplay 中止不发）
 
     // —— 地图点选信号 ——
     /** @brief 一次有效选点（库已完成防抖；mode 为 PickMode 枚举值）。

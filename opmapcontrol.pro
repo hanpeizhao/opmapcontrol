@@ -63,6 +63,7 @@ HEADERS += \
     ./src/engine/mapengine.h \
     ./src/engine/navigationengine.h \
     ./src/engine/waypointmissionengine.h \
+    ./src/engine/trailrecorder.h \
     ./src/engine/tile.h \
     ./src/engine/tilematrix.h \
     ./src/engine/loadtask.h \
@@ -81,6 +82,8 @@ HEADERS += \
     ./src/ui/geofenceitem.h \
     ./src/ui/mapmarkeritem.h \
     ./src/ui/mapanchoreditem.h \
+    ./src/ui/scalebaritem.h \
+    ./src/ui/measureitem.h \
     ./src/ui/trailitem.h \
     ./src/ui/traillineitem.h \
     ./src/ui/uavitem.h \
@@ -121,6 +124,7 @@ SOURCES += \
     ./src/engine/mapengine.cpp \
     ./src/engine/navigationengine.cpp \
     ./src/engine/waypointmissionengine.cpp \
+    ./src/engine/trailrecorder.cpp \
     ./src/engine/tile.cpp \
     ./src/engine/tilematrix.cpp \
     ./src/engine/loadtask.cpp \
@@ -139,6 +143,8 @@ SOURCES += \
     ./src/ui/routeitem.cpp \
     ./src/ui/geofenceitem.cpp \
     ./src/ui/mapmarkeritem.cpp \
+    ./src/ui/scalebaritem.cpp \
+    ./src/ui/measureitem.cpp \
     ./src/ui/trailitem.cpp \
     ./src/ui/traillineitem.cpp \
     ./src/ui/uavitem.cpp \

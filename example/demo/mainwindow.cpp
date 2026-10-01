@@ -90,7 +90,14 @@ MainWindow::MainWindow()
       m_hasDest(false),
       m_providerIsAmap(false),
       m_peerTimer(new QTimer(this)),
-      m_peerAngle(0)
+      m_peerAngle(0),
+      m_migrantTimer(new QTimer(this)),
+      m_migrantElapsed(0),
+      m_measureBtn(new QPushButton(QString::fromUtf8("开始测距"), this)),
+      m_recTrailBtn(new QPushButton(QString::fromUtf8("记录轨迹"), this)),
+      m_replayBtn(new QPushButton(QString::fromUtf8("回放轨迹…"), this)),
+      m_stopReplayBtn(new QPushButton(QString::fromUtf8("停止回放"), this)),
+      m_replaySpeedSpin(new QDoubleSpinBox(this))
 {
     setWindowTitle(QString::fromUtf8("opmapcontrol 示例 — 地图/航点/车载导航"));
     resize(1200, 800);
@@ -132,6 +139,14 @@ MainWindow::MainWindow()
 
     // 多人共享位置演示：定时器驱动模拟位置报文
     connect(m_peerTimer, SIGNAL(timeout()), this, SLOT(onPeerTick()));
+
+    // 候鸟迁徙演示：定时器沿大圆弧路线推进各个体
+    connect(m_migrantTimer, SIGNAL(timeout()), this, SLOT(onMigrantTick()));
+
+    // 量测与轨迹：库信号 → 按钮状态/日志
+    connect(m_map, SIGNAL(measureFinished(double,QList<opmap::PointLatLng>)),
+            this, SLOT(onMeasureFinished(double,QList<opmap::PointLatLng>)));
+    connect(m_map, SIGNAL(trailReplayFinished()), this, SLOT(onTrailReplayFinished()));
 
     setupMenus();
     setupDocks();
@@ -408,11 +423,14 @@ void MainWindow::setupCapabilityDock()
     QCheckBox *glCheck = new QCheckBox(QString::fromUtf8("OpenGL 渲染"), viewBox);
     QCheckBox *followMouseCheck = new QCheckBox(QString::fromUtf8("鼠标跟随"), viewBox);
     QCheckBox *diagCheck = new QCheckBox(QString::fromUtf8("诊断信息叠显"), viewBox);
+    QCheckBox *scaleCheck = new QCheckBox(QString::fromUtf8("显示比例尺"), viewBox);
+    scaleCheck->setChecked(m_map->ShowScale());   // 库默认开启，勾选态与库状态对齐
     viewLayout->addWidget(gridCheck);
     viewLayout->addWidget(dragCheck);
     viewLayout->addWidget(glCheck);
     viewLayout->addWidget(followMouseCheck);
     viewLayout->addWidget(diagCheck);
+    viewLayout->addWidget(scaleCheck);
     QHBoxLayout *rotateRow = new QHBoxLayout();
     rotateRow->addWidget(new QLabel(QString::fromUtf8("旋转"), viewBox));
     QSlider *rotateSlider = new QSlider(Qt::Horizontal, viewBox);
@@ -442,6 +460,7 @@ void MainWindow::setupCapabilityDock()
     connect(glCheck, &QCheckBox::toggled, m_map, &opmap::OPMapWidget::SetUseOpenGL);
     connect(followMouseCheck, &QCheckBox::toggled, m_map, &opmap::OPMapWidget::SetFollowMouse);
     connect(diagCheck, &QCheckBox::toggled, m_map, &opmap::OPMapWidget::SetShowDiagnostics);
+    connect(scaleCheck, &QCheckBox::toggled, m_map, &opmap::OPMapWidget::SetShowScale);
     connect(rotateSlider, &QSlider::valueChanged, m_map, &opmap::OPMapWidget::SetRotate);
     connect(rotResetBtn, &QPushButton::clicked, [rotateSlider]() { rotateSlider->setValue(0); });
     connect(minZoomSpin, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged),
@@ -507,6 +526,55 @@ void MainWindow::setupCapabilityDock()
         m_map->configuration->ExportMapDataToDB(m_map->configuration->CacheLocation(), dest);
         logEvent(QString::fromUtf8("缓存库增量导出 → %1").arg(dest));
     });
+
+    // —— 量测与轨迹 ——
+    QGroupBox *measureBox = new QGroupBox(QString::fromUtf8("量测与轨迹"), panel);
+    QVBoxLayout *measureLayout = new QVBoxLayout(measureBox);
+    measureLayout->addWidget(m_measureBtn);   // 多点测距：开始 → 地图点取顶点 → 右键结束一段
+    QPushButton *clearMeasureBtn = new QPushButton(QString::fromUtf8("清除测距"), measureBox);
+    measureLayout->addWidget(clearMeasureBtn);
+    measureLayout->addWidget(m_recTrailBtn);  // 记录位置流（所有位置源统一截获）
+    QPushButton *saveTrailBtn = new QPushButton(QString::fromUtf8("保存轨迹…"), measureBox);
+    measureLayout->addWidget(saveTrailBtn);
+    QHBoxLayout *replayRow = new QHBoxLayout();
+    m_replaySpeedSpin->setRange(0.5, 16.0);
+    m_replaySpeedSpin->setSingleStep(0.5);
+    m_replaySpeedSpin->setValue(1.0);
+    m_replaySpeedSpin->setToolTip(QString::fromUtf8("回放倍速"));
+    replayRow->addWidget(new QLabel(QString::fromUtf8("倍速"), measureBox));
+    replayRow->addWidget(m_replaySpeedSpin);
+    replayRow->addWidget(m_replayBtn);
+    measureLayout->addLayout(replayRow);
+    m_stopReplayBtn->setEnabled(false);
+    measureLayout->addWidget(m_stopReplayBtn);
+    QPushButton *migrationBtn = new QPushButton(QString::fromUtf8("候鸟迁徙演示"), measureBox);
+    migrationBtn->setCheckable(true);
+    measureLayout->addWidget(migrationBtn);
+    connect(m_measureBtn, &QPushButton::clicked, this, &MainWindow::onMeasureClicked);
+    connect(clearMeasureBtn, &QPushButton::clicked, [this]() {
+        m_map->ClearMeasurements();
+        logEvent(QString::fromUtf8("已清除全部测距折线"));
+    });
+    connect(m_recTrailBtn, &QPushButton::clicked, this, &MainWindow::onRecTrailClicked);
+    connect(saveTrailBtn, &QPushButton::clicked, [this]() {
+        const QString path = QFileDialog::getSaveFileName(
+                    this, QString::fromUtf8("保存运动轨迹"), QString::fromUtf8("flight.trail.json"),
+                    QString::fromUtf8("轨迹文件 (*.trail.json *.json);;所有文件 (*.*)"));
+        if (path.isEmpty())
+            return;
+        QString err;
+        if (m_map->SaveTrailToFile(path, &err)) {
+            m_recTrailBtn->setText(QString::fromUtf8("记录轨迹"));   // 存盘即收笔（缓冲保留可回放）
+            m_map->StopTrailRecording();
+            logEvent(QString::fromUtf8("轨迹已保存 → %1").arg(path));
+        } else {
+            logEvent(QString::fromUtf8("轨迹保存失败：%1").arg(err));
+        }
+    });
+    connect(m_replayBtn, &QPushButton::clicked, this, &MainWindow::onReplayClicked);
+    connect(m_stopReplayBtn, &QPushButton::clicked, this, &MainWindow::onStopReplayClicked);
+    connect(migrationBtn, &QPushButton::toggled, this, &MainWindow::onMigrationToggled);
+    layout->addWidget(measureBox);
 
     // —— 地理围栏 ——
     QGroupBox *demoBox = new QGroupBox(QString::fromUtf8("地理围栏"), panel);
@@ -845,6 +913,11 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     QAction *delWp = menu.addAction(QString::fromUtf8("删除选中航点"));
     delWp->setEnabled(!m_map->WPSelected().isEmpty());
 
+    // 测距：进入多点测距模式（逐点画线，右键结束一段），或清除已有结果
+    QAction *startMeasure = menu.addAction(QString::fromUtf8("开始测距（多点）"));
+    QAction *clearMeasure = menu.addAction(QString::fromUtf8("清除测距结果"));
+    clearMeasure->setEnabled(m_map->HasMeasurements());
+
     // Home 返航点与飞行参数
     menu.addSeparator();
     QAction *setHome = menu.addAction(QString::fromUtf8("设置 Home 返航点到此位置"));
@@ -879,6 +952,14 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
             m_map->WPDelete(sel.at(i));
         if (!sel.isEmpty())
             refreshWaypointList();
+    } else if (chosen == startMeasure) {
+        m_map->SetPickMode(opmap::OPMapWidget::PickMeasure);
+        m_measureBtn->setText(QString::fromUtf8("结束测距"));
+        statusBar()->showMessage(QString::fromUtf8("多点测距：在地图上逐点点击画折线（每段/总距离实时标注），右键结束一段"), 10000);
+        logEvent(QString::fromUtf8("多点测距开始（右键菜单进入）"));
+    } else if (chosen == clearMeasure) {
+        m_map->ClearMeasurements();
+        logEvent(QString::fromUtf8("已清除全部测距折线"));
     } else if (chosen == setHome) {
         m_map->Home->SetCoord(m_map->currentMousePosition());
         m_map->Home->update();
@@ -957,6 +1038,12 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
 void MainWindow::onPeersDemoToggled(bool on)
 {
     if (on) {
+        if (!m_migrantMarkers.isEmpty()) {   // 迁徙与多人位置演示共用标记层，防互删
+            logEvent(QString::fromUtf8("多人位置演示与迁徙演示共用标记层，请先关闭候鸟迁徙演示"));
+            if (QAction *act = qobject_cast<QAction*>(sender()))
+                act->setChecked(false);
+            return;
+        }
         // 3 名模拟成员：头像图钉 + 名字标签，绕西安附近各自圆心匀速转圈。
         // 真实接入时只需：收到共享报文 → m_peerMarkers[id]->SetCoord(newPos)
         struct Seed { const char *name; double dLat, dLng, rLat, rLng, phase; };
@@ -1008,6 +1095,194 @@ void MainWindow::onPeerTick()
             opmap::PointLatLng(s.cLat + s.rLat * qSin(a),
                                s.cLng + s.rLng * qCos(a)));
     }
+}
+
+// ————————————————— 候鸟迁徙演示 —————————————————
+
+namespace {
+/// 大圆弧（球面）插值：把两经纬点投到单位球做 slerp 后转回经纬度，
+/// 远距离迁徙路线呈地球表面最短弧线而非墨卡托直线
+opmap::PointLatLng SlerpLatLng(const opmap::PointLatLng &a, const opmap::PointLatLng &b, double f)
+{
+    if (f <= 0.0)
+        return a;
+    if (f >= 1.0)
+        return b;
+    const double d2r = M_PI / 180.0;
+    const double latA = a.Lat() * d2r, lngA = a.Lng() * d2r;
+    const double latB = b.Lat() * d2r, lngB = b.Lng() * d2r;
+    // 经纬度 → 单位球笛卡尔
+    const double ax = qCos(latA) * qCos(lngA), ay = qCos(latA) * qSin(lngA), az = qSin(latA);
+    const double bx = qCos(latB) * qCos(lngB), by = qCos(latB) * qSin(lngB), bz = qSin(latB);
+    const double dot = qBound(-1.0, ax * bx + ay * by + az * bz, 1.0);
+    const double omega = qAcos(dot);
+    if (omega < 1e-9)   // 两点重合/极近：线性退化
+        return a;
+    const double s = qSin(omega);
+    const double wA = qSin((1.0 - f) * omega) / s;
+    const double wB = qSin(f * omega) / s;
+    const double x = wA * ax + wB * bx;
+    const double y = wA * ay + wB * by;
+    const double z = wA * az + wB * bz;
+    const double r2r = 180.0 / M_PI;
+    return opmap::PointLatLng(qAsin(qBound(-1.0, z, 1.0)) * r2r, qAtan2(y, x) * r2r);
+}
+}
+
+void MainWindow::onMigrationToggled(bool on)
+{
+    if (on) {
+        if (!m_peerMarkers.isEmpty()) {   // 迁徙与多人位置演示共用标记层，防互删
+            logEvent(QString::fromUtf8("迁徙演示与多人位置演示共用标记层，请先关闭多人位置演示"));
+            if (QPushButton *b = qobject_cast<QPushButton*>(sender()))
+                b->setChecked(false);
+            return;
+        }
+        // 4 只候鸟各自真实迁徙路线（繁殖地 → 中停地 → 越冬地），时长不同
+        // 长途演示压缩到 1 分钟级：tick 200ms，全程 45~75s
+        m_migrants.clear();
+        m_migrantMarkers.clear();
+        struct Seed { const char *name; int durationS;
+                      double pts[3][2]; };   // 每个体 3 个途经点（纬度,经度）
+        const Seed seeds[] = {
+            { "红嘴鸥", 60, { {52.5, 107.2}, {39.2, 119.6}, {29.1, 116.3} } },  // 贝加尔湖→渤海湾→鄱阳湖
+            { "大天鹅", 50, { {47.2, 103.8}, {37.8, 119.1}, {37.2, 122.6} } },  // 蒙古高原→黄河三角洲→荣成
+            { "白鹤",   75, { {62.0, 129.7}, {45.3, 132.5}, {29.1, 116.3} } },  // 雅库特→兴凯湖→鄱阳湖
+            { "绿头鸭", 55, { {52.0, 112.0}, {35.0, 122.5}, {31.2, 121.9} } },  // 贝加尔湖东→黄海→长江口
+        };
+        for (int i = 0; i < 4; ++i) {
+            MigrantSim m;
+            m.name = QString::fromUtf8(seeds[i].name);
+            for (int j = 0; j < 3; ++j)
+                m.route.append(opmap::PointLatLng(seeds[i].pts[j][0], seeds[i].pts[j][1]));
+            m.durationMs = seeds[i].durationS * 1000;
+            m.arrived = false;
+            opmap::MapMarkerItem *mk = m_map->AddMarker(m.route.first());
+            mk->SetText(m.name);
+            mk->SetFontSize(10);
+            mk->SetShowTrail(true);   // 移动轨迹连为橙色折线（库内 MarkerTrailItem）
+            m_migrants.append(m);
+            m_migrantMarkers.insert(m.name, mk);
+        }
+        m_migrantElapsed = 0;
+        m_map->SetCurrentPosition(opmap::PointLatLng(44.0, 119.0));   // 视野罩住东亚迁飞区
+        m_map->SetZoom(4);
+        m_migrantTimer->start(200);
+        logEvent(QString::fromUtf8("候鸟迁徙演示开始：4 只候鸟沿大圆弧迁飞区路线南迁（每 200ms 推进，橙色线为飞行轨迹）"));
+    } else {
+        m_migrantTimer->stop();
+        m_map->ClearMarkers();
+        m_migrantMarkers.clear();
+        m_migrants.clear();
+        logEvent(QString::fromUtf8("候鸟迁徙演示停止，标记已清除"));
+    }
+}
+
+void MainWindow::onMigrantTick()
+{
+    m_migrantElapsed += 200;
+    int arrivedCount = 0;
+    for (int i = 0; i < m_migrants.size(); ++i) {
+        MigrantSim &m = m_migrants[i];
+        const double f = qMin(1.0, (double)m_migrantElapsed / m.durationMs);
+        // 全程按段均分时间：段内大圆弧插值推进
+        const int legs = m.route.size() - 1;
+        const double scaled = f * legs;
+        const int leg = qMin(legs - 1, (int)scaled);
+        const double legF = scaled - leg;
+        const opmap::PointLatLng pos = SlerpLatLng(m.route.at(leg), m.route.at(leg + 1), legF);
+        m_migrantMarkers.value(m.name)->SetCoord(pos);
+        if (f >= 1.0) {
+            ++arrivedCount;
+            if (!m.arrived) {
+                m.arrived = true;
+                logEvent(QString::fromUtf8("%1 已抵达越冬地").arg(m.name));
+            }
+        }
+    }
+    if (arrivedCount == m_migrants.size()) {
+        m_migrantTimer->stop();
+        logEvent(QString::fromUtf8("迁徙演示完成：全部候鸟抵达越冬地（标记与轨迹保留，关闭按钮可清除）"));
+    }
+}
+
+// ————————————————— 量测与轨迹 —————————————————
+
+void MainWindow::onMeasureClicked()
+{
+    // 测距中：再点按钮 = 结束当前段（库 EndPick 固化并发 measureFinished）
+    if (m_map->GetPickMode() == opmap::OPMapWidget::PickMeasure) {
+        m_map->SetPickMode(opmap::OPMapWidget::PickNone);
+        return;
+    }
+    // 开始/继续：进入多点测距模式，逐点点击画折线（防抖/预览/标签全在库内）
+    m_map->SetPickMode(opmap::OPMapWidget::PickMeasure);
+    m_measureBtn->setText(QString::fromUtf8("结束测距"));
+    statusBar()->showMessage(QString::fromUtf8("在地图上逐点点击画测距折线（每段/总距离实时标注），右键结束一段"), 10000);
+}
+
+void MainWindow::onMeasureFinished(double totalMeters, const QList<opmap::PointLatLng> &points)
+{
+    m_measureBtn->setText(QString::fromUtf8("开始测距"));
+    const QString dist = totalMeters < 1000.0
+            ? QString::fromUtf8("%1 m").arg(totalMeters, 0, 'f', 1)
+            : QString::fromUtf8("%1 km").arg(totalMeters / 1000.0, 0, 'f', 3);
+    logEvent(QString::fromUtf8("测距完成：%1 段折线，总距离 %2").arg(points.size() - 1).arg(dist));
+    statusBar()->showMessage(QString::fromUtf8("测距总距离 %1，可再次点击“开始测距”追加新测量").arg(dist), 8000);
+}
+
+void MainWindow::onRecTrailClicked()
+{
+    if (m_map->IsTrailReplaying())
+        m_map->StopTrailReplay();   // 记录与回放互斥（库内也有保护，UI 同步停）
+    if (m_map->IsTrailRecording()) {
+        m_map->StopTrailRecording();
+        m_recTrailBtn->setText(QString::fromUtf8("记录轨迹"));
+        logEvent(QString::fromUtf8("轨迹记录停止，共 %1 个采样点，可保存或回放")
+                 .arg(m_map->TrailPointCount()));
+    } else {
+        m_map->StartTrailRecording();
+        m_recTrailBtn->setText(QString::fromUtf8("停止记录"));
+        logEvent(QString::fromUtf8("轨迹记录开始：所有位置源喂点（跟车/航点飞行/GPS/MAVLink）自动入库"));
+    }
+}
+
+void MainWindow::onReplayClicked()
+{
+    const QString path = QFileDialog::getOpenFileName(
+                this, QString::fromUtf8("选择轨迹文件"), QString(),
+                QString::fromUtf8("轨迹文件 (*.trail.json *.json);;所有文件 (*.*)"));
+    if (path.isEmpty())
+        return;
+    QString err;
+    if (!m_map->LoadTrailFromFile(path, &err)) {
+        logEvent(QString::fromUtf8("轨迹加载失败：%1").arg(err));
+        return;
+    }
+    const double speed = m_replaySpeedSpin->value();
+    if (!m_map->StartTrailReplay(speed)) {
+        logEvent(QString::fromUtf8("轨迹点数不足（至少 2 个），无法回放"));
+        return;
+    }
+    m_recTrailBtn->setText(QString::fromUtf8("记录轨迹"));
+    m_replayBtn->setEnabled(false);
+    m_stopReplayBtn->setEnabled(true);
+    logEvent(QString::fromUtf8("轨迹回放开始（%1 倍速）：UAV 图标按原始时序沿轨迹重演").arg(speed));
+}
+
+void MainWindow::onStopReplayClicked()
+{
+    m_map->StopTrailReplay();
+    m_replayBtn->setEnabled(true);
+    m_stopReplayBtn->setEnabled(false);
+    logEvent(QString::fromUtf8("轨迹回放已中止"));
+}
+
+void MainWindow::onTrailReplayFinished()
+{
+    m_replayBtn->setEnabled(true);
+    m_stopReplayBtn->setEnabled(false);
+    logEvent(QString::fromUtf8("轨迹回放播完"));
 }
 
 void MainWindow::onMapMouseMove(QMouseEvent *)
@@ -1562,6 +1837,10 @@ void MainWindow::onPickFinished(int mode, const QList<opmap::PointLatLng> &point
             m_fenceBtn->setText(QString::fromUtf8("绘制围栏"));
             logEvent(QString::fromUtf8("围栏顶点不足 3 个，已取消"));
         }
+        break;
+    case opmap::OPMapWidget::PickMeasure:
+        // 段固化后 measureFinished 已发；不足 2 点的丢弃段没有结果信号，此处兜底复位按钮
+        m_measureBtn->setText(QString::fromUtf8("开始测距"));
         break;
     case opmap::OPMapWidget::PickPosition:
         m_mockPosBtn->setText(QString::fromUtf8("点选喂位置"));

@@ -16,6 +16,7 @@
 | 拖动开关 | `SetCanDragMap()` | ✅ |
 | 瓦片网格线显示 | `SetShowTileGridLines()` | ✅ |
 | 指北针显示 | `SetShowCompass()` | ✅（默认显示） |
+| 比例尺显示（左下角，随缩放/中心纬度实时换算整距离） | `SetShowScale()` / `ShowScale()` | ✅（默认显示） |
 | OpenGL 渲染开关 | `SetUseOpenGL()` | ✅ |
 | 强制重载地图 | `ReloadMap()` | ✅ |
 | 鼠标跟随模式 | `SetFollowMouse()` | ✅ |
@@ -96,7 +97,7 @@
 | `WPInserted` / `WPDeleted` / `WPNumberChanged` / `WPValuesChanged` / `WPReached` | 航点增删/改号/改值/到达 | ✅（事件日志） |
 | `UAVReachedWayPoint` / `UAVLeftSafetyBouble` | UAV 到点/出安全圈 | ✅（事件日志） |
 
-其余业务信号（导航、任务、围栏、IP 定位、位置源、取点、下载）见第 8/9 节及 [api-reference.md](api-reference.md) 第 11 节总表。
+其余业务信号（导航、任务、围栏、IP 定位、位置源、取点、测距/轨迹、下载）见第 8/9/10 节及 [api-reference.md](api-reference.md) 第 12 节总表。
 
 ## 8. 车载导航（路径规划 / NavigationEngine / RouteItem）
 
@@ -159,7 +160,38 @@ IP 定位信号：
 - 调用方拿到 `ipLocationReady` 后自行决定喂给 `UpdateVehiclePosition`（example 的做法）或仅显示
 - 若需更换定位服务，可在 `OPMapWidget` 外自行实现并替换（provider 只依赖 Qt 网络模块，无库内耦合）
 
-## 10. example 未覆盖的能力汇总
+## 10. 地图测距 / 运动轨迹（保存回放）/ 迁徙示例
+
+**多点测距**（复用取点模式机制：6px 防抖、橡皮筋预览、每段与总距离标注全在库内）：
+
+| 功能 | API | example |
+|------|:---:|:----:|
+| 进入/退出测距模式（逐点点击画折线，右键结束一段，画面保留可续测） | `SetPickMode(PickMeasure / PickNone)` | ✅（测距按钮三态 + 右键菜单） |
+| 清除全部测距结果 | `ClearMeasurements()` | ✅ |
+| 是否有测距内容 | `HasMeasurements()` | — |
+
+| 信号 | 触发时机 | example |
+|------|----------|:----:|
+| `measureFinished(总米数, 点列表)` | 一段测距完成（≥2 点），画面保留可继续追加 | ✅（日志+状态栏） |
+
+**运动轨迹记录 / 保存 / 回放**（记录挂钩在 facade 喂点链路，模拟/GPS/IP 定位/MAVLink/回放等所有位置源统一入库，engine 层 `TrailRecorder` 纯数据无图元依赖）：
+
+| 功能 | API | example |
+|------|:---:|:----:|
+| 开始/停止记录（喂点自动采样：经纬度+高度+相对毫秒时间轴） | `StartTrailRecording()` / `StopTrailRecording()` | ✅ |
+| 记录状态/点数查询 | `IsTrailRecording()` / `TrailPointCount()` | ✅ |
+| 清空轨迹缓冲 | `ClearTrailRecording()` | ✅ |
+| 保存为 JSON（`opmap-trail` 格式：t/lat/lng/alt） | `SaveTrailToFile(路径, *错误)` | ✅（QFileDialog） |
+| 加载轨迹文件 | `LoadTrailFromFile(路径, *错误)` | ✅ |
+| 按时间轴回放（QTimer 50ms × 倍速，相邻点线性插值喂 SetUAVPos，图标/轨迹/围栏/任务机全联动） | `StartTrailReplay(倍速=1.0)` / `StopTrailReplay()` / `IsTrailReplaying()` | ✅（倍速 0.5~16） |
+
+| 信号 | 触发时机 | example |
+|------|----------|:----:|
+| `trailReplayFinished()` | 回放推进到末点 | ✅ |
+
+**迁徙图示例**（demo 层）：4 只候鸟沿球面 slerp 大圆弧插值路线从繁殖地飞往越冬地（贝加尔湖→鄱阳湖、蒙古高原→荣成等），途经点分段推进，通用标记（`AddMarker` + `SetText` + `SetShowTrail`）实时携带移动轨迹线；与多人位置演示互斥（共用标记层，双向守卫）。
+
+## 11. example 未覆盖的能力汇总
 
 example 以三块组合覆盖库的绝大多数能力：**各功能面板**（地图/航点/导航/行车模拟）、**库能力示范面板**（左侧：视图控制 / 缓存与访问 / 多机与几何）、**事件日志面板**（底部：库信号实时流）。以下为仍未演示的少数项，多为样式定制或预留能力：
 

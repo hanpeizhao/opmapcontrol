@@ -39,6 +39,9 @@
 #include "waypointmissionengine.h"
 #include "routeitem.h"
 #include "mapmarkeritem.h"
+#include "scalebaritem.h"
+#include "measureitem.h"
+#include "trailrecorder.h"
 #include "uas_types.h"
 
 namespace opmap {
@@ -50,6 +53,9 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     Home(0),
     followmouse(true),
     compass(0),
+    scaleBar(0),
+    measureItem(0),
+    trailRecorder(0),
     showuav(false),
     showhome(false),
     diagTimer(0),
@@ -96,6 +102,15 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     SetShowDiagnostics(showDiag);
     this->setMouseTracking(followmouse);
     SetShowCompass(true);
+
+    // —— 比例尺 / 测距 / 轨迹记录：比例尺默认开，测距折线空态不可见 ——
+    measureItem = new MeasureItem(map);
+    trailRecorder = new TrailRecorder(this);
+    connect(trailRecorder, SIGNAL(replayPosition(opmap::PointLatLng,int)),
+            this, SLOT(onTrailReplayPosition(opmap::PointLatLng,int)));
+    connect(trailRecorder, SIGNAL(replayFinished()),
+            this, SIGNAL(trailReplayFinished()));
+    SetShowScale(true);
 
     // —— 车载导航：provider → 引擎 → 路线绘制项 ——
     routeProvider = new OsrmRouteProvider(this);
@@ -453,6 +468,8 @@ void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
 
     vehiclePos = pos;
     vehiclePosValid = true;
+    if (trailRecorder->IsRecording())
+        trailRecorder->AddPoint(pos, 0);   // 轨迹记录（所有位置源统一在此截获）
     navEngine->UpdatePosition(pos);
     CheckGeofence(pos);   // 围栏判定对所有位置源（模拟/GPS/MAVLink）统一生效
     if (missionEngine && missionEngine->IsMissionActive())
@@ -463,6 +480,8 @@ void OPMapWidget::SetUAVPos(int const& id, opmap::PointLatLng const& pos, int co
 {
     UAVItem *uav = EnsureUAV(id);
     uav->SetUAVPos(pos, alt);
+    if (trailRecorder->IsRecording())
+        trailRecorder->AddPoint(pos, alt);   // 任务飞行喂点同样进轨迹记录
     CheckGeofence(pos);   // 任务飞行喂点同样接入围栏越界判定
     if (missionEngine && missionEngine->IsMissionActive())
         missionEngine->UpdatePosition(pos);   // 任务状态推进（真机遥测喂点同构）
@@ -772,6 +791,7 @@ void OPMapWidget::resizeEvent(QResizeEvent *event)
     QGraphicsView::resizeEvent(event);
     if(compass)
         compass->setScale(0.1+0.05*(qreal)(event->size().width())/1000*(qreal)(event->size().height())/600);
+    RepositionScaleBar();   // 比例尺随窗口缩放保持贴左下角
 
 }
 
@@ -849,6 +869,10 @@ void OPMapWidget::mouseMoveEvent(QMouseEvent *event)
         SetGeofence(preview);
     }
 
+    // 测距橡皮筋预览：末顶点到鼠标的虚线 + 瞬时距离（同围栏模式手感）
+    if (pickMode == PickMeasure && measureItem)
+        measureItem->SetPreviewPoint(currentmouseposition);
+
     emit mouseMove(event);
 }
 
@@ -859,7 +883,7 @@ void OPMapWidget::mousePressEvent(QMouseEvent *event)
     // 点选模式（仅左键）：记录按下位置做防抖基线；单发模式（航点/起点/目的地）按下即取点
     if (pickMode != PickNone && event->button() == Qt::LeftButton) {
         pickPressPos = event->pos();
-        if (pickMode != PickFence && pickMode != PickPosition)
+        if (pickMode != PickFence && pickMode != PickPosition && pickMode != PickMeasure)
             HandlePickClick(currentMousePosition());
     }
 
@@ -870,9 +894,9 @@ void OPMapWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     QGraphicsView::mouseReleaseEvent(event);
 
-    // 连续取点模式（围栏/喂位置）左键：抬起位移 <6px 才固化一次选点，拖动地图不算
+    // 连续取点模式（围栏/喂位置/测距）左键：抬起位移 <6px 才固化一次选点，拖动地图不算
     if (event->button() == Qt::LeftButton
-            && (pickMode == PickFence || pickMode == PickPosition)
+            && (pickMode == PickFence || pickMode == PickPosition || pickMode == PickMeasure)
             && (event->pos() - pickPressPos).manhattanLength() <= 6)
         HandlePickClick(currentMousePosition());
 
@@ -904,7 +928,7 @@ void OPMapWidget::SetPickMode(PickMode mode)
     pickPoints.clear();
 }
 
-/// 结束当前取点：围栏按顶点数固化/清理预览，随后发 pickFinished
+/// 结束当前取点：围栏按顶点数固化/清理预览，测距段固化，随后发 pickFinished
 void OPMapWidget::EndPick()
 {
     const PickMode finished = pickMode;
@@ -914,6 +938,11 @@ void OPMapWidget::EndPick()
             SetGeofence(pickPoints);                     // 顶点足够：固化为有效围栏
         else
             SetGeofence(QList<opmap::PointLatLng>());    // 不足 3 点：清取点预览残留
+    } else if (finished == PickMeasure) {
+        // 固化刚结束的测距段（<2 点自动丢弃），发结果信号后再清取点累积
+        const double totalM = measureItem ? measureItem->CommitMeasure() : 0.0;
+        if (totalM > 0.0)
+            emit measureFinished(totalM, pickPoints);
     }
     emit pickFinished((int)finished, pickPoints);
     pickPoints.clear();
@@ -924,6 +953,8 @@ void OPMapWidget::HandlePickClick(opmap::PointLatLng const& pos)
 {
     pickPoints.append(pos);
     emit positionPicked((int)pickMode, pos);
+    if (pickMode == PickMeasure && measureItem)
+        measureItem->AddPoint(pos);
     if (pickMode == PickWaypoint || pickMode == PickOrigin || pickMode == PickDest)
         SetPickMode(PickNone);   // 单发模式：内部再发 pickFinished
 }
@@ -1139,6 +1170,100 @@ void OPMapWidget::SetShowCompass(const bool &value)
         delete compass;
         compass=0;
     }
+}
+
+// ———————— 比例尺 ————————
+
+void OPMapWidget::SetShowScale(const bool &value)
+{
+    if (value && !scaleBar) {
+        scaleBar = new ScaleBarItem(map);
+        mscene.addItem(scaleBar);
+        scaleBar->setOpacity(0.85);
+        scaleBar->Reposition();
+        // 地图失效/缩放/拖动 → 重算标尺（实际换算在 paint 时按当前状态进行）
+        connect(map, SIGNAL(mapChanged()), scaleBar, SLOT(RefreshScale()));
+        connect(map, SIGNAL(zoomChanged(double,double,double)), scaleBar, SLOT(RefreshScale()));
+    } else if (!value && scaleBar) {
+        delete scaleBar;
+        scaleBar = 0;
+    }
+}
+
+void OPMapWidget::RepositionScaleBar()
+{
+    if (scaleBar)
+        scaleBar->Reposition();
+}
+
+// ———————— 地图测距 ————————
+
+void OPMapWidget::ClearMeasurements()
+{
+    if (measureItem)
+        measureItem->ClearAll();
+}
+
+bool OPMapWidget::HasMeasurements() const
+{
+    return measureItem && measureItem->HasContent();
+}
+
+// ———————— 运动轨迹记录与回放 ————————
+
+void OPMapWidget::StartTrailRecording()
+{
+    trailRecorder->StartRecording();
+}
+
+void OPMapWidget::StopTrailRecording()
+{
+    trailRecorder->StopRecording();
+}
+
+bool OPMapWidget::IsTrailRecording() const
+{
+    return trailRecorder->IsRecording();
+}
+
+void OPMapWidget::ClearTrailRecording()
+{
+    trailRecorder->Clear();
+}
+
+int OPMapWidget::TrailPointCount() const
+{
+    return trailRecorder->PointCount();
+}
+
+bool OPMapWidget::SaveTrailToFile(const QString &path, QString *error)
+{
+    return trailRecorder->SaveToFile(path, error);
+}
+
+bool OPMapWidget::LoadTrailFromFile(const QString &path, QString *error)
+{
+    return trailRecorder->LoadFromFile(path, error);
+}
+
+bool OPMapWidget::StartTrailReplay(double speed)
+{
+    return trailRecorder->StartReplay(speed);
+}
+
+void OPMapWidget::StopTrailReplay()
+{
+    trailRecorder->StopReplay();
+}
+
+bool OPMapWidget::IsTrailReplaying() const
+{
+    return trailRecorder->IsReplaying();
+}
+
+void OPMapWidget::onTrailReplayPosition(opmap::PointLatLng pos, int altM)
+{
+    SetUAVPos(0, pos, altM);   // 回放=重演：图标/轨迹/围栏/任务机全联动
 }
 
 void OPMapWidget::SetRotate(qreal const& value)

@@ -15,6 +15,7 @@
 #include <QtWidgets/QListWidget>
 #include <QtWidgets/QLabel>
 #include <QtWidgets/QComboBox>
+#include <QtWidgets/QDoubleSpinBox>
 #include <QtWidgets/QLineEdit>
 #include <QtWidgets/QCheckBox>
 #include <QtWidgets/QPushButton>
@@ -109,6 +110,18 @@ private slots:
     // 多人共享位置演示：成员上线创建标记，模拟报文驱动 SetCoord 实时移动
     void onPeersDemoToggled(bool on);
     void onPeerTick();
+
+    // 候鸟迁徙演示：多个体大圆弧路线飞行 + 标记轨迹线
+    void onMigrationToggled(bool on);
+    void onMigrantTick();
+
+    // 量测与轨迹：测距 / 轨迹记录保存回放
+    void onMeasureClicked();                 ///< 多点测距三态按钮（开始 → 结束一段）
+    void onMeasureFinished(double totalMeters, const QList<opmap::PointLatLng> &points);
+    void onRecTrailClicked();                ///< 轨迹记录开始/停止
+    void onReplayClicked();                  ///< 选择轨迹文件并按倍速回放
+    void onStopReplayClicked();
+    void onTrailReplayFinished();
 
     // 地图右键菜单：切换地图源 / 航点增删
     void onMapContextMenu(const QPoint &pos);
@@ -207,6 +220,25 @@ private:
     QHash<QString, opmap::MapMarkerItem *> m_peerMarkers;   ///< 成员名 → 地图标记
     QTimer *m_peerTimer;         ///< 模拟位置报文定时器
     double m_peerAngle;          ///< 演示公转角（rad，随 tick 递增）
+
+    // 候鸟迁徙演示
+    struct MigrantSim {                        ///< 模拟候鸟个体运动参数
+        QString name;
+        QList<opmap::PointLatLng> route;       // 繁殖地→中停地→越冬地多段路线
+        int durationMs;                        // 全程飞行时长（演示加速倍）
+        bool arrived;                          // 是否已抵达终点（到达只记一次日志）
+    };
+    QVector<MigrantSim> m_migrants;                         ///< 个体运动参数表
+    QHash<QString, opmap::MapMarkerItem *> m_migrantMarkers; ///< 个体名 → 地图标记
+    QTimer *m_migrantTimer;      ///< 迁徙推进定时器
+    qint64 m_migrantElapsed;     ///< 迁徙已推进毫秒数
+
+    // 量测与轨迹面板
+    QPushButton *m_measureBtn;      ///< 多点测距三态按钮（开始测距 → 结束测距）
+    QPushButton *m_recTrailBtn;     ///< 轨迹记录开始/停止
+    QPushButton *m_replayBtn;       ///< 加载轨迹文件并回放
+    QPushButton *m_stopReplayBtn;   ///< 中止回放
+    QDoubleSpinBox *m_replaySpeedSpin;  ///< 回放倍速（0.5~16x）
 };
 
 #endif // MAINWINDOW_H
