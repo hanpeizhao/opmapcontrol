@@ -25,7 +25,6 @@
 
 #include "opmapcontrol.h"
 
-class WaypointStore;
 class NavigationSimulator;
 class WaypointFlightSimulator;
 class QAction;
@@ -140,7 +139,6 @@ private:
 
     opmap::OPMapWidget *m_map;
     QList<QAction*> m_mapTypeActions;   ///< 地图源菜单动作（右键菜单与菜单栏共用）
-    WaypointStore *m_store;
     NavigationSimulator *m_simulator;
 
     // 航点面板

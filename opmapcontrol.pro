@@ -68,6 +68,7 @@ HEADERS += \
     ./src/engine/loadtask.h \
     ./src/engine/pureprojection.h \
     ./src/engine/alllayersoftype.h \
+    ./src/engine/uas_types.h \
     ./src/engine/projections/mercatorprojection.h \
     ./src/engine/projections/platecarreeprojection.h \
     ./src/ui/gpsitem.h \
@@ -124,6 +125,7 @@ SOURCES += \
     ./src/engine/loadtask.cpp \
     ./src/engine/pureprojection.cpp \
     ./src/engine/alllayersoftype.cpp \
+    ./src/engine/uas_types.cpp \
     ./src/engine/projections/mercatorprojection.cpp \
     ./src/engine/projections/platecarreeprojection.cpp \
     ./src/ui/configuration.cpp \

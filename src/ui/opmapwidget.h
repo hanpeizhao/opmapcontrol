@@ -512,6 +512,14 @@ public:
     void RemoveMarker(MapMarkerItem *marker);
     /** @brief 清除全部标记 */
     void ClearMarkers();
+
+    // ———————— 航点文件（.wp）———————
+    /** @brief 把地图当前航点导出为 APM .wp 任务文件
+     *  @return 成功 true；失败返回 false 并填充 *error（error 传 0 可忽略原因） */
+    bool WPExportToFile(const QString &path, QString *error = 0);
+    /** @brief 从 APM .wp 任务文件导入航点（会先清空地图现有航点）
+     *  @return 成功 true；失败返回 false 并填充 *error */
+    bool WPImportFromFile(const QString &path, QString *error = 0);
     QGraphicsItemGroup* waypointLine(int id);
     void SetShowUAV(bool const& value);
     void SetShowGPS(bool const& value);   ///< 独立 GPS 位置标记（"我的位置"图标，与导航车互不相干）

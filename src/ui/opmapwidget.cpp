@@ -39,6 +39,7 @@
 #include "waypointmissionengine.h"
 #include "routeitem.h"
 #include "mapmarkeritem.h"
+#include "uas_types.h"
 
 namespace opmap {
 
@@ -331,6 +332,51 @@ void OPMapWidget::ClearMarkers()
     foreach(MapMarkerItem *m, markers)
         delete m;
     markers.clear();
+}
+
+// ————————————————— 航点文件（.wp） —————————————————
+
+bool OPMapWidget::WPExportToFile(const QString &path, QString *error)
+{
+    QMap<int, WayPointItem*> wpMap = WPAll();
+    if (wpMap.isEmpty()) {
+        if (error)
+            *error = QString::fromUtf8("地图上没有航点");
+        return false;
+    }
+    AP_WPArray arrWP;
+    QMap<int, WayPointItem*>::const_iterator it = wpMap.constBegin();
+    for (; it != wpMap.constEnd(); ++it) {
+        AP_WayPoint wp;
+        wp.idx = it.key();
+        wp.set(it.value()->Coord().Lat(), it.value()->Coord().Lng(),
+               it.value()->Altitude());
+        arrWP.set(wp);
+    }
+    if (arrWP.save(path.toStdString()) != 0) {
+        if (error)
+            *error = QString::fromUtf8("写入文件失败: %1").arg(path);
+        return false;
+    }
+    return true;
+}
+
+bool OPMapWidget::WPImportFromFile(const QString &path, QString *error)
+{
+    AP_WPArray arrWP;
+    if (arrWP.load(path.toStdString()) != 0) {
+        if (error)
+            *error = QString::fromUtf8("读取文件失败: %1").arg(path);
+        return false;
+    }
+    WPDeleteAll();
+    AP_WayPointMap *wpMap = arrWP.getAll();
+    for (AP_WayPointMap::const_iterator it = wpMap->begin(); it != wpMap->end(); ++it) {
+        WayPointItem *item = WPCreate(PointLatLng(it->second->lat, it->second->lng),
+                                      (int)it->second->alt);
+        item->SetReached(false);
+    }
+    return true;
 }
 
 // ————————————————— 车载导航 —————————————————

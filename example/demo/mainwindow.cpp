@@ -28,7 +28,6 @@
 #include <QtCore/QDebug>
 #include <QtGui/QResizeEvent>
 
-#include "waypoint_store.h"
 #include "navigation_simulator.h"
 #include "waypoint_flight_simulator.h"
 #include "uavitem.h"
@@ -50,7 +49,6 @@ const char *kBannerArrived  = "rgba(0,110,40,220)";    ///< 到达提示底色�
 
 MainWindow::MainWindow()
     : m_map(new opmap::OPMapWidget(this)),
-      m_store(new WaypointStore(m_map)),
       m_simulator(new NavigationSimulator(this)),
       m_wpList(new QListWidget(this)),
       m_addWpBtn(new QPushButton(QString::fromUtf8("地图点选添加"), this)),
@@ -1042,8 +1040,9 @@ void MainWindow::onImportWaypointsClicked()
                                                       QString(), QString::fromUtf8("航点文件 (*.wp)"));
     if (path.isEmpty())
         return;
-    if (!m_store->load(path)) {
-        QMessageBox::warning(this, QString::fromUtf8("导入失败"), m_store->error());
+    QString err;
+    if (!m_map->WPImportFromFile(path, &err)) {
+        QMessageBox::warning(this, QString::fromUtf8("导入失败"), err);
         return;
     }
     refreshWaypointList();
@@ -1055,8 +1054,9 @@ void MainWindow::onExportWaypointsClicked()
                                                       QString(), QString::fromUtf8("航点文件 (*.wp)"));
     if (path.isEmpty())
         return;
-    if (!m_store->save(path)) {
-        QMessageBox::warning(this, QString::fromUtf8("导出失败"), m_store->error());
+    QString err;
+    if (!m_map->WPExportToFile(path, &err)) {
+        QMessageBox::warning(this, QString::fromUtf8("导出失败"), err);
         return;
     }
     statusBar()->showMessage(QString::fromUtf8("已导出 %1").arg(path), 5000);
