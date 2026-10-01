@@ -26,8 +26,6 @@
 
 #include "opmapcontrol.h"
 
-namespace opmap { class ArcLineItem; }   // MigrantSim 持有弧线句柄用（完整定义在 arclineitem.h）
-
 class NavigationSimulator;
 class WaypointFlightSimulator;
 class QAction;
