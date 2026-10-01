@@ -48,19 +48,21 @@ namespace opmap {
 *        时序，回放即按 t 轴推进。
 *
 *        文件：JSON（opmap-trail 格式），人类可读、向后兼容易扩展：
-*        { "format":"opmap-trail", "version":1, "uavId":0, "created":"...",
-*          "points":[ {"t":0,"lat":34.26,"lng":108.94,"alt":100}, ... ] }
-*        加载目标由参数 uavId 决定（文件内 uavId 仅为来源标注）。
-*
-*        回放：QTimer 50ms tick 按真实时间轴 × 倍速推进，相邻点间线性
-*        插值出位置经 replayPosition 信号发出（携带 uavId，facade 接
-*        SetUAVPos 驱动对应机图标/轨迹/围栏/任务机），播完发 replayFinished。
-*
-*        互斥：记录与回放全局互斥（开始回放停掉所有道的记录）；
-*        多道记录之间互不影响（多机同时记录正是需求）。
-*
-* @class TrailRecorder trailrecorder.h "trailrecorder.h"
-*/
+ *        { "format":"opmap-trail", "version":1, "uavId":0, "created":"...",
+ *          "points":[ {"t":0,"lat":34.26,"lng":108.94,"alt":100}, ... ] }
+ *        加载目标由参数 uavId 决定（文件内 uavId 仅为来源标注），
+ *        也可用 LoadFromFileAuto 按文件内标注自动归道。
+ *
+ *        回放：按道并行——每道独立时间轴/倍速快照，共享 50ms tick 推进，
+ *        相邻点间线性插值出位置经 replayPosition 信号发出（携带 uavId，
+ *        facade 接 SetUAVPos 驱动对应机图标/轨迹/围栏/任务机）；
+ *        某道播完自动补发末点，全部道播完才发 replayFinished。
+ *
+ *        互斥：按道互斥——开始回放某道自动停该道记录（回放喂点会经
+ *        SetUAVPos 回到本道，停记录避免混流），其他道的记录/回放不受影响。
+ *
+ * @class TrailRecorder trailrecorder.h "trailrecorder.h"
+ */
 class TrailRecorder : public QObject
 {
     Q_OBJECT
@@ -78,7 +80,7 @@ public:
     explicit TrailRecorder(QObject *parent = 0);
 
     // —— 记录（按机分道）——
-    void StartRecording(int uavId = 0);    ///< 开始记录指定机（该道清空重启；自动停止回放）
+    void StartRecording(int uavId = 0);    ///< 开始记录指定机（该道清空重启；该道回放中则先停）
     void StopRecording(int uavId = 0);     ///< 停止指定机记录（缓冲保留，可存盘/回放）
     bool IsRecording(int uavId = 0) const { return channelOf(uavId).recording; }
     /// 记录指定机的位置点（该道未在记录中时静默忽略；t 自动取相对起点毫秒）
@@ -86,16 +88,19 @@ public:
     int PointCount(int uavId = 0) const { return channelOf(uavId).points.size(); }
     void Clear();                          ///< 清空全部道（自动停止回放）
 
-    // —— 文件（读写指定道）——
+    // —— 文件（读写指定道 / 按文件内机号标注自动归道）——
     bool SaveToFile(const QString &path, QString *error = 0, int uavId = 0) const;
     bool LoadFromFile(const QString &path, QString *error = 0, int uavId = 0);
+    /// 读取文件内 uavId 标注装入对应道（无标注默认 0 道）；返回机号，失败 -1
+    int LoadFromFileAuto(const QString &path, QString *error = 0);
 
-    // —— 回放（回放指定道）——
-    /// 开始回放指定机（该道点数<2 返回 false；停止全部道的记录，互斥）
+    // —— 回放（按道并行）——
+    /// 开始回放指定机（该道点数<2 返回 false；自动停该道记录，其他道不受影响）；
+    /// 同道重复开始=从头重启该道回放
     bool StartReplay(double speed = 1.0, int uavId = 0);
-    void StopReplay();
-    bool IsReplaying() const { return replaying; }
-    int ReplayUavId() const { return replayUavId; }   ///< 当前回放的机 id
+    void StopReplay();                     ///< 停止全部道的回放（主动停不发 replayFinished）
+    bool IsReplaying() const { return !replayRuns.isEmpty(); }
+    int ReplayUavId() const { return replayRuns.size() == 1 ? replayRuns.constBegin().key() : -1; }   ///< 单道回放时为该机 id，多道/无回放为 -1
 
 signals:
     /// 回放推进出的插值位置（facade 接 SetUAVPos(uavId) 驱动对应机）
@@ -115,17 +120,26 @@ private:
         Channel() : recording(false) {}
     };
 
+    /// 单道回放状态：数据快照 + 独立时钟（多道并行互不干扰）
+    struct ReplayRun
+    {
+        QList<TrailPoint> buf;   ///< 该道数据快照（回放期间该道继续记录不影响）
+        double speed;            ///< 回放倍速（1.0=原速）
+        int idx;                 ///< 当前插值区间左端点（单调推进）
+        QElapsedTimer clock;     ///< 该道回放时钟（tick 换算 × 倍速）
+        ReplayRun() : speed(1.0), idx(0) {}
+    };
+
     const Channel &channelOf(int uavId) const;   ///< 取道（不存在时返回空道）
     Channel &channelRef(int uavId);              ///< 取道引用（不存在时创建）
+    void StopReplayOf(int uavId);                ///< 停止指定道的回放（内部复用）
+    /// 读轨迹文件 → 采样序列 + 文件内机号标注（format/version 校验）
+    bool ParseTrailFile(const QString &path, QString *error,
+                        QList<TrailPoint> &out, int &uavIdOut);
 
-    QMap<int, Channel> channels;   ///< 按 uavId 分道（多机同时记录互不混流）
-    QList<TrailPoint> replayBuf;   ///< 回放快照（开始回放时从道拷贝，记录继续不影响）
-    int replayUavId;               ///< 当前回放的机 id
-    bool replaying;
-    QElapsedTimer replayClock;     ///< 回放时钟（tick 换算 × 倍速）
-    QTimer *replayTimer;           ///< 50ms 推进定时器
-    double replaySpeed;            ///< 回放倍速（1.0=原速）
-    int replayIdx;                 ///< 当前插值区间左端点（单调推进）
+    QMap<int, Channel> channels;     ///< 按 uavId 分道（多机同时记录互不混流）
+    QMap<int, ReplayRun> replayRuns; ///< 进行中的回放（按 uavId，多道并行）
+    QTimer *replayTimer;             ///< 共享 50ms 推进定时器（驱动所有道的回放）
 };
 
 } // end of namespace opmap

@@ -124,7 +124,8 @@ private slots:
     void onMeasureClicked();                 ///< 多点测距三态按钮（开始 → 结束一段）
     void onMeasureFinished(double totalMeters, const QList<opmap::PointLatLng> &points);
     void onRecTrailClicked();                ///< 轨迹记录开始/停止
-    void onReplayClicked();                  ///< 选择轨迹文件并按倍速回放
+    void onSaveTrailClicked();               ///< 保存轨迹（选机号分道或全部各存一份）
+    void onReplayClicked();                  ///< 选择轨迹文件并按倍速回放（可多选=多机同时回放）
     void onStopReplayClicked();
     void onTrailReplayFinished();
 

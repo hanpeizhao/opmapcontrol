@@ -196,17 +196,17 @@ IP 定位信号：
 | 记录状态/点数查询 | `IsTrailRecording(uavId=0)` / `TrailPointCount(uavId=0)` | ✅ |
 | **多机分道记录**（各机同时记录互不混流，uavId 默认 0 老代码零改动） | `StartTrailRecording(机id)` 等 | ✅（多机任务演示各机分段同录） |
 | 清空轨迹缓冲（全部道） | `ClearTrailRecording()` | ✅ |
-| 保存为 JSON（`opmap-trail` 格式：t/lat/lng/alt + uavId 来源标注） | `SaveTrailToFile(路径, *错误, 机id=0)` | ✅（QFileDialog） |
-| 加载轨迹文件（装入指定机道） | `LoadTrailFromFile(路径, *错误, 机id=0)` | ✅ |
-| 按时间轴回放指定机（QTimer 50ms × 倍速，相邻点线性插值喂 SetUAVPos(机id)，图标/轨迹/围栏全联动） | `StartTrailReplay(倍速=1.0, 机id=0)` / `StopTrailReplay()` / `IsTrailReplaying()` | ✅（倍速 0.5~16） |
+| 保存为 JSON（`opmap-trail` 格式：t/lat/lng/alt + uavId 来源标注） | `SaveTrailToFile(路径, *错误, 机id=0)` | ✅（QFileDialog，多机时可选单机或全部各存一份） |
+| 加载轨迹文件（装入指定机道 / 按文件内 uavId 标注自动归道） | `LoadTrailFromFile(路径, *错误, 机id=0)` / `LoadTrailFromFileAuto(路径, *错误)` | ✅（Auto 版） |
+| 按时间轴回放（QTimer 50ms × 倍速，相邻点线性插值喂 SetUAVPos(机id)，图标/轨迹/围栏全联动；**按道并行**——多选文件即可多机同时回放各显各轨迹） | `StartTrailReplay(倍速=1.0, 机id=0)` / `StopTrailReplay()` / `IsTrailReplaying()` | ✅（倍速 0.5~16，QFileDialog 多选） |
 
 | 信号 | 触发时机 | example |
 |------|----------|:----:|
-| `trailReplayFinished()` | 回放推进到末点 | ✅ |
+| `trailReplayFinished()` | **全部道**都自然播完（某道先播完静默移除） | ✅ |
 
 **迁徙图示例**（demo 层）：4 只候鸟沿**贝塞尔弧线航线**飞往越冬地（贝加尔湖→鄱阳湖、蒙古高原→荣成等），库内 `ArcLineItem` 提供拱弧航线 + 沿弧方向箭头 + 流动光效动画（ECharts 迁徙图风格），鸟按 `ArcPointAt(t)` 沿弧飞行与线严格重合；个体间/段间交替拱向呈 S 形；与多人位置演示互斥（共用标记层，双向守卫）。
 
-**多机任务飞行示例**（demo 层，替代原"多机编队监控示例"）：**用户摆航点、用户定架数**——在地图点选 ≥4 个航点后点「多机任务飞行」，弹窗选 2~3 架，航点按编号连续均分成段（前 extra 架各多 1 个），每架沿自己的分段独立执行真任务：库按机实例化 `WaypointMissionEngine` 状态机（目标切换/到达判定/悬停计时/动作触发/完成信号全带机号 `*For`），各机模拟遥测独立喂 `SetUAVPos(id)`，轨迹按机分道自动记录；主机 0 走 Home 起飞编排，僚机以分段首航点为集结点；全部完成后自动收尾（图标/轨迹保留可保存回放）。仅与航点飞行互斥（0 号机占用）；迁徙/多人位置演示（标记/弧线层）可同时开启。
+**多机任务飞行示例**（demo 层，替代原"多机编队监控示例"）：**用户摆航点、用户定架数、用户编排每机路线**——在地图点选 ≥4 个航点后点「多机任务飞行」，弹窗选 2~3 架并逐航点指定归属机（下拉框默认按编号连续均分，可任意改派），每架沿自己分到的航点序列独立执行真任务：**所有机统一从 Home 起飞**（Home→首航点即任务第一段），库按机实例化 `WaypointMissionEngine` 状态机（目标切换/到达判定/悬停计时/动作触发/完成信号全带机号 `*For`），各机模拟遥测独立喂 `SetUAVPos(id)`，轨迹按机分道自动记录；全部完成后自动收尾（图标/轨迹保留可保存回放）。「清空航点」为全清语义——停任务/回放 + 删全部 UAV 图标 + 清全部道轨迹；「回放轨迹」支持多选文件，按文件内 uavId 标注自动归道后多机同时回放。仅与航点飞行互斥（0 号机占用）；迁徙/多人位置演示（标记/弧线层）可同时开启。
 
 ## 11. example 未覆盖的能力汇总
 

@@ -23,6 +23,9 @@
 #include <QtWidgets/QSpinBox>
 #include <QtWidgets/QScrollArea>
 #include <QtWidgets/QInputDialog>
+#include <QtWidgets/QDialog>
+#include <QtWidgets/QFormLayout>
+#include <QtWidgets/QDialogButtonBox>
 #include <QtCore/QTime>
 #include <QtCore/QTimer>
 #include <QtCore/QDebug>
@@ -655,27 +658,7 @@ void MainWindow::setupCapabilityDock()
         logEvent(QString::fromUtf8("已清除全部测距折线"));
     });
     connect(m_recTrailBtn, &QPushButton::clicked, this, &MainWindow::onRecTrailClicked);
-    connect(saveTrailBtn, &QPushButton::clicked, [this]() {
-        if (m_map->TrailPointCount() == 0) {
-            // 空轨迹前置拦截：引导正确操作序列，避免存出无效文件
-            logEvent(QString::fromUtf8("还没有可保存的轨迹。正确用法：① 点「记录轨迹」开始 → ② 点「航点飞行」或行车模拟运动一段 → ③ 再点「记录轨迹」停止 → ④ 保存/回放"));
-            statusBar()->showMessage(QString::fromUtf8("轨迹为空：请先点「记录轨迹」并运动一段"), 8000);
-            return;
-        }
-        const QString path = QFileDialog::getSaveFileName(
-                    this, QString::fromUtf8("保存运动轨迹"), QString::fromUtf8("flight.trail.json"),
-                    QString::fromUtf8("轨迹文件 (*.trail.json *.json);;所有文件 (*.*)"));
-        if (path.isEmpty())
-            return;
-        QString err;
-        if (m_map->SaveTrailToFile(path, &err)) {
-            m_recTrailBtn->setText(QString::fromUtf8("记录轨迹"));   // 存盘即收笔（缓冲保留可回放）
-            m_map->StopTrailRecording();
-            logEvent(QString::fromUtf8("轨迹已保存（%1 个采样点）→ %2").arg(m_map->TrailPointCount()).arg(path));
-        } else {
-            logEvent(QString::fromUtf8("轨迹保存失败：%1").arg(err));
-        }
-    });
+    connect(saveTrailBtn, &QPushButton::clicked, this, &MainWindow::onSaveTrailClicked);
     connect(m_replayBtn, &QPushButton::clicked, this, &MainWindow::onReplayClicked);
     connect(m_stopReplayBtn, &QPushButton::clicked, this, &MainWindow::onStopReplayClicked);
     connect(migrationBtn, &QPushButton::toggled, this, &MainWindow::onMigrationToggled);
@@ -1277,7 +1260,8 @@ void MainWindow::onMigrantTick()
 }
 
 // ————————————————— 多机任务飞行 —————————————————
-// 用户在地图摆航点 → 选架数 → 航点按编号连续分段 → 各机独立任务状态机
+// 用户在地图摆航点 → 选架数 → 逐航点指定归属机（默认连续均分）→ 各机
+// 从 Home 起飞沿自己的分段独立执行任务状态机
 // （真机接入：把每机的 WaypointFlightSimulator 换成各自遥测，直喂 SetUAVPos(id)）
 
 void MainWindow::onMultiMissionToggled(bool on)
@@ -1301,7 +1285,7 @@ void MainWindow::onMultiMissionToggled(bool on)
     }
     bool ok = false;
     const int n = QInputDialog::getInt(this, QString::fromUtf8("多机任务飞行"),
-                                       QString::fromUtf8("出动架数（航点按编号连续分段，每机至少 2 个）"),
+                                       QString::fromUtf8("出动架数（下一步可逐航点指定归属机）"),
                                        2, 2, 3, 1, &ok);
     if (!ok) {   // 用户取消
         m_multiBtn->setChecked(false);
@@ -1314,19 +1298,70 @@ void MainWindow::onMultiMissionToggled(bool on)
         return;
     }
 
-    // 连续均分：base = total/n，前 extra 架各多 1 个（段间无交叉，总点数不变）
+    // —— 每机路线编排对话框：逐航点下拉选择归属机，默认=按编号连续均分 ——
     const QList<opmap::WayPointItem*> ordered = wps.values();
     const int total = ordered.size();
     const int base = total / n, extra = total % n;
+    QVector<int> defaultSeg(total);
+    int cursor = 0;
+    for (int s = 0; s < n; ++s) {
+        const int cnt = base + (s < extra ? 1 : 0);
+        for (int k = 0; k < cnt; ++k)
+            defaultSeg[cursor + k] = s;
+        cursor += cnt;
+    }
+    QDialog dlg(this);
+    dlg.setWindowTitle(QString::fromUtf8("每机路线编排：%1 架 / %2 个航点").arg(n).arg(total));
+    QVBoxLayout *dlgLayout = new QVBoxLayout(&dlg);
+    QScrollArea *scroll = new QScrollArea(&dlg);
+    scroll->setWidgetResizable(true);
+    QWidget *rows = new QWidget(scroll);
+    QFormLayout *form = new QFormLayout(rows);
+    QVector<QComboBox*> assign(total);
+    for (int i = 0; i < total; ++i) {
+        QComboBox *cb = new QComboBox(rows);
+        for (int j = 0; j < n; ++j) {
+            const QString label = (j == 0) ? QString::fromUtf8("主机（0）")
+                                           : QString::fromUtf8("僚机%1（%2）").arg(j).arg(j);
+            cb->addItem(label, j);
+        }
+        cb->setCurrentIndex(defaultSeg.at(i));
+        form->addRow(QString::fromUtf8("航点 %1").arg(ordered.at(i)->Number()), cb);
+        assign[i] = cb;
+    }
+    scroll->setWidget(rows);
+    dlgLayout->addWidget(scroll);
+    QDialogButtonBox *bb = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    connect(bb, SIGNAL(accepted()), &dlg, SLOT(accept()));
+    connect(bb, SIGNAL(rejected()), &dlg, SLOT(reject()));
+    dlgLayout->addWidget(bb);
+    if (dlg.exec() != QDialog::Accepted) {   // 取消编排=放弃本次多机任务
+        m_multiBtn->setChecked(false);
+        return;
+    }
+    // 汇总各机分段（保持航点编号顺序）；任一机没分到航点则拒绝启动
+    QVector<MultiMissionUAV> plan(n);
+    for (int s = 0; s < n; ++s) {
+        plan[s].uavId = s;
+        plan[s].name = (s == 0) ? QString::fromUtf8("主机") : QString::fromUtf8("僚机%1").arg(s);
+    }
+    for (int i = 0; i < total; ++i)
+        plan[assign.at(i)->currentData().toInt()].seg.append(ordered.at(i));
+    for (int s = 0; s < n; ++s) {
+        if (plan.at(s).seg.isEmpty()) {
+            QMessageBox::warning(this, QString::fromUtf8("多机任务"),
+                                 QString::fromUtf8("%1 没有分配到任何航点，请每架至少分配 1 个")
+                                 .arg(plan.at(s).name));
+            m_multiBtn->setChecked(false);
+            return;
+        }
+    }
+
+    // —— 逐机建任务并起飞：起飞位统一=Home（无 Home 用车辆位置，再退分段首航点）——
     m_multiMission.clear();
     m_multiFinishedCount = 0;
-    int cursor = 0;
-    for (int i = 0; i < n; ++i) {
-        MultiMissionUAV mu;
-        mu.uavId = i;   // 0=主机（库内走 Home 起飞编排），1..N-1=僚机（起飞位=首航点）
-        mu.name = (i == 0) ? QString::fromUtf8("主机") : QString::fromUtf8("僚机%1").arg(i);
-        mu.seg = ordered.mid(cursor, base + (i < extra ? 1 : 0));
-        cursor += mu.seg.size();
+    for (int s = 0; s < n; ++s) {
+        MultiMissionUAV mu = plan.at(s);
         mu.sim = new WaypointFlightSimulator(this);
         const int uavId = mu.uavId;
         connect(mu.sim, &WaypointFlightSimulator::positionChanged, this,
@@ -1336,23 +1371,22 @@ void MainWindow::onMultiMissionToggled(bool on)
             m_map->SetUAVHeading(uavId, heading);
         });
         m_multiMission.append(mu);
-        // 模拟遥测先起飞（start 会清目标），StartWaypointMission 随后同步发首目标信号
-        opmap::PointLatLng takeoff = mu.seg.first()->Coord();   // 僚机：分段首航点=集结点
-        if (i == 0) {   // 主机起飞位与库编排一致：Home 优先，其次车辆位置
-            if (m_map->Home)
-                takeoff = m_map->Home->Coord();
-            else if (m_map->HasVehiclePosition())
-                takeoff = m_map->VehiclePosition();
-        }
-        mu.sim->start(takeoff, 80.0);
-        m_map->StartWaypointMission(i, mu.seg, 15.0);   // 库：建 UAV/任务状态机/发首目标
-        m_map->StartTrailRecording(i);                  // 按机分道自动记录轨迹
-        logEvent(QString::fromUtf8("[机%1]%2 任务开始：航点 %3~%4（共 %5 个），巡航 80 m/s")
-                 .arg(i).arg(mu.name).arg(mu.seg.first()->Number())
-                 .arg(mu.seg.last()->Number()).arg(mu.seg.size()));
+        // 先建任务（StartMission 同步发首目标信号，sim 未启动仅存下目标）
+        // 后起飞（start 保留已设目标）：各机从 Home 飞向各自分段首航点
+        opmap::PointLatLng takeoff = mu.seg.first()->Coord();
+        if (m_map->Home)
+            takeoff = m_map->Home->Coord();
+        else if (m_map->HasVehiclePosition())
+            takeoff = m_map->VehiclePosition();
+        m_map->StartWaypointMission(uavId, mu.seg, 15.0);   // 库：建 UAV/任务状态机/发首目标
+        mu.sim->start(takeoff, 80.0);                       // 从 Home 起飞
+        m_map->StartTrailRecording(uavId);                  // 按机分道自动记录轨迹
+        logEvent(QString::fromUtf8("[机%1]%2 任务开始：%3 个航点（%4→%5），从 Home 起飞，巡航 80 m/s")
+                 .arg(uavId).arg(mu.name).arg(mu.seg.size())
+                 .arg(mu.seg.first()->Number()).arg(mu.seg.last()->Number()));
     }
     m_multiBtn->setText(QString::fromUtf8("停止多机任务"));
-    logEvent(QString::fromUtf8("多机任务开始：%1 架沿各自分段独立飞行（航点已连续均分），目标切换/悬停/动作全部来自库任务状态机")
+    logEvent(QString::fromUtf8("多机任务开始：%1 架从 Home 起飞，沿各自分段独立飞行（目标切换/悬停/动作全部来自库任务状态机）")
              .arg(n));
 }
 
@@ -1448,28 +1482,111 @@ void MainWindow::onRecTrailClicked()
     }
 }
 
-void MainWindow::onReplayClicked()
+void MainWindow::onSaveTrailClicked()
 {
-    const QString path = QFileDialog::getOpenFileName(
-                this, QString::fromUtf8("选择轨迹文件"), QString(),
+    // 收集有数据的道（demo 最多 3 架：0=主机 / 1、2=僚机）
+    QList<int> ids;
+    QStringList opts;
+    const char *names[] = { "主机", "僚机一", "僚机二" };
+    for (int id = 0; id < 3; ++id) {
+        const int cnt = m_map->TrailPointCount(id);
+        if (cnt > 0) {
+            ids.append(id);
+            opts.append(QString::fromUtf8("%1（%2 号机，%3 个采样点）").arg(names[id]).arg(id).arg(cnt));
+        }
+    }
+    if (ids.isEmpty()) {
+        // 空轨迹前置拦截：引导正确操作序列，避免存出无效文件
+        logEvent(QString::fromUtf8("还没有可保存的轨迹。正确用法：① 点「记录轨迹」开始 → ② 点「航点飞行」或行车模拟运动一段 → ③ 再点「记录轨迹」停止 → ④ 保存/回放"));
+        statusBar()->showMessage(QString::fromUtf8("轨迹为空：请先点「记录轨迹」并运动一段"), 8000);
+        return;
+    }
+    // 多道可存时让用户选：存哪架，或全部各存一份（文件名自动加机号后缀）
+    int chosen = -1;   // -1=全部
+    if (ids.size() > 1) {
+        opts.append(QString::fromUtf8("全部（各存一个文件，自动加机号后缀）"));
+        const QString sel = QInputDialog::getItem(this, QString::fromUtf8("保存轨迹"),
+                                                  QString::fromUtf8("保存哪架飞机的轨迹？"),
+                                                  opts, 0, false);
+        if (sel.isEmpty())
+            return;
+        const int idx = opts.indexOf(sel);
+        chosen = (idx >= 0 && idx < ids.size()) ? ids.at(idx) : -1;
+    } else {
+        chosen = ids.first();
+    }
+    const QString path = QFileDialog::getSaveFileName(
+                this, QString::fromUtf8("保存运动轨迹"), QString::fromUtf8("flight.trail.json"),
                 QString::fromUtf8("轨迹文件 (*.trail.json *.json);;所有文件 (*.*)"));
     if (path.isEmpty())
         return;
-    QString err;
-    if (!m_map->LoadTrailFromFile(path, &err)) {
-        logEvent(QString::fromUtf8("轨迹加载失败：%1").arg(err));
-        return;
+    if (chosen >= 0) {
+        QString err;
+        if (m_map->SaveTrailToFile(path, &err, chosen)) {
+            logEvent(QString::fromUtf8("%1 号机轨迹已保存（%2 个采样点）→ %3")
+                     .arg(chosen).arg(m_map->TrailPointCount(chosen)).arg(path));
+        } else {
+            logEvent(QString::fromUtf8("轨迹保存失败：%1").arg(err));
+            return;
+        }
+    } else {
+        // 全部：每道一份，文件名插入 -u{机号} 后缀
+        int saved = 0;
+        for (int i = 0; i < ids.size(); ++i) {
+            const int id = ids.at(i);
+            const int dot = path.lastIndexOf('.');
+            const QString p = (dot < 0) ? path + QString::fromUtf8("-u%1").arg(id)
+                                        : path.mid(0, dot) + QString::fromUtf8("-u%1").arg(id) + path.mid(dot);
+            QString err;
+            if (m_map->SaveTrailToFile(p, &err, id)) {
+                ++saved;
+                logEvent(QString::fromUtf8("%1 号机轨迹已保存（%2 个采样点）→ %3")
+                         .arg(id).arg(m_map->TrailPointCount(id)).arg(p));
+            } else {
+                logEvent(QString::fromUtf8("%1 号机轨迹保存失败：%2").arg(id).arg(err));
+            }
+        }
+        if (saved == ids.size())
+            statusBar()->showMessage(QString::fromUtf8("已保存 %1 份分机轨迹文件").arg(saved), 8000);
     }
+    if (m_map->IsTrailRecording()) {   // 存盘即收笔（0 号道；缓冲保留可回放）
+        m_map->StopTrailRecording();
+        m_recTrailBtn->setText(QString::fromUtf8("记录轨迹"));
+    }
+}
+
+void MainWindow::onReplayClicked()
+{
+    // 多选=多机同时回放；文件内含来源机号标注，自动装入对应道
+    const QStringList paths = QFileDialog::getOpenFileNames(
+                this, QString::fromUtf8("选择轨迹文件（可多选＝多机同时回放）"), QString(),
+                QString::fromUtf8("轨迹文件 (*.trail.json *.json);;所有文件 (*.*)"));
+    if (paths.isEmpty())
+        return;
     const double speed = m_replaySpeedSpin->value();
-    if (!m_map->StartTrailReplay(speed)) {
-        logEvent(QString::fromUtf8("轨迹点数不足（至少 2 个），无法回放"));
-        statusBar()->showMessage(QString::fromUtf8("轨迹点数不足（至少 2 个），无法回放"), 8000);
+    QStringList started;
+    for (int i = 0; i < paths.size(); ++i) {
+        QString err;
+        const int id = m_map->LoadTrailFromFileAuto(paths.at(i), &err);
+        if (id < 0) {
+            logEvent(QString::fromUtf8("轨迹加载失败：%1（%2）").arg(paths.at(i)).arg(err));
+            continue;
+        }
+        if (m_map->StartTrailReplay(speed, id))
+            started.append(QString::fromUtf8("机%1（%2 点）").arg(id).arg(m_map->TrailPointCount(id)));
+        else
+            logEvent(QString::fromUtf8("机%1 轨迹点数不足（至少 2 个），跳过回放").arg(id));
+    }
+    if (started.isEmpty()) {
+        statusBar()->showMessage(QString::fromUtf8("没有可回放的轨迹（每份文件至少 2 个采样点）"), 8000);
         return;
     }
-    m_recTrailBtn->setText(QString::fromUtf8("记录轨迹"));
+    m_recTrailBtn->setText(m_map->IsTrailRecording()   // 回放已停被回放道的记录，同步按钮文案
+                           ? QString::fromUtf8("停止记录") : QString::fromUtf8("记录轨迹"));
     m_replayBtn->setEnabled(false);
     m_stopReplayBtn->setEnabled(true);
-    logEvent(QString::fromUtf8("轨迹回放开始（%1 倍速）：UAV 图标按原始时序沿轨迹重演").arg(speed));
+    logEvent(QString::fromUtf8("轨迹回放开始（%1 倍速）：同时回放 %2")
+             .arg(speed).arg(started.join(QString::fromUtf8("、"))));
 }
 
 void MainWindow::onStopReplayClicked()
@@ -1527,13 +1644,29 @@ void MainWindow::onDeleteWaypointClicked()
 
 void MainWindow::onClearWaypointsClicked()
 {
+    // 先停进行中的任务/回放：清空语义=回到无航点、无 UAV、无轨迹的干净状态
+    stopMultiMission();   // 多机任务全停（内含各机分道记录停止；未启动时空表直接返回）
+    if (m_flightSim && m_flightSim->isActive()) {
+        m_map->StopWaypointMission();
+        m_flightSim->stop();
+        m_flightBtn->setText(QString::fromUtf8("航点飞行"));
+        if (opmap::UAVItem *u = m_map->GetUAV(0))
+            u->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));
+        logEvent(QString::fromUtf8("航点飞行已随清空停止"));
+    }
+    if (m_map->IsTrailReplaying()) {
+        m_map->StopTrailReplay();
+        m_replayBtn->setEnabled(true);
+        m_stopReplayBtn->setEnabled(false);
+    }
     m_map->WPDeleteAll();
-    // 飞行轨迹挂在 UAV 图元上、不随航点删除：清航点时一并清掉，
-    // 否则上次任务的轨迹点/连线会永久残留在地图上
-    if (opmap::UAVItem *u = m_map->GetUAV(0))
-        u->DeleteTrail();
+    // 删除全部 UAV 图标（含僚机）——图标、轨迹线、航点连线组一并随图元移除
+    const QList<int> ids = m_map->UAVIds();
+    for (int i = 0; i < ids.size(); ++i)
+        m_map->DeleteUAV(ids.at(i));
+    m_map->ClearTrailRecording();   // 全部道的轨迹缓冲清空
     refreshWaypointList();
-    logEvent(QString::fromUtf8("已清除全部航点及飞行轨迹"));
+    logEvent(QString::fromUtf8("已清除全部航点、%1 架 UAV 图标及各机轨迹").arg(ids.size()));
 }
 
 void MainWindow::onImportWaypointsClicked()

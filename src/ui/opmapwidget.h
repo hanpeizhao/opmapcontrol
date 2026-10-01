@@ -521,6 +521,9 @@ public:
     /** @brief 从 JSON 轨迹文件加载到指定机（接管该道缓冲，加载后即可回放该机）
      *  @return 成功 true；失败 false 并填充 *error */
     bool LoadTrailFromFile(const QString &path, QString *error = 0, int uavId = 0);
+    /** @brief 从 JSON 轨迹文件按文件内机号标注自动装入对应道（无标注进 0 道）
+     *  @return 成功返回装入的机号；失败返回 -1 并填充 *error */
+    int LoadTrailFromFileAuto(const QString &path, QString *error = 0);
     /** @brief 按时间轴回放指定机轨迹：插值喂 SetUAVPos(uavId)（图标/轨迹/围栏全联动），
      *         speed 为倍速（1=原速），播完发 trailReplayFinished
      *  @return 该道缓冲有效（≥2 点）返回 true */
@@ -541,6 +544,7 @@ public:
     void DeleteUAV(int id);
     UAVItem* GetUAV(int id);
     const QList<UAVItem*> GetUAVS();
+    QList<int> UAVIds() const;   ///< 当前全部 UAV 机号（含僚机，全清图标/分道清理用）
     /** @brief 内部地图画布访问器：供上层直接挂载自定义地理锚定图元（WayPointItem 等） */
     MapGraphicItem* GetMap() const { return map; }
 

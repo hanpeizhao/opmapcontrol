@@ -29,6 +29,7 @@ public:
 
 public slots:
     /// 从 startPos 起飞，以 speedMps（米/秒）巡航；目标点由库任务引擎下发
+    /// （起飞前已下发的目标保留不清，支持"先建任务后起飞"的多机编排）
     void start(const opmap::PointLatLng &startPos, double speedMps);
     void stop();
     /// 库 missionCurrentWaypointChanged → 切换推进目标

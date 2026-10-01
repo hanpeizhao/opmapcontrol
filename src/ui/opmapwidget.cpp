@@ -276,6 +276,11 @@ const QList<UAVItem*> OPMapWidget::GetUAVS()
     return UAVS.values();
 }
 
+QList<int> OPMapWidget::UAVIds() const
+{
+    return UAVS.keys();
+}
+
 QGraphicsItemGroup* OPMapWidget::waypointLine(int id)
 {
     return waypointLines.value(id, NULL);
@@ -1437,6 +1442,11 @@ bool OPMapWidget::SaveTrailToFile(const QString &path, QString *error, int uavId
 bool OPMapWidget::LoadTrailFromFile(const QString &path, QString *error, int uavId)
 {
     return trailRecorder->LoadFromFile(path, error, uavId);
+}
+
+int OPMapWidget::LoadTrailFromFileAuto(const QString &path, QString *error)
+{
+    return trailRecorder->LoadFromFileAuto(path, error);
 }
 
 bool OPMapWidget::StartTrailReplay(double speed, int uavId)

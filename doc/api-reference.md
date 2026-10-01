@@ -237,7 +237,7 @@ map->StartWaypointMission(uavId, segment, 15.0);  // uavId=0 即主机单机语�
 
 | 方法 | 参数 | 功能 |
 |------|------|------|
-| `StartWaypointMission(int uavId, QList<WayPointItem*>, double arrivalRadiusMeters=15.0)` | 机号、该机专属航点分段、到达半径 | 为指定机启动独立任务；uavId>0 时起飞位=首航点（无 Home 编排），uavId=0 保留完整主机编排 |
+| `StartWaypointMission(int uavId, QList<WayPointItem*>, double arrivalRadiusMeters=15.0)` | 机号、该机专属航点分段、到达半径 | 为指定机启动独立任务；uavId>0 无 Home 编排（引擎只管目标推进，初始位置由调用方喂点决定，可统一从 Home 起飞），uavId=0 保留完整主机编排 |
 | `StopWaypointMission(int uavId)` | 机号 | 中止指定机任务 |
 | `StopWaypointMission()` | — | 中止全部机任务 |
 | `IsWaypointMissionActive(int uavId)` | 机号 | 指定机任务是否进行中 |
@@ -297,15 +297,21 @@ map->StartTrailReplay(2.0);               // 2 倍速回放：插值喂 SetUAVPo
 map->StartTrailRecording(1);              // 单独记录 1 号机（各机同时记录互不混流）
 map->SaveTrailToFile("uav1.json", &err, 1);   // 保存 1 号机轨迹
 map->StartTrailReplay(2.0, 1);            // 回放 1 号机（插值喂 SetUAVPos(1)）
+map->StartTrailReplay(1.5, 2);            // 各机回放**并行**：0 号回放中仍可回放 2 号
+
+int id = map->LoadTrailFromFileAuto("uav1.json");   // 按文件内 uavId 标注自动归道
+map->StartTrailReplay(1.0, id);
 ```
 
 | 方法 | 功能 |
 |------|------|
-| `StartTrailRecording(uavId=0)` / `StopTrailRecording(uavId=0)` / `IsTrailRecording(uavId=0)` | 记录控制（按机分道，多机同时记录互不混流；与回放互斥） |
+| `StartTrailRecording(uavId=0)` / `StopTrailRecording(uavId=0)` / `IsTrailRecording(uavId=0)` | 记录控制（按机分道，多机同时记录互不混流；与回放按道互斥——该道回放中则该道不能开记录，其他道不受影响） |
 | `ClearTrailRecording()` / `TrailPointCount(uavId=0)` | 清空全部道 / 指定机采样点数 |
-| `SaveTrailToFile(path, *error, uavId=0)` / `LoadTrailFromFile(path, *error, uavId=0)` | JSON 文件存取（格式 `opmap-trail`，人类可读；加载目标机由参数决定） |
-| `StartTrailReplay(speed=1.0, uavId=0)` / `StopTrailReplay()` / `IsTrailReplaying()` | 时间轴变速回放指定机（播完自动停） |
-| 信号 `trailReplayFinished()` | 回放自然播完（主动中止不发） |
+| `SaveTrailToFile(path, *error, uavId=0)` | JSON 文件保存（格式 `opmap-trail`，含 uavId 来源标注，人类可读） |
+| `LoadTrailFromFile(path, *error, uavId=0)` | 加载到指定机道（旧格式 .wp 兼容见航点导入；轨迹仅 JSON） |
+| `LoadTrailFromFileAuto(path, *error)` | 按文件内 uavId 标注自动装入对应道（无标注默认 0），返回机号/失败 -1 |
+| `StartTrailReplay(speed=1.0, uavId=0)` / `StopTrailReplay()` / `IsTrailReplaying()` | 时间轴变速回放（**按道并行**：多机可同时回放各显各的轨迹；`StopTrailReplay` 停全部道，`IsTrailReplaying` 任一道在播即 true） |
+| 信号 `trailReplayFinished()` | **全部道**都自然播完时发一次（某道先播完只静默移除；主动中止不发） |
 
 ## 9. IP 定位兜底 / MAVLink 遥测 / 离线下载
 

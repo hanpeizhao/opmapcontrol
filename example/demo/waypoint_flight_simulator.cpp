@@ -35,12 +35,12 @@ WaypointFlightSimulator::WaypointFlightSimulator(QObject *parent)
 void WaypointFlightSimulator::start(const opmap::PointLatLng &startPos, double speedMps)
 {
     m_pos = startPos;
-    m_target = startPos;
-    m_hasTarget = false;
     m_speedMps = speedMps > 0 ? speedMps : 25.0;
     m_lastHeading = 0.0;
     m_hovering = false;
     m_active = true;
+    // 目标保留不清：库 StartMission 会同步发首目标信号，多机任务流程是
+    // "先建任务（sim 存下首目标）→ 后 start 起飞"，起飞点（Home）≠ 首目标
     emit positionChanged(m_pos, 0.0);
     m_timer->start(kTickMs);
 }
