@@ -1,0 +1,52 @@
+# opmapcontrol_ex 持续构建：Windows + Qt 5.12 (MinGW 73) 编译库与 demo 示例
+# 产物：opmapcontrol_example.exe（连同 Qt 运行时打包为 artifact 供下载）
+name: build
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Windows (Qt 5.12 MinGW 64-bit)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Qt 5.12.12 (MinGW 73 64-bit)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '5.12.12'
+          arch: 'win64_mingw73'
+          cache: true
+
+      - name: Build opmapwidget library
+        shell: cmd
+        run: |
+          qmake opmapcontrol.pro
+          mingw32-make -j4
+
+      - name: Build demo example
+        shell: cmd
+        working-directory: example/demo
+        run: |
+          qmake demo.pro
+          mingw32-make -j4
+
+      - name: Package demo (windeployqt)
+        shell: cmd
+        working-directory: example/demo
+        run: |
+          mkdir package
+          copy opmapcontrol_example.exe package\
+          windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw package\opmapcontrol_example.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: opmapcontrol-demo-windows
+          path: example/demo/package/
