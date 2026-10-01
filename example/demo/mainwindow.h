@@ -25,9 +25,6 @@
 class WaypointStore;
 class NavigationSimulator;
 class WaypointFlightSimulator;
-class QGeoPositionInfoSource;
-class QGeoPositionInfo;
-class QTimer;
 class QAction;
 
 /**
@@ -92,16 +89,13 @@ private slots:
     void onSimStatus(int current, int total, const QString &message);
     void onSimFinished();
 
-    // 位置源（模拟 / 系统 GPS）
+    // 位置源（模拟 / 系统 GPS / IP / MAVLink）：启停互斥与轮询全在库内，
+    // demo 只做下拉切换、错误回退与链路状态日志
     void onPosSourceChanged(int index);
-    void onGpsPositionUpdated(const QGeoPositionInfo &info);
-    // MAVLink UDP 遥测（真机/SITL 接入点）：库 provider 解析帧，demo 只处理结果
-    void onMavPositionUpdated(double lat, double lon, double altM, double headingDeg);
-    void onMavLinkAlive();
-    void onMavLinkTimeout();
-    // IP 定位源（城市级兜底，桌面无 GPS 时仍能拿到大概位置）
-    void onIpPollTimeout();         ///< 60s 轮询触发库请求 IP 定位
-    // 库 IP 定位结果回调（OPMapWidget 的 ipLocationReady/ipLocationFailed 信号）
+    void onPosSourceError(const QString &reason, bool fatal);
+    void onPositionLinkAlive();
+    void onPositionLinkTimeout();
+    // 库 IP 定位结果回调（OPMapWidget 的 ipLocationReady/ipLocationFailed 信号，仅提示）
     void onIpLocationReady(opmap::PointLatLng pos, QString city);
     void onIpLocationFailed(QString reason);
     // 工具栏定位：库内一键定位（有车辆位置直接居中，无则 IP 兜底只居中）
@@ -132,7 +126,6 @@ private:
     void setupStatusBar();
     void refreshWaypointList();
     void applyProviderFromUI();   ///< 按面板选择创建/更新库内路由 provider
-    void stopGps();               ///< 停止系统 GPS 位置源（若有）
     void setBanner(const QString &headline, const QString &subText, const QString &bgColor);
     void repositionBanner();
 
@@ -166,10 +159,7 @@ private:
     QPushButton *m_yawBtn;
     QPushButton *m_mockPosBtn;   ///< 喂模拟位置：在当前视野内随机取点手动喂 vehiclePos
     QComboBox *m_speedCombo;
-    QComboBox *m_posSourceCombo;     ///< 位置源：模拟 / 系统 GPS / IP 定位
-    QGeoPositionInfoSource *m_gpsSource;   ///< 系统 GPS 源（惰性创建，可能为空）
-    opmap::MavlinkTelemetryProvider *m_mavProvider;   ///< MAVLink UDP 遥测源（真机/SITL 接入点）
-    QTimer *m_ipTimer;                     ///< IP 定位轮询定时器（触发库的 RequestIpLocation）
+    QComboBox *m_posSourceCombo;     ///< 位置源：模拟 / 系统 GPS / IP 定位 / MAVLink
     QCheckBox *m_followCheck;
     QCheckBox *m_trailCheck;
     QLabel *m_simInfo;
@@ -189,8 +179,6 @@ private:
     opmap::WayPointItem *m_originMarker;    ///< 导航起点标记（地理锚定，选中时立即显示）
     opmap::WayPointItem *m_destMarker;      ///< 导航目的地标记
     int m_flightSpeedMps;            ///< 航点飞行巡航速度（m/s，右键菜单可调）
-    bool m_hasRealPos;               ///< 是否有过真实位置源（GPS/IP/MAVLink/模拟）喂入的位置
-    opmap::PointLatLng m_lastRealPos;///< 最近一次真实位置（导航起点等假想喂点不参与记录）
 
     opmap::PointLatLng m_origin;     ///< 点选的起点（缺省用当前位置）
     opmap::PointLatLng m_dest;

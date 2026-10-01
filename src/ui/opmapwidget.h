@@ -54,6 +54,7 @@
 #include "mapripper.h"
 #include "uavtrailtype.h"
 #include "route.h"
+#include "positionsource.h"
 
 namespace opmap {
 
@@ -559,6 +560,10 @@ private:
     QPoint pickPressPos;                           ///< 按下位置（抬起位移 <6px 才算选点，拖图不算）
     QList<opmap::PointLatLng> pickPoints;          ///< 本次取点累积（围栏多点）
 
+    // —— 位置源状态 ——
+    PositionSource positionSource;                 ///< 当前位置源
+    PositionSourceManager *posSourceManager;       ///< 统一位置源管理器（providers 层）
+
 private slots:
     void diagRefresh();
     void onNavProgress(double traveledM, double remainingM, int remainingS, const QString &instruction);
@@ -750,6 +755,17 @@ signals:
      *         正常右键转发此信号供上层弹自定义菜单（等同 Qt::CustomContextMenu） */
     void mapContextMenuRequested(QPoint pos);
 
+    // —— 位置源信号 ——
+    /** @brief 统一位置流：SetPositionSource 启用的源产生的每个位置点
+     *         （库已同步喂入 UpdateVehiclePosition，上层通常只做记录/日志）；
+     *         source 为 PositionSource 枚举值 */
+    void positionUpdated(opmap::PointLatLng pos, double altM, double headingDeg, int source);
+    /** @brief 位置源错误（fatal=true：源无法启用已被库停用，需上层回退 UI；
+     *         false：单次失败，源继续运行自动重试） */
+    void positionSourceError(QString reason, bool fatal);
+    void positionLinkAlive();     ///< MAVLink 链路建立/恢复
+    void positionLinkTimeout();   ///< MAVLink 链路超时（5 秒无包）
+
     // ———————— 离线下载进度信号（转发自 MapRipper）————————
     /** @brief 抓取进度百分比（0-100） */
     void mapDownloadProgress(int percent);
@@ -803,6 +819,11 @@ public slots:
      *        ipLocationReady/ipLocationFailed 供上层提示
      */
     void LocateCurrentPosition();
+
+    // —— 位置源管理（库内互斥切换：先停用全部旧源再启用目标源）——
+    /// 切换位置源；位置点自动喂入 UpdateVehiclePosition 并经 positionUpdated 分发
+    void SetPositionSource(PositionSource src);
+    PositionSource GetPositionSource() const { return positionSource; }   ///< 当前位置源
 
     // —— 地图点选（库内防抖/多点累积/右键结束）——
     /// 进入/切换/退出取点模式；设为 PickNone 或右键 = 结束（围栏按顶点数闭合或清理）

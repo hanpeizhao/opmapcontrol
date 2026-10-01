@@ -33,6 +33,7 @@
 #include "geoutils.h"
 #include "osrmrouteprovider.h"
 #include "iplocationprovider.h"
+#include "positionsource.h"
 #include "geofenceitem.h"
 #include "navigationengine.h"
 #include "waypointmissionengine.h"
@@ -62,7 +63,8 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     vehiclePosValid(false),
     followVehicle(false),
     locatePending(false),
-    pickMode(PickNone)
+    pickMode(PickNone),
+    positionSource(SourceNone)
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
@@ -102,6 +104,17 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
             this, SLOT(onIpLocated(opmap::PointLatLng,QString)));
     connect(ipLocator, SIGNAL(locationFailed(QString)),
             this, SIGNAL(ipLocationFailed(QString)));
+
+    // —— 位置源管理：统一互斥切换；位置点自动喂车 + 分发 positionUpdated ——
+    posSourceManager = new PositionSourceManager(this);
+    connect(posSourceManager, SIGNAL(positionUpdated(opmap::PointLatLng,double,double,int)),
+            this, SLOT(UpdateVehiclePosition(opmap::PointLatLng)));
+    connect(posSourceManager, SIGNAL(positionUpdated(opmap::PointLatLng,double,double,int)),
+            this, SIGNAL(positionUpdated(opmap::PointLatLng,double,double,int)));
+    connect(posSourceManager, SIGNAL(sourceError(QString,bool)),
+            this, SIGNAL(positionSourceError(QString,bool)));
+    connect(posSourceManager, SIGNAL(linkAlive()), this, SIGNAL(positionLinkAlive()));
+    connect(posSourceManager, SIGNAL(linkTimeout()), this, SIGNAL(positionLinkTimeout()));
 
     // —— 航点任务：引擎信号 → facade 信号转发（喂点驱动，见 UpdatePosition）——
     missionEngine = new WaypointMissionEngine(this);
@@ -390,6 +403,16 @@ void OPMapWidget::onIpLocated(opmap::PointLatLng pos, QString city)
             SetZoom(15.0);
     }
     emit ipLocationReady(pos, city);
+}
+
+// ———————— 位置源管理（互斥切换） ————————
+
+void OPMapWidget::SetPositionSource(PositionSource src)
+{
+    if (positionSource == src)
+        return;
+    positionSource = src;
+    posSourceManager->SetSource(src);   // 互斥停启/错误回退在管理器内完成
 }
 
 opmap::NavigationEngine *OPMapWidget::GetNavigationEngine() const

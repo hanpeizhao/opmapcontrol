@@ -7,6 +7,8 @@ TEMPLATE = app
 TARGET = opmapcontrol_example
 CONFIG  += release
 CONFIG  -= debug_and_release
+# positioning：demo 代码已不直接使用（位置源下沉库内），但静态链接 libopmapwidget.a
+# 时其 QtPositioning 符号需在本工程链接期解析，故必须保留
 QT    += core gui widgets opengl sql svg network positioning
 
 

@@ -10,7 +10,7 @@
 #   src/platform  基础类型（几何点/矩形、坐标系转换、诊断）
 # ============================================================
 
-QT       += core gui network sql widgets
+QT       += core gui network sql positioning widgets
 CONFIG   += staticlib release
 CONFIG   -= debug_and_release
 TEMPLATE  = lib
@@ -57,6 +57,7 @@ HEADERS += \
     ./src/providers/osrmrouteprovider.h \
     ./src/providers/amaprouteprovider.h \
     ./src/providers/iplocationprovider.h \
+    ./src/providers/positionsource.h \
     ./src/providers/mavlinktelemetryprovider.h \
     ./src/engine/mapservice.h \
     ./src/engine/mapengine.h \
@@ -111,6 +112,7 @@ SOURCES += \
     ./src/providers/osrmrouteprovider.cpp \
     ./src/providers/amaprouteprovider.cpp \
     ./src/providers/iplocationprovider.cpp \
+    ./src/providers/positionsource.cpp \
     ./src/providers/mavlinktelemetryprovider.cpp \
     ./src/engine/mapservice.cpp \
     ./src/engine/mapengine.cpp \

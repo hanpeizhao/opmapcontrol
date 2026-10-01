@@ -27,8 +27,6 @@
 #include <QtCore/QTimer>
 #include <QtCore/QDebug>
 #include <QtGui/QResizeEvent>
-#include <QtPositioning/QGeoPositionInfoSource>
-#include <QtPositioning/QGeoPositionInfo>
 
 #include "waypoint_store.h"
 #include "navigation_simulator.h"
@@ -73,9 +71,6 @@ MainWindow::MainWindow()
       m_mockPosBtn(new QPushButton(QString::fromUtf8("点选喂位置"), this)),
       m_speedCombo(new QComboBox(this)),
       m_posSourceCombo(new QComboBox(this)),
-      m_gpsSource(0),
-      m_mavProvider(0),
-      m_ipTimer(new QTimer(this)),
       m_followCheck(new QCheckBox(QString::fromUtf8("地图跟随车辆"), this)),
       m_trailCheck(new QCheckBox(QString::fromUtf8("显示行车轨迹"), this)),
       m_simInfo(new QLabel(QString::fromUtf8("空闲"), this)),
@@ -89,8 +84,6 @@ MainWindow::MainWindow()
       m_originMarker(0),
       m_destMarker(0),
       m_flightSpeedMps(80),
-      m_hasRealPos(false),
-      m_lastRealPos(0, 0),
       m_origin(0, 0),
       m_dest(0, 0),
       m_hasOrigin(false),
@@ -346,12 +339,16 @@ void MainWindow::setupDocks()
     connect(m_yawBtn, SIGNAL(clicked()), this, SLOT(onYawClicked()));
     connect(m_speedCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onSpeedChanged(int)));
     connect(m_posSourceCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onPosSourceChanged(int)));
-    connect(m_ipTimer, SIGNAL(timeout()), this, SLOT(onIpPollTimeout()));
-    // IP 定位的请求/双源回退/超时都在库内，demo 只处理结果
+    // IP 定位的请求/双源回退/超时都在库内，demo 只处理结果提示
     connect(m_map, SIGNAL(ipLocationReady(opmap::PointLatLng,QString)),
             this, SLOT(onIpLocationReady(opmap::PointLatLng,QString)));
     connect(m_map, SIGNAL(ipLocationFailed(QString)),
             this, SLOT(onIpLocationFailed(QString)));
+    // 库位置源管理：错误提示回退 + MAVLink 链路状态日志
+    connect(m_map, SIGNAL(positionSourceError(QString,bool)),
+            this, SLOT(onPosSourceError(QString,bool)));
+    connect(m_map, SIGNAL(positionLinkAlive()), this, SLOT(onPositionLinkAlive()));
+    connect(m_map, SIGNAL(positionLinkTimeout()), this, SLOT(onPositionLinkTimeout()));
     connect(m_followCheck, SIGNAL(toggled(bool)), this, SLOT(onFollowToggled(bool)));
     // 库内跟随开关变化 → 复选框同步（任务启动时库自动暂停跟随）
     connect(m_map, SIGNAL(mapFollowChanged(bool)), this, SLOT(onMapFollowChanged(bool)));
@@ -1199,107 +1196,58 @@ void MainWindow::onSimFinished()
     statusBar()->showMessage(QString::fromUtf8("跟车模拟到达路线终点"), 5000);
 }
 
-// ————————————————— 位置源（模拟 / 系统 GPS） —————————————————
+// ————————————————— 位置源（模拟 / 系统 GPS / IP / MAVLink） —————————————————
 
 void MainWindow::onPosSourceChanged(int index)
 {
     // 图标语义区分：位置源=绿色大头针（位置标记），航点飞行=四旋翼无人机图标
     if (opmap::UAVItem *u = m_map->GetUAV(0))
         u->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));
-    if (index == 0) {           // 行车模拟：停 GPS / IP，喂点交还模拟器
-        stopGps();
-        m_ipTimer->stop();
-        return;
+
+    // 库内互斥切换：启用一个源前自动停用其它库源（GPS/IP/MAVLink 源的
+    // 启停、轮询、错误回退全部库内完成），位置点自动喂入并经 positionUpdated 分发
+    switch (index) {
+    case 1:
+        m_map->SetPositionSource(opmap::SourceSystemGps);
+        break;
+    case 2:
+        m_map->SetPositionSource(opmap::SourceIpLocation);
+        break;
+    case 3:
+        m_map->SetPositionSource(opmap::SourceMavlink);
+        break;
+    default:
+        m_map->SetPositionSource(opmap::SourceExternal);   // 行车模拟：demo 侧喂点
+        break;
     }
 
-    // 系统 GPS / IP 定位：先停模拟器，避免双源同时喂点
-    m_simulator->stop();
-
-    if (index == 2) {           // IP 定位（城市级兜底）
-        stopGps();
-        m_map->RequestIpLocation();     // 立即取一次，之后每 60s 轮询
-        m_ipTimer->start(60000);
-        return;
-    }
-
-    if (index == 3) {           // MAVLink (UDP 14550)：真机/SITL 遥测接入点
-        stopGps();
-        m_ipTimer->stop();
-        if (!m_mavProvider) {
-            m_mavProvider = new opmap::MavlinkTelemetryProvider(this);
-            connect(m_mavProvider, SIGNAL(positionUpdated(double,double,double,double)),
-                    this, SLOT(onMavPositionUpdated(double,double,double,double)));
-            connect(m_mavProvider, SIGNAL(linkAlive()), this, SLOT(onMavLinkAlive()));
-            connect(m_mavProvider, SIGNAL(linkTimeout()), this, SLOT(onMavLinkTimeout()));
-        }
-        if (m_mavProvider->start(14550))
-            statusBar()->showMessage(QString::fromUtf8("MAVLink 遥测监听中（UDP 14550），等待飞控数据…"), 8000);
-        else
-            QMessageBox::warning(this, QString::fromUtf8("MAVLink 不可用"),
-                                 QString::fromUtf8("UDP 14550 端口监听失败（可能被占用），已保持当前模式"));
-        return;
-    }
-
-    m_ipTimer->stop();
-
-    // 切回系统 GPS：停 MAVLink 遥测，避免双源同时喂点
-    if (m_mavProvider && m_mavProvider->isListening())
-        m_mavProvider->stop();
-
-    if (!m_gpsSource) {
-        // Windows 桌面默认 serialnmea 后端，无可用 GPS 时返回空指针
-        m_gpsSource = QGeoPositionInfoSource::createDefaultSource(this);
-        if (!m_gpsSource) {
-            QMessageBox::warning(this, QString::fromUtf8("系统 GPS 不可用"),
-                                 QString::fromUtf8("未找到可用的系统定位源，已回退到行车模拟"));
-            m_posSourceCombo->blockSignals(true);
-            m_posSourceCombo->setCurrentIndex(0);
-            m_posSourceCombo->blockSignals(false);
-            return;
-        }
-        connect(m_gpsSource, SIGNAL(positionUpdated(QGeoPositionInfo)),
-                this, SLOT(onGpsPositionUpdated(QGeoPositionInfo)));
-    }
-    m_gpsSource->startUpdates();
-    statusBar()->showMessage(QString::fromUtf8("已切换到系统 GPS 位置源"), 5000);
+    // 模拟器是 demo 侧喂点器（库管不到）：切走时停掉，避免双源同时喂点
+    if (index != 0)
+        m_simulator->stop();
 }
 
-void MainWindow::onGpsPositionUpdated(const QGeoPositionInfo &info)
+void MainWindow::onPosSourceError(const QString &reason, bool fatal)
 {
-    if (!info.isValid())
+    if (!fatal) {
+        logEvent(QString::fromUtf8("位置源错误：%1").arg(reason));
         return;
-    const QGeoCoordinate c = info.coordinate();
-    // QGeoCoordinate 为 (纬度, 经度)，与 PointLatLng(Lat, Lng) 顺序一致
-    m_lastRealPos = opmap::PointLatLng(c.latitude(), c.longitude());
-    m_hasRealPos = true;
-    m_map->UpdateVehiclePosition(m_lastRealPos);
+    }
+    // fatal（GPS 缺失 / UDP 端口占用）：库已停用该源，demo 回退 UI 到行车模拟
+    QMessageBox::warning(this, QString::fromUtf8("位置源不可用"),
+                         QString::fromUtf8("%1，已回退到行车模拟").arg(reason));
+    m_posSourceCombo->blockSignals(true);
+    m_posSourceCombo->setCurrentIndex(0);
+    m_posSourceCombo->blockSignals(false);
+    m_map->SetPositionSource(opmap::SourceExternal);
+    logEvent(QString::fromUtf8("位置源启用失败：%1，已回退到外部喂点").arg(reason));
 }
 
-void MainWindow::stopGps()
-{
-    if (m_gpsSource)
-        m_gpsSource->stopUpdates();
-}
-
-// ————————————————— MAVLink 遥测源（真机/SITL 接入点） —————————————————
-
-void MainWindow::onMavPositionUpdated(double lat, double lon, double altM, double headingDeg)
-{
-    Q_UNUSED(altM);
-    // 链路对齐 QGeoCoordinate：lat/lon 直接对应 PointLatLng(Lat, Lng)
-    m_lastRealPos = opmap::PointLatLng(lat, lon);
-    m_hasRealPos = true;
-    m_map->UpdateVehiclePosition(m_lastRealPos);
-    if (headingDeg >= 0)    // 库内 UpdateVehiclePosition 也按位移推算航向，飞控自带 hdg 优先
-        qDebug("[mavlink] pos update lat=%.6f lon=%.6f alt=%.1fm hdg=%.0f", lat, lon, altM, headingDeg);
-}
-
-void MainWindow::onMavLinkAlive()
+void MainWindow::onPositionLinkAlive()
 {
     logEvent(QString::fromUtf8("MAVLink 链路建立：收到 GLOBAL_POSITION_INT 遥测"));
 }
 
-void MainWindow::onMavLinkTimeout()
+void MainWindow::onPositionLinkTimeout()
 {
     logEvent(QString::fromUtf8("MAVLink 链路超时：5 秒未收到遥测包，请检查飞控/模拟器"));
 }
@@ -1312,24 +1260,11 @@ void MainWindow::onLocateClicked()
     m_map->LocateCurrentPosition();
 }
 
-void MainWindow::onIpPollTimeout()
-{
-    // 位置源选"IP 定位"时每 60s 触发一次；请求/双源回退/超时全在库内
-    m_map->RequestIpLocation();
-    logEvent(QString::fromUtf8("IP 定位轮询触发（IsIpLocationBusy=%1）")
-             .arg(m_map->IsIpLocationBusy() ? "true" : "false"));
-}
-
 void MainWindow::onIpLocationReady(opmap::PointLatLng pos, QString city)
 {
+    // 仅结果提示：喂入由库位置源管理完成（IP 作为活动位置源时），一键定位兜底只居中
     statusBar()->showMessage(QString::fromUtf8("IP 定位（城市级，精度约数公里）：%1 (%2, %3)")
                              .arg(city).arg(pos.Lat(), 0, 'f', 4).arg(pos.Lng(), 0, 'f', 4), 10000);
-    // 仅当 IP 定位是当前选定的位置源时才喂入位置流（一键定位兜底由库内居中，不喂车）
-    if (m_posSourceCombo->currentIndex() == 2) {
-        m_lastRealPos = pos;
-        m_hasRealPos = true;
-        m_map->UpdateVehiclePosition(pos);   // 惰性创建 UAV（库默认即大头针位置标记）
-    }
 }
 
 void MainWindow::onIpLocationFailed(QString reason)
