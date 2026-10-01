@@ -81,8 +81,6 @@ MainWindow::MainWindow()
       m_navStateLabel(0),
       m_lastDlPct(-1),
       m_fenceBtn(new QPushButton(QString::fromUtf8("绘制围栏"), this)),
-      m_originMarker(0),
-      m_destMarker(0),
       m_flightSpeedMps(80),
       m_origin(0, 0),
       m_dest(0, 0),
@@ -1311,14 +1309,7 @@ void MainWindow::onPositionPicked(int mode, const opmap::PointLatLng &p)
     case opmap::OPMapWidget::PickOrigin: {
         m_origin = p;
         m_hasOrigin = true;
-        // 起点/目的地即时标记：地理锚定（走航点刷新链），不进 WPAll 不影响飞行序列
-        if (!m_originMarker) {
-            m_originMarker = new opmap::WayPointItem(p, 0, QString::fromUtf8("起点"), m_map->GetMap());
-            m_originMarker->setFlag(QGraphicsItem::ItemIsMovable, false);
-            m_originMarker->setFlag(QGraphicsItem::ItemIsSelectable, false);
-        } else {
-            m_originMarker->SetCoord(p);
-        }
+        // 起点/目的地图钉由库在 PlanRoute/NavigateTo 时自动挂载（auxiliary 装饰航点）
         m_originLabel->setText(QString::fromUtf8("起点：lat %1, lng %2")
                                .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         break;
@@ -1326,13 +1317,6 @@ void MainWindow::onPositionPicked(int mode, const opmap::PointLatLng &p)
     case opmap::OPMapWidget::PickDest: {
         m_dest = p;
         m_hasDest = true;
-        if (!m_destMarker) {
-            m_destMarker = new opmap::WayPointItem(p, 0, QString::fromUtf8("目的地"), m_map->GetMap());
-            m_destMarker->setFlag(QGraphicsItem::ItemIsMovable, false);
-            m_destMarker->setFlag(QGraphicsItem::ItemIsSelectable, false);
-        } else {
-            m_destMarker->SetCoord(p);
-        }
         m_destLabel->setText(QString::fromUtf8("目的地：lat %1, lng %2")
                              .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         break;

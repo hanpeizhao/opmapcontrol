@@ -528,6 +528,8 @@ private:
     UAVItem *EnsureUAV(int id);   ///< 惰性取用 UAV：不存在则创建并套用默认样式
     void HandlePickClick(opmap::PointLatLng const& pos);   ///< 一次有效选点：累积+发信号+单发自动收尾
     void EndPick();               ///< 结束当前取点（围栏收尾 + pickFinished）
+    WayPointItem *EnsureRouteMarker(WayPointItem *&marker, opmap::PointLatLng const& pos, QString const& text);   ///< 惰性取用路线端点图钉（auxiliary 装饰航点）
+    void ClearRouteMarkers();     ///< 清除路线端点图钉（停止导航时）
     opmap::MapService *service;   ///< 地图数据服务（构造创建、析构释放）
     opmap::MapEngine *core;
     QGraphicsScene mscene;
@@ -563,6 +565,10 @@ private:
     // —— 位置源状态 ——
     PositionSource positionSource;                 ///< 当前位置源
     PositionSourceManager *posSourceManager;       ///< 统一位置源管理器（providers 层）
+
+    // —— 路线端点图钉 ——
+    WayPointItem *routeFromMarker;                 ///< 路线起点图钉（auxiliary，装饰性不进任务序列）
+    WayPointItem *routeToMarker;                   ///< 路线终点图钉（auxiliary，装饰性不进任务序列）
 
 private slots:
     void diagRefresh();

@@ -138,6 +138,14 @@ public:
     opmap::PointLatLng Coord() const {return coord;}
 
     /**
+    * @brief 辅助标记：路线起终点图钉等库内装饰性航点。
+    *        auxiliary 项不参与任务航点序列（WPAll/WPDeleteAll 跳过），
+    *        上层经 WPAll 拿到的永远是真实任务航点
+    */
+    bool IsAuxiliary() const { return auxiliary; }
+    void SetAuxiliary(bool const& value) { auxiliary = value; }
+
+    /**
     * @brief  Sets WayPoint LatLng coordinate
     *
     * @param value
@@ -219,6 +227,7 @@ protected:
     float heading;
     int number;
     bool m_mouseDown;
+    bool auxiliary;   ///< 辅助标记（起终点图钉等装饰性航点，不进任务序列）
 
 public slots:
     /**

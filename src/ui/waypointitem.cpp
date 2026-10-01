@@ -47,7 +47,8 @@ WayPointItem::WayPointItem(const opmap::PointLatLng &coord,
     altitude(altitude), // sets a 10m default just in case
     heading(0),
     number(0),
-    m_mouseDown(false)
+    m_mouseDown(false),
+    auxiliary(false)
 {
     picture.load(QString::fromUtf8(":/markers/images/marker.png"));
     number=WayPointItem::snumber;
@@ -80,7 +81,9 @@ WayPointItem::WayPointItem(const opmap::PointLatLng &coord,
     isDragging(false),
     altitude(altitude), // sets a 10m default just in case
     heading(0),
-    number(0)
+    number(0),
+    m_mouseDown(false),
+    auxiliary(false)
 {
     picture.load(QString::fromUtf8(":/markers/images/marker.png"));
     number=WayPointItem::snumber;

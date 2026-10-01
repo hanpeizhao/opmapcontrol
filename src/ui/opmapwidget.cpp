@@ -64,7 +64,9 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     followVehicle(false),
     locatePending(false),
     pickMode(PickNone),
-    positionSource(SourceNone)
+    positionSource(SourceNone),
+    routeFromMarker(0),
+    routeToMarker(0)
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
@@ -293,12 +295,15 @@ void OPMapWidget::NavigateTo(opmap::PointLatLng const& dest)
     const opmap::PointLatLng from = vehiclePosValid ? vehiclePos
                                                     : map->core->CurrentPosition();
     navEngine->NavigateTo(from, dest);
+    EnsureRouteMarker(routeToMarker, dest, QString::fromUtf8("目的地"));
 }
 
 void OPMapWidget::PlanRoute(opmap::PointLatLng const& from, opmap::PointLatLng const& to)
 {
     navEngine->PlanRoute(from, to);
     routeItem->setVisible(true);   // 预览结果经 routePlanned 回来时绘制
+    EnsureRouteMarker(routeFromMarker, from, QString::fromUtf8("起点"));
+    EnsureRouteMarker(routeToMarker, to, QString::fromUtf8("目的地"));
 }
 
 /// 惰性取用 UAV：不存在则创建并套用默认跟踪样式——
@@ -364,6 +369,34 @@ void OPMapWidget::StopNavigation()
 {
     navEngine->Stop();
     routeItem->ClearRoute();
+    ClearRouteMarkers();
+}
+
+// ———————— 路线端点自动图钉 ————————
+
+/// 惰性取用端点图钉：不存在则创建（auxiliary 装饰航点——不进任务序列、
+/// 不可拖选、不显示序号，WPAll/WPDeleteAll 自动跳过），存在则仅移动到新坐标
+WayPointItem *OPMapWidget::EnsureRouteMarker(WayPointItem *&marker, opmap::PointLatLng const& pos, QString const& text)
+{
+    if (!marker) {
+        marker = new WayPointItem(pos, 0, text, map);
+        marker->SetAuxiliary(true);
+        marker->SetShowNumber(false);
+        marker->setFlag(QGraphicsItem::ItemIsMovable, false);
+        marker->setFlag(QGraphicsItem::ItemIsSelectable, false);
+        marker->setParentItem(map);
+    } else {
+        marker->SetCoord(pos);
+    }
+    return marker;
+}
+
+void OPMapWidget::ClearRouteMarkers()
+{
+    delete routeFromMarker;   // QGraphicsItem 析构自动从场景摘除
+    routeFromMarker = 0;
+    delete routeToMarker;
+    routeToMarker = 0;
 }
 
 void OPMapWidget::RequestIpLocation()
@@ -844,7 +877,9 @@ void OPMapWidget::WPDeleteAll()
     foreach(QGraphicsItem* i,map->childItems())
     {
         WayPointItem* w=qgraphicsitem_cast<WayPointItem*>(i);
-        if(w)
+        // auxiliary 图钉（路线起终点）由 PlanRoute/NavigateTo/StopNavigation 自管理，
+        // 这里删除会造成 facade 悬空指针，必须跳过
+        if(w && !w->IsAuxiliary())
             delete w;
     }
 }
@@ -868,7 +903,7 @@ QMap<int, WayPointItem*> OPMapWidget::WPAll()
 
     foreach(QGraphicsItem* i, mscene.items()) {
         WayPointItem* w=qgraphicsitem_cast<WayPointItem*>(i);
-        if ( w ) wpMap.insert(w->Number(), w);
+        if ( w && !w->IsAuxiliary() ) wpMap.insert(w->Number(), w);   // auxiliary 图钉不属任务序列
     }
 
     return wpMap;

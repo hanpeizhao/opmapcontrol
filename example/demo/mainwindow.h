@@ -176,8 +176,6 @@ private:
     QLabel *m_navStateLabel;         ///< 导航状态行（导航中/路线摘要/请求状态）
     int m_lastDlPct;                 ///< 下载日志节流（上个 10% 档位）
     QPushButton *m_fenceBtn;         ///< 多边形围栏三态按钮
-    opmap::WayPointItem *m_originMarker;    ///< 导航起点标记（地理锚定，选中时立即显示）
-    opmap::WayPointItem *m_destMarker;      ///< 导航目的地标记
     int m_flightSpeedMps;            ///< 航点飞行巡航速度（m/s，右键菜单可调）
 
     opmap::PointLatLng m_origin;     ///< 点选的起点（缺省用当前位置）
