@@ -36,6 +36,7 @@ MapMarkerItem::MapMarkerItem(const opmap::PointLatLng &coord, MapGraphicItem *ma
     font.setPointSize(10);
     font.setBold(true);
     setFlag(QGraphicsItem::ItemIgnoresTransformations, true);   // 屏幕尺寸恒定，不随瓦片缩放
+    setFlag(QGraphicsItem::ItemIsSelectable, true);   // 可选中（供上层"删除选中标记"等操作）；不可拖动，移动用 SetCoord
     setZValue(5);   // 纯装饰最上层（UAV=4），不被飞行器图标遮挡
     RefreshPos();
 }
@@ -138,7 +139,6 @@ void MapMarkerItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
         painter->setBrush(Qt::red);
         painter->setPen(Qt::NoPen);
         painter->drawEllipse(QPointF(0, 0), 5, 5);
-        return;
     }
 
     if (!text.isEmpty()) {
@@ -155,6 +155,12 @@ void MapMarkerItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
         painter->setPen(Qt::NoPen);
         painter->setBrush(Qt::white);
         painter->drawPath(outline);
+    }
+
+    if (isSelected()) {   // 选中反馈：青色虚线框围住全部内容（与航点选中框同语义）
+        painter->setBrush(Qt::NoBrush);
+        painter->setPen(QPen(Qt::cyan, 1, Qt::DashLine));
+        painter->drawRect(boundingRect());
     }
 }
 

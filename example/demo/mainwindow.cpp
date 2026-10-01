@@ -858,6 +858,14 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     QAction *addTextMarker = menu.addAction(QString::fromUtf8("在此处添加文字标记…"));
     QAction *addBothMarker = menu.addAction(QString::fromUtf8("在此处添加图文标记…"));
     QAction *clearMarkers = menu.addAction(QString::fromUtf8("清除所有标记"));
+    QAction *delMarker = menu.addAction(QString::fromUtf8("删除选中标记"));
+    delMarker->setEnabled(false);
+    const QList<QGraphicsItem*> selNow = m_map->scene()->selectedItems();
+    for (int i = 0; i < selNow.count(); ++i)
+        if (qgraphicsitem_cast<opmap::MapMarkerItem*>(selNow.at(i))) {
+            delMarker->setEnabled(true);
+            break;
+        }
 
     QAction *chosen = menu.exec(m_map->mapToGlobal(pos));
     if (chosen == addWp) {
@@ -930,6 +938,16 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     } else if (chosen == clearMarkers) {
         m_map->ClearMarkers();
         logEvent(QString::fromUtf8("已清除所有标记"));
+    } else if (chosen == delMarker) {
+        QList<opmap::MapMarkerItem*> sel;
+        const QList<QGraphicsItem*> items = m_map->scene()->selectedItems();
+        for (int i = 0; i < items.count(); ++i)
+            if (opmap::MapMarkerItem *mk = qgraphicsitem_cast<opmap::MapMarkerItem*>(items.at(i)))
+                sel.append(mk);
+        for (int i = 0; i < sel.count(); ++i)
+            m_map->RemoveMarker(sel.at(i));
+        if (!sel.isEmpty())
+            logEvent(QString::fromUtf8("已删除 %1 个选中标记").arg(sel.count()));
     }
 }
 
