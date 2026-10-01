@@ -55,7 +55,10 @@ TrailRecorder::TrailRecorder(QObject *parent)
 const TrailRecorder::Channel &TrailRecorder::channelOf(int uavId) const
 {
     static const Channel emptyChannel;
-    return channels.contains(uavId) ? channels.value(uavId) : emptyChannel;
+    // 注意：必须用 constFind 取 map 内对象的左值引用；若写 channels.value(uavId)
+    // 会返回值拷贝临时，跨 return 的临时不延长生命周期 → 调用方拿悬空引用
+    QMap<int, Channel>::const_iterator it = channels.constFind(uavId);
+    return it != channels.constEnd() ? it.value() : emptyChannel;
 }
 
 TrailRecorder::Channel &TrailRecorder::channelRef(int uavId)
