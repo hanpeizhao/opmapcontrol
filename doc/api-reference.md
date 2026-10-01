@@ -263,11 +263,14 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 任务 | `missionStarted` / `missionCurrentWaypointChanged` / `missionWaypointReached` / `missionHoverStateChanged` / `missionActionTriggered` / `missionFinished` |
 | 围栏 | `geofenceBreach` / `geofenceEntered` |
 | IP 定位 | `ipLocationReady` / `ipLocationFailed` |
+| 位置源 | `positionUpdated(pos, altM, headingDeg, source)` / `positionSourceError(reason, fatal)` / `positionLinkAlive` / `positionLinkTimeout` |
+| 取点 | `positionPicked(mode, pos)` / `pickFinished(mode, points)` / `mapContextMenuRequested(pos)` |
+| 跟随 | `mapFollowChanged(on)` |
 | 下载 | `mapDownloadProgress` / `mapDownloadTiles` / `mapDownloadFinished` |
 
 ---
 
-## 12. 简化用法差距分析（供审视，未动代码）
+## 12. 简化用法差距分析（已全部实施）
 
 目标形态：**传一个参数库做大部分工作**——调用一个方法显示地图、传两个点路径规划。逐条对照：
 
@@ -278,18 +281,18 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 显示地图 | `new OPMapWidget(this)` ✅（默认 GoogleHybrid z2，放进布局即用） |
 | 两点路径规划 | `PlanRoute(from, to)` ✅ |
 | 一键导航 | `NavigateTo(dest)` ✅ |
-| 航点任务 | `StartWaypointMission(WPAll().values())` ✅（差一步：喂点/图标初始化仍在上层，见下） |
+| 航点任务 | `StartWaypointMission(WPAll().values())` ✅（图标/起飞点跳转/到达参数均由库自动编排） |
 
-### 12.2 demo 目前替库干的活（下沉建议）
+### 12.2 demo 目前替库干的活（已下沉）
 
 | # | demo 现状（位置/行数） | 问题 | 建议的库 API |
 |---|----------------------|------|-------------|
-| 1 | **位置源管理**：`onPosSourceChanged` 64 行四源互斥 + GPS 惰性创建/回退弹窗 + IP 轮询定时器 + MAVLink 生命周期（mainwindow.cpp:1265-1328，成员 m_gpsSource/m_mavProvider/m_ipTimer/stopGps） | 互斥、惰性创建、轮询、超时全是通用逻辑，每个使用方都要重写一遍 | `SetPositionSource(PositionSource)` 枚举 `None / External(手动喂点) / SystemGps / IpLocation / Mavlink(port)`，库内持有并互斥管理全部源；统一信号 `positionUpdated(pos, altM, headingDeg, source)`。demo 删约 100 行 |
-| 2 | **地图点选交互**：PickMode 五态枚举 + `applyPickPoint` 106 行 + 按下/抬起 6px 防抖（mainwindow.cpp:129-137, 1455-1568, 910-931） | 防抖、取点分发是纯库侧能力，却要求每个使用方自建状态机 | `SetPickMode(PickWaypoint / PickOrigin / PickDest / PickFence / PickPosition)` + 信号 `positionPicked(mode, pos)`、`pickFinished(mode)`；防抖、围栏多点累积与 1~2 点预览库内处理。demo 删约 130 行 |
+| 1 | **位置源管理**：`onPosSourceChanged` 64 行四源互斥 + GPS 惰性创建/回退弹窗 + IP 轮询定时器 + MAVLink 生命周期（mainwindow.cpp:1265-1328，成员 m_gpsSource/m_mavProvider/m_ipTimer/stopGps） | 互斥、惰性创建、轮询、超时全是通用逻辑，每个使用方都要重写一遍 | `SetPositionSource(PositionSource)` 枚举（命名空间级）`SourceNone / SourceExternal(手动喂点) / SourceSystemGps / SourceIpLocation / SourceMavlink`（MAVLink 固定 14550），库内持有并互斥管理全部源；统一信号 `positionUpdated(pos, altM, headingDeg, source)` + `positionSourceError(reason, fatal)` + 链路 `positionLinkAlive/Timeout`。demo 删约 126 行 |
+| 2 | **地图点选交互**：PickMode 五态枚举 + `applyPickPoint` 106 行 + 按下/抬起 6px 防抖（mainwindow.cpp:129-137, 1455-1568, 910-931） | 防抖、取点分发是纯库侧能力，却要求每个使用方自建状态机 | `SetPickMode(PickWaypoint / PickOrigin / PickDest / PickFence / PickPosition / PickNone)` + 信号 `positionPicked(mode, pos)`、`pickFinished(mode, points)`；防抖、围栏多点累积与 1~2 点预览库内处理；取点中右键由库拦截为"结束取点"，正常右键经 `mapContextMenuRequested` 转发上层。demo 删约 130 行 |
 | 3 | **一键定位**：`onLocateClicked` 三级优先级 + `m_locatePending` + IP 结果处理（mainwindow.cpp:1372-1438） | 定位优先级策略是通用语义（有运动位置→居中车辆；否则 IP 兜底），不该每家重写 | `LocateCurrentPosition()` 槽：库内按优先级取用、IP 兜底、居中并切街区级缩放；结果经现有信号通知。demo 删约 50 行 |
 | 4 | **UAV 惰性创建**：`ensureUAV()` + 首次喂点前手动建图标/设轨迹/设图标语义（mainwindow.cpp:1546-1568 及各喂点入口） | `SetUAVPos` 喂点前 UAV 未创建则静默无效，语义陷阱 | `SetUAVPos` 首次喂点自动惰性创建 UAV（默认图标/轨迹），`SetUAVHeading(id, 角度)` 补成槽。demo 删 ensureUAV 全部调用 |
 | 5 | **航点飞行前奏**：`onFlightClicked` 105 行里约一半在铺 UI 前置（挑起飞点、图标切换、SetAutoSetReached、地图跳起飞点、暂停跟随）（mainwindow.cpp:671-776） | 状态机已下沉（912e002），剩下的都是"启动一次任务的通用编排" | `StartWaypointMission` 增加默认行为：自动 `ensureUAV`+设到达参数、自动跳转起飞点；库内加 `SetFollowVehicle(bool)`（每次喂点居中，替代 demo 自实现的跟随复选框）。demo 保留的只剩：按钮文案、模拟遥测源 connect、动作日志 |
-| 6 | **起终点临时标记**：选点阶段手动 `new WayPointItem` + 关拖拽/选中标志（applyPickPoint 内） | 预览起终点是路线功能的自然组成 | `PlanRoute`/`NavigateTo` 时自动挂起终点图钉（导航路线绘制已含起终点，补选点预览阶段）；或 `ShowRouteEndpoints(bool)`。demo 删 m_originMarker/m_destMarker |
+| 6 | **起终点临时标记**：选点阶段手动 `new WayPointItem` + 关拖拽/选中标志（applyPickPoint 内） | 预览起终点是路线功能的自然组成 | `PlanRoute`/`NavigateTo` 时自动挂起终点图钉（`WayPointItem` 新增 auxiliary 标志：装饰航点不进任务序列、WPAll/WPDeleteAll 跳过、不可拖选；`StopNavigation` 自动清理）。demo 删 m_originMarker/m_destMarker |
 
 ### 12.3 建议不下沉（保持在上层）
 
@@ -299,7 +302,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 业务动作响应（拍照=下发相机指令、悬停=下发悬停指令） | 库只发 `missionActionTriggered` 信号，动作的物理执行因机型而异 |
 | 事件日志/状态栏/横幅等 UI 反馈 | 上层自有 UI 风格，库不该绑死表现层 |
 
-### 12.4 下沉后的理想用法（预期形态）
+### 12.4 下沉后的用法（实际形态）
 
 ```cpp
 // 全部业务 = 4 行 connect + 1 行喂点
@@ -310,4 +313,4 @@ map->StartWaypointMission(map->WPAll().values());        // 航点任务：图�
 connect(map, &opmap::OPMapWidget::missionActionTriggered, this, &MainWindow::onAction);
 ```
 
-> 以上 6 项均为建议，待确认优先级后分批实施；每项独立成提交，不改变既有 API 语义（新增为主）。
+> 以上 6 项已全部实施：④ UAV 惰性创建（2927fdf）→ ⑤ 任务默认编排（0c315ea）→ ② 点选模式下沉（3cd96a1）→ ③ 一键定位（3449069）→ ① 位置源管理器（af32f95）→ ⑥ 路线端点图钉（6cdfa63）。每项独立成提交、库与 demo 同步重编，既有 API 语义不变（全部为新增）。
