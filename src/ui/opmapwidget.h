@@ -33,6 +33,7 @@
 #include <QObject>
 #include <QElapsedTimer>
 #include <QtOpenGL/QGLWidget>
+#include <functional>
 
 // Qt4 or Qt5
 #if QT_VERSION < QT_VERSION_CHECK(5, 0, 0)
@@ -219,6 +220,13 @@ public:
         PickFence,      ///< 围栏取点：多点累积 + 橡皮筋预览，右键/再设 PickNone 闭合
         PickPosition    ///< 点选喂位置：点哪喂哪（连续取点，右键/再设 PickNone 结束）
     };
+
+    /**
+     * @brief IP 定位完成回调（std::function 回调式包装，与信号槽并行）：
+     *        ok=true → pos/city 有效；ok=false → 定位失败（pos/city 无意义）。
+     *        完成/失败自动回调一次，ipLocationReady/ipLocationFailed 信号仍照常发射
+     */
+    typedef std::function<void(bool ok, opmap::PointLatLng pos, QString city)> IpLocationCallback;
 
     QSize sizeHint() const;
 
@@ -605,6 +613,7 @@ private:
     QElapsedTimer lastRealPosAge;                  ///< 距上次真实源喂点的时长（活性判断用）
     bool followVehicle;                            ///< 地图跟随车辆开关（喂点时自动居中）
     bool locatePending;                            ///< 定位按钮触发的 IP 兜底在途（结果只居中）
+    IpLocationCallback m_ipCallback;               ///< 回调式 IP 定位的 std::function（一次性：回调后清空）
 
     // —— 地图点选状态 ——
     PickMode pickMode;                             ///< 当前取点模式
@@ -899,6 +908,13 @@ public slots:
      *        结果经 ipLocationReady/ipLocationFailed 信号返回；在途时重复调用被忽略
      */
     void RequestIpLocation();
+
+    /**
+     * @brief 回调式一步到位 IP 定位：完成/失败自动回调一次
+     *        （ok=true → pos/city 有效），信号仍并行发射，两种消费方式任选；
+     *        在途时重复调用被忽略（回调保留至下次请求覆盖）
+     */
+    void RequestIpLocation(IpLocationCallback callback);
 
     /// 是否有 IP 定位请求在途
     bool IsIpLocationBusy() const;

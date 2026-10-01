@@ -524,6 +524,12 @@ void OPMapWidget::RequestIpLocation()
         ipLocator->requestLocation();
 }
 
+void OPMapWidget::RequestIpLocation(IpLocationCallback callback)
+{
+    m_ipCallback = callback;        // 一次性：完成/失败时取出调用并清空
+    RequestIpLocation();
+}
+
 bool OPMapWidget::IsIpLocationBusy() const
 {
     return ipLocator ? ipLocator->isBusy() : false;
@@ -574,12 +580,22 @@ void OPMapWidget::onIpLocated(opmap::PointLatLng pos, QString city)
         locatePending = false;
         ShowRealLocation(pos);      // 只落图标+居中：城市级位置不喂导航车
     }
+    if (m_ipCallback) {             // 回调式通知（与信号并行，不影响 emit）
+        IpLocationCallback cb;
+        cb.swap(m_ipCallback);
+        cb(true, pos, city);
+    }
     emit ipLocationReady(pos, city);
 }
 
 void OPMapWidget::onIpLocationFailed(QString reason)
 {
     locatePending = false;   // 兜底请求已终结，防残留标记误居中后续无关结果
+    if (m_ipCallback) {      // 回调式通知（与信号并行，不影响 emit）
+        IpLocationCallback cb;
+        cb.swap(m_ipCallback);
+        cb(false, opmap::PointLatLng(), QString());
+    }
     emit ipLocationFailed(reason);
 }
 
