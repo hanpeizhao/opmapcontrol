@@ -37,6 +37,7 @@
 
 #include "pointlatlng.h"
 #include "mapgraphicitem.h"
+#include "mapanchoreditem.h"
 #include "waypointitem.h"
 #include "uavmapfollowtype.h"
 #include "uavtrailtype.h"
@@ -54,7 +55,7 @@ class OPMapWidget;
 *
 * @class UAVItem gpsitem.h "mapwidget/gpsitem.h"
 */
-class GPSItem:public QObject,public QGraphicsItem
+class GPSItem:public QObject,public QGraphicsItem,public MapAnchoredItem
 {
     Q_OBJECT
     Q_INTERFACES(QGraphicsItem)
@@ -116,7 +117,7 @@ public:
 
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget);
-    void RefreshPos();
+    virtual void RefreshPos();
     QRectF boundingRect() const;
 
     /**

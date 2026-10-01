@@ -31,13 +31,14 @@
 #include <QPainter>
 #include <QLabel>
 #include "pointlatlng.h"
+#include "mapanchoreditem.h"
 #include <QObject>
 
 namespace opmap
 {
 class MapGraphicItem;
 
-    class TrailLineItem:public QObject,public QGraphicsLineItem
+    class TrailLineItem:public QObject,public QGraphicsLineItem,public MapAnchoredItem
     {
         Q_OBJECT
         Q_INTERFACES(QGraphicsItem)
@@ -48,7 +49,7 @@ class MapGraphicItem;
       //  void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
        //             QWidget *widget);
         /// 地图拖动/缩放时由 ChildPosRefresh 驱动，重算屏幕线段
-        void RefreshPos();
+        virtual void RefreshPos();
         opmap::PointLatLng coord1;
         opmap::PointLatLng coord2;
     private:

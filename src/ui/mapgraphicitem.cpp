@@ -26,13 +26,9 @@
 * 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 */
 
-#include "uavitem.h"
-#include "gpsitem.h"
-#include "homeitem.h"
-#include "geofenceitem.h"
 #include "mapgraphicitem.h"
-#include "mapmarkeritem.h"
-#include "waypointlineitem.h"
+#include "mapanchoreditem.h"
+#include <QGraphicsScene>
 #include <QGraphicsSceneMouseEvent>
 
 namespace opmap {
@@ -94,30 +90,9 @@ void MapGraphicItem::Core_OnNeedInvalidation()
     this->update();
     foreach(QGraphicsItem* i,this->childItems())
     {
-        WayPointItem* w=qgraphicsitem_cast<WayPointItem*>(i);
-        if(w)
-            w->RefreshPos();
-        UAVItem* ww=qgraphicsitem_cast<UAVItem*>(i);
-        if(ww)
-            ww->RefreshPos();
-        HomeItem* www=qgraphicsitem_cast<HomeItem*>(i);
-        if(www)
-            www->RefreshPos();
-        GPSItem* wwww=qgraphicsitem_cast<GPSItem*>(i);
-        if(wwww)
-            wwww->RefreshPos();
-        GeofenceItem* gf=qgraphicsitem_cast<GeofenceItem*>(i);
-        if(gf)
-            gf->RefreshPos();
-        TrailItem* ti=qgraphicsitem_cast<TrailItem*>(i);
-        if(ti)
-            ti->RefreshPos();
-        TrailLineItem* tl=qgraphicsitem_cast<TrailLineItem*>(i);
-        if(tl)
-            tl->RefreshPos();
-        MapMarkerItem* im=qgraphicsitem_cast<MapMarkerItem*>(i);
-        if(im)
-            im->RefreshPos();
+        MapAnchoredItem* anchored=dynamic_cast<MapAnchoredItem*>(i);
+        if(anchored)
+            anchored->RefreshPos();
 
         emit mapChanged();
     }
@@ -127,30 +102,9 @@ void MapGraphicItem::ChildPosRefresh()
 {
     foreach(QGraphicsItem* i,this->childItems())
     {
-        WayPointItem* w=qgraphicsitem_cast<WayPointItem*>(i);
-        if(w)
-            w->RefreshPos();
-        UAVItem* ww=qgraphicsitem_cast<UAVItem*>(i);
-        if(ww)
-            ww->RefreshPos();
-        HomeItem* www=qgraphicsitem_cast<HomeItem*>(i);
-        if(www)
-            www->RefreshPos();
-        GPSItem* wwww=qgraphicsitem_cast<GPSItem*>(i);
-        if(wwww)
-            wwww->RefreshPos();
-        GeofenceItem* gf=qgraphicsitem_cast<GeofenceItem*>(i);
-        if(gf)
-            gf->RefreshPos();
-        TrailItem* ti=qgraphicsitem_cast<TrailItem*>(i);
-        if(ti)
-            ti->RefreshPos();
-        TrailLineItem* tl=qgraphicsitem_cast<TrailLineItem*>(i);
-        if(tl)
-            tl->RefreshPos();
-        MapMarkerItem* im=qgraphicsitem_cast<MapMarkerItem*>(i);
-        if(im)
-            im->RefreshPos();
+        MapAnchoredItem* anchored=dynamic_cast<MapAnchoredItem*>(i);
+        if(anchored)
+            anchored->RefreshPos();
 
         emit mapChanged();
     }

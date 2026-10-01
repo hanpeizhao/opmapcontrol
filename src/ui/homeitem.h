@@ -33,13 +33,14 @@
 #include <QPainter>
 #include <QLabel>
 #include "pointlatlng.h"
+#include "mapanchoreditem.h"
 #include <QObject>
 #include "opmapwidget.h"
 
 namespace opmap
 {
 
-class HomeItem:public QObject,public QGraphicsItem
+class HomeItem:public QObject,public QGraphicsItem,public MapAnchoredItem
 {
     Q_OBJECT
     Q_INTERFACES(QGraphicsItem)
@@ -51,7 +52,7 @@ public:
                QWidget *widget);
     QRectF boundingRect() const;
     int type() const;
-    void RefreshPos();
+    virtual void RefreshPos();
     bool ShowSafeArea()const{return showsafearea;}
     int SafeArea()const{return safearea;}
     bool safe;

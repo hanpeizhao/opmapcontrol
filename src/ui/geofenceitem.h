@@ -16,10 +16,11 @@
 
 #include "pointlatlng.h"
 #include "mapgraphicitem.h"
+#include "mapanchoreditem.h"
 
 namespace opmap {
 
-class GeofenceItem : public QObject, public QGraphicsItem
+class GeofenceItem : public QObject, public QGraphicsItem, public MapAnchoredItem
 {
     Q_OBJECT
     Q_INTERFACES(QGraphicsItem)
@@ -37,7 +38,7 @@ public:
     void SetVertices(const QList<opmap::PointLatLng> &value);
 
     /// 地图拖动/缩放时由 MapGraphicItem::ChildPosRefresh 统一驱动重算屏幕多边形
-    void RefreshPos();
+    virtual void RefreshPos();
 
     /// 射线法：point 是否在多边形内部（围栏允许区内）
     static bool Contains(const QList<opmap::PointLatLng> &polygon, const opmap::PointLatLng &point);

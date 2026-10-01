@@ -32,6 +32,7 @@
 #include <QLabel>
 #include "pointlatlng.h"
 #include "mapgraphicitem.h"
+#include "mapanchoreditem.h"
 #include "waypointmissionengine.h"
 #include <QObject>
 
@@ -42,7 +43,7 @@ namespace opmap {
 *
 * @class WayPointItem waypointitem.h "waypointitem.h"
 */
-class WayPointItem : public QObject,public QGraphicsItem
+class WayPointItem : public QObject,public QGraphicsItem,public MapAnchoredItem
 {
     Q_OBJECT
 
@@ -197,7 +198,7 @@ public:
     virtual QRectF boundingRect() const;
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                 QWidget *widget);
-    void RefreshPos();
+    virtual void RefreshPos();
     void RefreshToolTip();
     QPixmap picture;
 

@@ -31,13 +31,14 @@
 #include <QPainter>
 #include <QLabel>
 #include "pointlatlng.h"
+#include "mapanchoreditem.h"
 #include <QObject>
 
 namespace opmap
 {
 class MapGraphicItem;
 
-    class TrailItem:public QObject,public QGraphicsItem
+    class TrailItem:public QObject,public QGraphicsItem,public MapAnchoredItem
     {
         Q_OBJECT
         Q_INTERFACES(QGraphicsItem)
@@ -49,7 +50,7 @@ class MapGraphicItem;
         QRectF boundingRect() const;
         int type() const;
         /// 地图拖动/缩放时由 ChildPosRefresh 驱动，重算屏幕位置
-        void RefreshPos();
+        virtual void RefreshPos();
         opmap::PointLatLng coord;
     private:
         QBrush m_brush;

@@ -42,6 +42,7 @@
 #include "opmapwidget.h"
 #include "trailitem.h"
 #include "traillineitem.h"
+#include "mapanchoreditem.h"
 
 namespace opmap {
 
@@ -53,7 +54,7 @@ class OPMapWidget;
 *
 * @class UAVItem uavitem.h "mapwidget/uavitem.h"
 */
-class UAVItem:public QObject,public QGraphicsItem
+class UAVItem:public QObject,public QGraphicsItem,public MapAnchoredItem
 {
     Q_OBJECT
     Q_INTERFACES(QGraphicsItem)
@@ -117,7 +118,7 @@ public:
     void paint(QPainter *painter, const QStyleOptionGraphicsItem *option,
                QWidget *widget);
 
-    void RefreshPos();
+    virtual void RefreshPos();
 
     QRectF boundingRect() const;
 

@@ -80,6 +80,7 @@ HEADERS += \
     ./src/ui/routeitem.h \
     ./src/ui/geofenceitem.h \
     ./src/ui/mapmarkeritem.h \
+    ./src/ui/mapanchoreditem.h \
     ./src/ui/trailitem.h \
     ./src/ui/traillineitem.h \
     ./src/ui/uavitem.h \

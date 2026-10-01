@@ -32,6 +32,7 @@
 #include <QFont>
 #include "pointlatlng.h"
 #include "mapgraphicitem.h"
+#include "mapanchoreditem.h"
 
 namespace opmap {
 
@@ -50,7 +51,7 @@ namespace opmap {
 *
 * @class MapMarkerItem mapmarkeritem.h "mapmarkeritem.h"
 */
-class MapMarkerItem : public QGraphicsItem
+class MapMarkerItem : public QGraphicsItem, public MapAnchoredItem
 {
 public:
     enum { Type = UserType + 11 };   // 与既有 Type 分配错开（WP=1/UAV=2/Trail=3/Home=4/GPS=6/WPLine=7/Route=8/Geofence=9/TrailLine=10）
@@ -71,7 +72,7 @@ public:
     void SetText(QString const& text);                ///< 设置文字标签，空串=不显示
     void SetFontSize(int pointSize);                  ///< 文字字号（磅），默认 10 加粗
 
-    void RefreshPos();                                ///< coord → 屏幕位置重算（拖动/缩放地图时由 ChildPosRefresh 驱动）
+    virtual void RefreshPos();                        ///< coord → 屏幕位置重算（拖动/缩放地图时由 ChildPosRefresh 驱动）
 
     int type() const;
     QRectF boundingRect() const;
