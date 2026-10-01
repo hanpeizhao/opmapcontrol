@@ -355,6 +355,8 @@ void MainWindow::setupDocks()
     connect(m_map, SIGNAL(ipLocationFailed(QString)),
             this, SLOT(onIpLocationFailed(QString)));
     connect(m_followCheck, SIGNAL(toggled(bool)), this, SLOT(onFollowToggled(bool)));
+    // 库内跟随开关变化 → 复选框同步（任务启动时库自动暂停跟随）
+    connect(m_map, SIGNAL(mapFollowChanged(bool)), this, SLOT(onMapFollowChanged(bool)));
     connect(m_trailCheck, SIGNAL(toggled(bool)), this, SLOT(onTrailToggled(bool)));
 
     QDockWidget *wpDock = new QDockWidget(QString::fromUtf8("航点"), this);
@@ -697,30 +699,14 @@ void MainWindow::onFlightClicked()
             ++hoverCount;
     }
 
-    // 起飞点 = Home 返航点（右键"设置 Home 位置/安全围栏半径"生效；不覆盖用户设置）
+    // 起飞点仅用于模拟遥测源（真机接入时遥测从实际位置来）；
+    // 库 StartWaypointMission 自动完成：惰性建 UAV/到达参数/安全圈显示/
+    // UAV 摆位起飞点并跳转视图/暂停跟随
     opmap::PointLatLng start;
     if (m_map->Home)
         start = m_map->Home->Coord();
     else
         start = m_map->HasVehiclePosition() ? m_map->VehiclePosition() : kHomePos;
-    if (m_map->Home)
-        m_map->Home->SetShowSafeArea(true);
-
-    // 地图跟随会让 UAV 永远钉在屏幕中央、看起来"原地不动"，飞行观察期间自动暂停
-    if (m_followCheck->isChecked()) {
-        m_followCheck->setChecked(false);
-        logEvent(QString::fromUtf8("已暂停地图跟随，以便观察飞机依次飞向航点（可随时勾选恢复）"));
-    }
-
-    // 主机 UAV：惰性创建（库默认大头针 + 每秒轨迹点），打开库内自动到达判定
-    //（进入 15 m 即 SetReached + UAVReachedWayPoint 信号）
-    m_map->SetUAVPos(0, start, 120);
-    opmap::UAVItem *uav = m_map->GetUAV(0);
-    uav->SetAutoSetReached(true);
-    uav->SetAutoSetDistance(15);
-    uav->SetIcon(QString::fromUtf8(":/uavs/images/mapquad.png"));   // 飞行=四旋翼图标
-    m_map->SetUAVHeading(0, 0);
-    m_map->SetCurrentPosition(start);   // 地图跳到起飞点（Home 图标处），起飞位置一目了然
 
     if (!m_flightSim) {
         m_flightSim = new WaypointFlightSimulator(this);
@@ -771,7 +757,9 @@ void MainWindow::onFlightClicked()
     // 启动：库状态机 + 假遥测源（真机接入时删除模拟器，遥测直接喂 SetUAVPos）
     m_flightSim->start(start, double(m_flightSpeedMps));
     m_map->StartWaypointMission(wps.values(), 15.0);
-    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点（拍照 %2、悬停 %3），从 Home 图标处起飞，巡航 %4 m/s，安全围栏 3000 m")
+    if (opmap::UAVItem *u = m_map->GetUAV(0))
+        u->SetIcon(QString::fromUtf8(":/uavs/images/mapquad.png"));   // 飞行=四旋翼图标（展示语义，库默认大头针）
+    logEvent(QString::fromUtf8("航点飞行开始：%1 个航点（拍照 %2、悬停 %3），从 Home 图标处起飞，巡航 %4 m/s，安全围栏 3000 m，跟随已自动暂停")
              .arg(wps.size()).arg(photoCount).arg(hoverCount).arg(m_flightSpeedMps));
 }
 
@@ -1234,6 +1222,13 @@ void MainWindow::onSpeedChanged(int index)
 void MainWindow::onFollowToggled(bool on)
 {
     m_map->SetFollowVehicle(on);   // 库内管理：喂点自动居中，UAV 未创建时先记忆
+}
+
+void MainWindow::onMapFollowChanged(bool following)
+{
+    m_followCheck->blockSignals(true);   // 回写复选框，避免再触发 onFollowToggled 回环
+    m_followCheck->setChecked(following);
+    m_followCheck->blockSignals(false);
 }
 
 void MainWindow::onTrailToggled(bool on)

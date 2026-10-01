@@ -371,6 +371,33 @@ opmap::NavigationEngine *OPMapWidget::GetNavigationEngine() const
 void OPMapWidget::StartWaypointMission(QList<WayPointItem*> const& waypoints,
                                        double arrivalRadiusMeters)
 {
+    if (waypoints.isEmpty())
+        return;
+    // —— 任务启动默认编排（上层无需再手工铺垫）——
+    // 惰性建 UAV 并打开自动到达判定（进入 arrivalRadiusMeters 即到达信号）
+    UAVItem *uav = EnsureUAV(0);
+    uav->SetAutoSetReached(true);
+    uav->SetAutoSetDistance(arrivalRadiusMeters);
+    if (Home)
+        Home->SetShowSafeArea(true);   // 起飞点安全圈可见
+    // 起飞点取位：Home 返航点优先，其次车辆位置；有则摆好机位并跳转视图
+    opmap::PointLatLng start;
+    bool haveStart = false;
+    if (Home) {
+        start = Home->Coord();
+        haveStart = true;
+    } else if (vehiclePosValid) {
+        start = vehiclePos;
+        haveStart = true;
+    }
+    if (haveStart) {
+        uav->SetUAVPos(start, 120);
+        uav->SetUAVHeading(0);
+        SetCurrentPosition(start);   // 地图跳到起飞点，起飞位置一目了然
+    }
+    // 跟随会让 UAV 钉在屏幕中央、看起来"原地不动"，任务观察期间自动暂停
+    SetFollowVehicle(false);
+
     QList<WaypointMissionEngine::MissionWaypoint> mission;
     for (int i = 0; i < waypoints.size(); ++i) {
         WayPointItem *wp = waypoints.at(i);

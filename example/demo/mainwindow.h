@@ -86,6 +86,7 @@ private slots:
     void onMockPosClicked();
     void onSpeedChanged(int index);
     void onFollowToggled(bool on);
+    void onMapFollowChanged(bool following);   ///< 库跟随开关变化 → 复选框同步
     void onTrailToggled(bool on);
     void onSimStatus(int current, int total, const QString &message);
     void onSimFinished();

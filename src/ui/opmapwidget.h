@@ -782,7 +782,9 @@ public slots:
 
     // —— 航点任务飞行（库内状态机，喂点驱动）——
     /// 启动航点任务：从航点图元提取坐标/悬停时长/动作组装任务并启动。
-    /// 之后每次喂点（UpdateVehiclePosition/SetUAVPos）由库自动推进状态：
+    /// 启动时库自动完成默认编排：惰性创建 UAV、打开到达判定（半径=arrivalRadiusMeters）、
+    /// 显示 Home 安全圈、UAV 摆位到起飞点并跳转视图（Home 优先，其次车辆位置）、
+    /// 自动暂停地图跟随。之后每次喂点（UpdateVehiclePosition/SetUAVPos）由库推进状态：
     /// 到达判定→悬停计时→动作信号→下一航点→missionFinished
     void StartWaypointMission(QList<WayPointItem*> const& waypoints,
                               double arrivalRadiusMeters = 15.0);
