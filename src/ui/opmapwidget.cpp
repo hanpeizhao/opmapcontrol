@@ -96,6 +96,8 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
 
     // —— 车载导航：provider → 引擎 → 路线绘制项 ——
     routeProvider = new OsrmRouteProvider(this);
+    connect(routeProvider, SIGNAL(alternativesReady(QList<opmap::Route>)),
+            this, SLOT(onRouteAlternatives(QList<opmap::Route>)));
     navEngine = new NavigationEngine(this);
     navEngine->SetRouteProvider(routeProvider);
     routeItem = new RouteItem(map);
@@ -149,7 +151,10 @@ void OPMapWidget::SetShowDiagnostics(bool const& value)
     {
         if(diagGraphItem!=0)
         {
-            delete diagGraphItem;
+            // 文本是背景卡片子项：删卡片（连带文本），不留孤儿矩形
+            QGraphicsItem *diagOwner = diagGraphItem->parentItem() ? diagGraphItem->parentItem()
+                                                                   : static_cast<QGraphicsItem*>(diagGraphItem);
+            delete diagOwner;
             diagGraphItem=0;
         }
         if(diagTimer!=0)
@@ -299,6 +304,8 @@ void OPMapWidget::SetRouteProvider(opmap::AbstractRouteProvider *provider)
     delete routeProvider;          // 接管所有权；在途请求随 QNAM 释放中止
     routeProvider = provider;
     routeProvider->setParent(this);
+    connect(routeProvider, SIGNAL(alternativesReady(QList<opmap::Route>)),
+            this, SLOT(onRouteAlternatives(QList<opmap::Route>)));
     navEngine->SetRouteProvider(routeProvider);
 }
 
@@ -316,6 +323,21 @@ void OPMapWidget::PlanRoute(opmap::PointLatLng const& from, opmap::PointLatLng c
     routeItem->setVisible(true);   // 预览结果经 routePlanned 回来时绘制
     EnsureRouteMarker(routeFromMarker, from, QString::fromUtf8("起点"));
     EnsureRouteMarker(routeToMarker, to, QString::fromUtf8("目的地"));
+}
+
+void OPMapWidget::onRouteAlternatives(QList<opmap::Route> routes)
+{
+    routeAlternatives = routes;    // SelectRoute 取用；第 0 条已随 routePlanned 画出
+    emit routeAlternativesReady(routes);
+}
+
+void OPMapWidget::SelectRoute(int index)
+{
+    if (index < 0 || index >= routeAlternatives.size())
+        return;
+    routeProvider->setPreferredAlternative(index);   // 之后的导航/重规划沿选中的走
+    routeItem->SetRoute(routeAlternatives.at(index)); // 预览画布立即切换
+    routeItem->setVisible(true);
 }
 
 /// 惰性取用 UAV：不存在则创建并套用默认跟踪样式——
@@ -950,18 +972,31 @@ void OPMapWidget::diagRefresh()
 {
     if(showDiag) {
         if(diagGraphItem==0) {
-            diagGraphItem=new QGraphicsTextItem();
-            mscene.addItem(diagGraphItem);
-            diagGraphItem->setPos(10,100);
-            diagGraphItem->setZValue(3);
-            diagGraphItem->setFlag(QGraphicsItem::ItemIsMovable,true);
-            diagGraphItem->setDefaultTextColor(Qt::yellow);
+            // 半透明黑底卡片 + 白字：浅色/深色底图上都清晰可读
+            QGraphicsRectItem *diagBg = new QGraphicsRectItem();
+            mscene.addItem(diagBg);
+            diagBg->setPos(10,100);
+            diagBg->setZValue(3);
+            diagBg->setFlag(QGraphicsItem::ItemIsMovable,true);
+            diagBg->setBrush(QColor(0,0,0,150));
+            diagBg->setPen(Qt::NoPen);
+            diagGraphItem=new QGraphicsTextItem(diagBg);
+            diagGraphItem->setDefaultTextColor(Qt::white);
+            diagGraphItem->setPos(6,4);
         }
 
         diagGraphItem->setPlainText(core->GetDiagnostics().toString());
+        // 背景卡片随文本尺寸自适应（文本子项位于 (6,4)，四周各留 6/4 边距）
+        QGraphicsRectItem *diagBg = qgraphicsitem_cast<QGraphicsRectItem*>(diagGraphItem->parentItem());
+        if (diagBg)
+            diagBg->setRect(0, 0, diagGraphItem->boundingRect().width() + 12,
+                            diagGraphItem->boundingRect().height() + 8);
     } else {
         if(diagGraphItem!=0) {
-            delete diagGraphItem;
+            // 同 SetShowDiagnostics：删背景卡片（文本父项）连带文本
+            QGraphicsItem *diagOwner = diagGraphItem->parentItem() ? diagGraphItem->parentItem()
+                                                                   : static_cast<QGraphicsItem*>(diagGraphItem);
+            delete diagOwner;
             diagGraphItem=0;
         }
     }

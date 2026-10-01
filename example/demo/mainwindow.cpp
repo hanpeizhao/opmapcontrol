@@ -63,6 +63,8 @@ MainWindow::MainWindow()
       m_planBtn(new QPushButton(QString::fromUtf8("规划路线"), this)),
       m_navBtn(new QPushButton(QString::fromUtf8("开始导航"), this)),
       m_stopNavBtn(new QPushButton(QString::fromUtf8("停止导航"), this)),
+      m_routeSwitchBtn(new QPushButton(QString::fromUtf8("备选路线"), this)),
+      m_altIndex(0),
       m_navInfo(new QLabel(QString::fromUtf8("空闲"), this)),
       m_simStartBtn(new QPushButton(QString::fromUtf8("开始跟车"), this)),
       m_simPauseBtn(new QPushButton(QString::fromUtf8("暂停"), this)),
@@ -109,6 +111,8 @@ MainWindow::MainWindow()
 
     // 库导航信号 → 面板/横幅
     connect(m_map, SIGNAL(navigationRouteReady(opmap::Route)), this, SLOT(onNavigationRouteReady(opmap::Route)));
+    connect(m_map, &opmap::OPMapWidget::routeAlternativesReady,
+            this, &MainWindow::onRouteAlternativesReady);
     connect(m_map, SIGNAL(navigationProgress(double,int,QString)), this, SLOT(onNavProgress(double,int,QString)));
     connect(m_map, SIGNAL(offRouteDetected(opmap::PointLatLng,double)),
             this, SLOT(onOffRouteDetected(opmap::PointLatLng,double)));
@@ -268,6 +272,9 @@ void MainWindow::setupDocks()
     navBtnRow->addWidget(m_planBtn);
     navBtnRow->addWidget(m_navBtn);
     navBtnRow->addWidget(m_stopNavBtn);
+    // 备选路线循环切换：规划出 ≥2 条时可用（库 SelectRoute 切换显示与导航偏好）
+    m_routeSwitchBtn->setEnabled(false);
+    navBtnRow->addWidget(m_routeSwitchBtn);
     navLayout->addLayout(navBtnRow);
     navLayout->addWidget(m_navInfo);
     // —— 导航状态查询 / 路线显示开关 / 引擎参数（库能力示范）——
@@ -296,6 +303,7 @@ void MainWindow::setupDocks()
     connect(arriveSpin, static_cast<void(QSpinBox::*)(int)>(&QSpinBox::valueChanged),
             [this](int v) { if (m_map->GetNavigationEngine()) m_map->GetNavigationEngine()->SetArrivalThresholdM(v); });
     connect(m_planBtn, SIGNAL(clicked()), this, SLOT(onPlanClicked()));
+    connect(m_routeSwitchBtn, SIGNAL(clicked()), this, SLOT(onSwitchRouteClicked()));
     connect(m_navBtn, SIGNAL(clicked()), this, SLOT(onNavigateClicked()));
     connect(m_stopNavBtn, SIGNAL(clicked()), this, SLOT(onStopNavClicked()));
     connect(m_providerCombo, SIGNAL(currentIndexChanged(int)), this, SLOT(onProviderChanged(int)));
@@ -996,8 +1004,48 @@ void MainWindow::onPlanClicked()
     }
     m_map->SetPickMode(opmap::OPMapWidget::PickNone);   // 中止未完成的取点（无取点时为空操作）
     applyProviderFromUI();
+    m_altRoutes.clear();                // 新规划重置换选状态（结果在 onRouteAlternativesReady 刷新）
+    m_altIndex = 0;
+    m_routeSwitchBtn->setEnabled(false);
+    m_routeSwitchBtn->setText(QString::fromUtf8("备选路线"));
     m_navInfo->setText(QString::fromUtf8("规划中…"));
     m_map->PlanRoute(m_origin, m_dest);
+}
+
+/// 备选路线就绪：列出各条概要，≥2 条时启用切换按钮
+void MainWindow::onRouteAlternativesReady(QList<opmap::Route> routes)
+{
+    m_altRoutes = routes;
+    m_altIndex = 0;
+    for (int i = 0; i < routes.size(); ++i) {
+        logEvent(QString::fromUtf8("%1路线 %2：%3 km，约 %4 分钟")
+                 .arg(i == 0 ? QString::fromUtf8("推荐") : QString::fromUtf8("备选"))
+                 .arg(i + 1)
+                 .arg(routes.at(i).totalDistanceMeters / 1000.0, 0, 'f', 1)
+                 .arg(qRound(routes.at(i).totalDurationSeconds / 60.0)));
+    }
+    if (routes.size() >= 2) {
+        m_routeSwitchBtn->setEnabled(true);
+        m_routeSwitchBtn->setText(QString::fromUtf8("备选路线 1/%1").arg(routes.size()));
+    } else {
+        m_routeSwitchBtn->setEnabled(false);
+        m_routeSwitchBtn->setText(QString::fromUtf8("备选路线（无）"));
+    }
+}
+
+/// 循环切换备选路线：库内立即换画线，之后的导航/偏航重规划沿选中的走
+void MainWindow::onSwitchRouteClicked()
+{
+    if (m_altRoutes.size() < 2)
+        return;
+    m_altIndex = (m_altIndex + 1) % m_altRoutes.size();
+    m_map->SelectRoute(m_altIndex);
+    m_routeSwitchBtn->setText(QString::fromUtf8("备选路线 %1/%2")
+                              .arg(m_altIndex + 1).arg(m_altRoutes.size()));
+    logEvent(QString::fromUtf8("已切换到%1路线：%2 km，约 %3 分钟")
+             .arg(m_altIndex == 0 ? QString::fromUtf8("推荐") : QString::fromUtf8("备选"))
+             .arg(m_altRoutes.at(m_altIndex).totalDistanceMeters / 1000.0, 0, 'f', 1)
+             .arg(qRound(m_altRoutes.at(m_altIndex).totalDurationSeconds / 60.0)));
 }
 
 void MainWindow::onNavigateClicked()

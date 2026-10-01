@@ -507,6 +507,12 @@ public:
      */
     void PlanRoute(opmap::PointLatLng const& from, opmap::PointLatLng const& to);
 
+    /**
+     * @brief 选择备选路线（routeAlternativesReady 给出的索引，0=推荐路线）：
+     *        立即切换画布显示，之后的导航/偏航重规划也沿选中的那条走
+     */
+    void SelectRoute(int index);
+
     void SetShowRoute(bool const& value);
     bool ShowRoute() const;
     opmap::Route CurrentNavigationRoute() const;
@@ -549,6 +555,7 @@ private:
 
     opmap::AbstractRouteProvider *routeProvider;   ///< 路由规划服务（接管外部传入者）
     opmap::NavigationEngine *navEngine;            ///< 导航状态机
+    QList<opmap::Route> routeAlternatives;         ///< 最近一次规划的备选路线全集（SelectRoute 取用）
     opmap::WaypointMissionEngine *missionEngine;   ///< 航点任务状态机（喂点驱动）
     opmap::RouteItem *routeItem;                   ///< 路线绘制项（随 map 析构）
     opmap::IpLocationProvider *ipLocator;          ///< IP 定位服务（城市级兜底）
@@ -576,6 +583,8 @@ private:
 private slots:
     void diagRefresh();
     void onNavProgress(double traveledM, double remainingM, int remainingS, const QString &instruction);
+    /// 缓存本次规划的备选路线并转发 routeAlternativesReady
+    void onRouteAlternatives(QList<opmap::Route> routes);
     //   WayPointItem* item;//apagar
     // 航点任务引擎信号 → facade 信号转发
     void onMissionStarted();
@@ -738,6 +747,8 @@ signals:
     void navigationArrived();
     /** @brief 导航失败（无路由服务、服务忙或初次规划失败） */
     void navigationFailed(QString reason);
+    /** @brief 本次规划的备选路线全集（第 0 条=推荐路线，与路线绘制同步） */
+    void routeAlternativesReady(QList<opmap::Route> routes);
 
     // ———————— IP 定位信号 ————————
     /** @brief IP 定位成功（pos 为 WGS-84 城市级坐标，city 为城市名） */

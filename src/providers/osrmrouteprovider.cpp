@@ -28,7 +28,8 @@ OsrmRouteProvider::OsrmRouteProvider(QObject *parent)
     : AbstractRouteProvider(parent),
       m_nam(new QNetworkAccessManager(this)),
       m_serverUrl(QString::fromLatin1(kDefaultOsrmBase)),
-      m_busy(false)
+      m_busy(false),
+      m_preferredAlternative(0)
 {
 }
 
@@ -49,6 +50,7 @@ void OsrmRouteProvider::requestRoute(const opmap::PointLatLng &from, const opmap
     query.addQueryItem(QLatin1String("overview"), QLatin1String("full"));
     query.addQueryItem(QLatin1String("geometries"), QLatin1String("geojson"));
     query.addQueryItem(QLatin1String("steps"), QLatin1String("true"));
+    query.addQueryItem(QLatin1String("alternatives"), QLatin1String("2"));   // 最多 2 条备选 + 1 条推荐
     url.setQuery(query);
 
     QNetworkRequest request(url);
@@ -94,37 +96,14 @@ QString OsrmRouteProvider::instructionFromManeuver(const QString &type, const QS
     return QString::fromUtf8("直行");
 }
 
-void OsrmRouteProvider::onRequestFinished()
+/// 解析 OSRM 单条 route JSON：由 steps[].geometry.coordinates 顺序拼接折线，
+/// 保证 step 与折线索引严格对齐
+bool OsrmRouteProvider::parseRoute(const QJsonObject &routeObj, opmap::Route &route)
 {
-    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
-    if (!reply)
-        return;
-    reply->deleteLater();
-    m_busy = false;
-
-    if (reply->error() != QNetworkReply::NoError) {
-        emit routeFailed(reply->errorString());
-        return;
-    }
-
-    const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
-    if (!doc.isObject()) {
-        emit routeFailed(QString::fromUtf8("OSRM 响应不是有效 JSON"));
-        return;
-    }
-    const QJsonObject root = doc.object();
-    const QJsonArray routes = root.value(QLatin1String("routes")).toArray();
-    if (root.value(QLatin1String("code")).toString() != QLatin1String("Ok") || routes.isEmpty()) {
-        emit routeFailed(QString::fromUtf8("OSRM 无可用路线"));
-        return;
-    }
-
-    const QJsonObject routeObj = routes.at(0).toObject();
-    Route route;
+    route = opmap::Route();
     route.totalDistanceMeters = routeObj.value(QLatin1String("distance")).toDouble();
     route.totalDurationSeconds = (int)routeObj.value(QLatin1String("duration")).toDouble();
 
-    // 由 steps[].geometry.coordinates 顺序拼接折线，保证 step 与折线索引严格对齐
     const QJsonArray legs = routeObj.value(QLatin1String("legs")).toArray();
     for (int i = 0; i < legs.size(); ++i) {
         const QJsonArray steps = legs.at(i).toObject().value(QLatin1String("steps")).toArray();
@@ -152,12 +131,51 @@ void OsrmRouteProvider::onRequestFinished()
         }
     }
 
-    if (!route.isValid()) {
+    return route.isValid();
+}
+
+void OsrmRouteProvider::onRequestFinished()
+{
+    QNetworkReply *reply = qobject_cast<QNetworkReply*>(sender());
+    if (!reply)
+        return;
+    reply->deleteLater();
+    m_busy = false;
+
+    if (reply->error() != QNetworkReply::NoError) {
+        emit routeFailed(reply->errorString());
+        return;
+    }
+
+    const QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
+    if (!doc.isObject()) {
+        emit routeFailed(QString::fromUtf8("OSRM 响应不是有效 JSON"));
+        return;
+    }
+    const QJsonObject root = doc.object();
+    const QJsonArray routes = root.value(QLatin1String("routes")).toArray();
+    if (root.value(QLatin1String("code")).toString() != QLatin1String("Ok") || routes.isEmpty()) {
+        emit routeFailed(QString::fromUtf8("OSRM 无可用路线"));
+        return;
+    }
+
+    // 解析全部备选（推荐路线在最前）；无备选时只有一条
+    QList<opmap::Route> alternatives;
+    for (int i = 0; i < routes.size(); ++i) {
+        opmap::Route route;
+        if (parseRoute(routes.at(i).toObject(), route))
+            alternatives.append(route);
+    }
+    if (alternatives.isEmpty()) {
         emit routeFailed(QString::fromUtf8("OSRM 路线点过少"));
         return;
     }
 
-    emit routeReady(route);
+    // routeReady 按用户偏好发出（默认 0=推荐路线），导航/重规划随之走选中的那条
+    const int preferred = (m_preferredAlternative >= 0 && m_preferredAlternative < alternatives.size())
+            ? m_preferredAlternative : 0;
+    emit alternativesReady(alternatives);
+    emit routeReady(alternatives.at(preferred));
 }
 
 } // namespace opmap

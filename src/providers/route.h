@@ -45,5 +45,6 @@ struct Route
 } // namespace opmap
 
 Q_DECLARE_METATYPE(opmap::Route)
+Q_DECLARE_METATYPE(QList<opmap::Route>)
 
 #endif // ROUTE_H

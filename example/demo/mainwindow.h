@@ -68,6 +68,8 @@ private slots:
     void onPlanClicked();
     void onNavigateClicked();
     void onStopNavClicked();
+    void onRouteAlternativesReady(QList<opmap::Route> routes);   ///< 备选路线就绪：刷新切换按钮
+    void onSwitchRouteClicked();                                 ///< 循环切换备选路线
     void onProviderChanged(int index);
     void onNavigationRouteReady(const opmap::Route &route);
     void onNavProgress(double remainingMeters, int remainingSeconds, const QString &instruction);
@@ -150,6 +152,9 @@ private:
     QPushButton *m_planBtn;
     QPushButton *m_navBtn;
     QPushButton *m_stopNavBtn;
+    QPushButton *m_routeSwitchBtn;         ///< 备选路线循环切换（规划出 ≥2 条时可用）
+    QList<opmap::Route> m_altRoutes;       ///< 最近规划的备选路线（切换显示用）
+    int m_altIndex;                        ///< 当前选中备选索引
     QLabel *m_navInfo;
 
     // 行车模拟面板

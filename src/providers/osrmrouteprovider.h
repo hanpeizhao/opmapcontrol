@@ -29,6 +29,8 @@ public:
 
     virtual void requestRoute(const opmap::PointLatLng &from, const opmap::PointLatLng &to);
     virtual bool isBusy() const { return m_busy; }
+    /// 用户备选路线偏好：routeReady 发出第 index 条备选（0=推荐路线，越界自动回 0）
+    virtual void setPreferredAlternative(int index) { m_preferredAlternative = index; }
 
 private slots:
     void onRequestFinished();
@@ -36,10 +38,13 @@ private slots:
 private:
     /// maneuver.type + modifier → 中文指令（如 turn+right → "右转"）
     static QString instructionFromManeuver(const QString &type, const QString &modifier);
+    /// 解析 OSRM 单条 route JSON → Route（折线+分步指令），点过少返回 false
+    static bool parseRoute(const QJsonObject &routeObj, opmap::Route &route);
 
     QNetworkAccessManager *m_nam;
     QString m_serverUrl;
     bool m_busy;
+    int m_preferredAlternative;
 };
 
 } // namespace opmap

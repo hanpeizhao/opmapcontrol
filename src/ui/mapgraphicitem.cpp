@@ -433,7 +433,10 @@ void MapGraphicItem::DrawMap2D(QPainter *painter)
 
                         if(showTileGridLines)
                         {
-                            painter->setPen(config->EmptyTileBorders);
+                            // 品红半透明：浅色/深色瓦片上都清晰可见（原白色在浅色底图上看不清）
+                            QPen gridPen(QColor(255,0,255,200));
+                            painter->setPen(gridPen);
+                            painter->setBrush(Qt::NoBrush);
                             painter->drawRect(core->tileRect.X(), core->tileRect.Y(), core->tileRect.Width(), core->tileRect.Height());
                             {
                                 painter->setFont(config->MissingDataFont);
