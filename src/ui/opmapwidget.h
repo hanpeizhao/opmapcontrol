@@ -203,6 +203,20 @@ class OPMapWidget:public QGraphicsView
     Q_ENUMS(opmap::MouseWheelZoomType::Types)
 
 public:
+    /**
+     * @brief 地图点选模式：库内统一处理 6px 防抖、多点累积与右键结束，
+     *        上层只接 positionPicked/pickFinished 两个信号即可完成取点交互
+     */
+    enum PickMode
+    {
+        PickNone,       ///< 正常浏览（无取点）
+        PickWaypoint,   ///< 点选放航点（单发：取一次自动结束）
+        PickOrigin,     ///< 点选导航起点（单发）
+        PickDest,       ///< 点选导航目的地（单发）
+        PickFence,      ///< 围栏取点：多点累积 + 橡皮筋预览，右键/再设 PickNone 闭合
+        PickPosition    ///< 点选喂位置：点哪喂哪（连续取点，右键/再设 PickNone 结束）
+    };
+
     QSize sizeHint() const;
 
     /**
@@ -511,6 +525,8 @@ public:
 
 private:
     UAVItem *EnsureUAV(int id);   ///< 惰性取用 UAV：不存在则创建并套用默认样式
+    void HandlePickClick(opmap::PointLatLng const& pos);   ///< 一次有效选点：累积+发信号+单发自动收尾
+    void EndPick();               ///< 结束当前取点（围栏收尾 + pickFinished）
     opmap::MapService *service;   ///< 地图数据服务（构造创建、析构释放）
     opmap::MapEngine *core;
     QGraphicsScene mscene;
@@ -537,6 +553,11 @@ private:
     bool vehiclePosValid;
     bool followVehicle;                            ///< 地图跟随车辆开关（喂点时自动居中）
 
+    // —— 地图点选状态 ——
+    PickMode pickMode;                             ///< 当前取点模式
+    QPoint pickPressPos;                           ///< 按下位置（抬起位移 <6px 才算选点，拖图不算）
+    QList<opmap::PointLatLng> pickPoints;          ///< 本次取点累积（围栏多点）
+
 private slots:
     void diagRefresh();
     void onNavProgress(double traveledM, double remainingM, int remainingS, const QString &instruction);
@@ -558,6 +579,7 @@ protected:
     void mouseMoveEvent(QMouseEvent *event );
     void mousePressEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *event);
+    void contextMenuEvent(QContextMenuEvent *event);   ///< 取点中右键=结束取点，不弹上层菜单
 
     void ConnectWP(WayPointItem* item);
 
@@ -714,6 +736,17 @@ signals:
     void geofenceEntered(opmap::PointLatLng position);  ///< UAV 回到多边形围栏内
     void mapFollowChanged(bool following);              ///< 地图跟随车辆开关变化（供 UI 复选框同步）
 
+    // —— 地图点选信号 ——
+    /** @brief 一次有效选点（库已完成防抖；mode 为 PickMode 枚举值）。
+     *         单发模式（航点/起点/目的地）取一次后自动结束并再发 pickFinished */
+    void positionPicked(int mode, opmap::PointLatLng pos);
+    /** @brief 取点结束：右键取消/切换模式/再设 PickNone 均触发；
+     *         points 为本次取到的全部点（围栏闭合时即顶点序列） */
+    void pickFinished(int mode, QList<opmap::PointLatLng> points);
+    /** @brief 右键菜单请求（非取点模式）：取点中的右键由库拦截为"结束取点"，
+     *         正常右键转发此信号供上层弹自定义菜单（等同 Qt::CustomContextMenu） */
+    void mapContextMenuRequested(QPoint pos);
+
     // ———————— 离线下载进度信号（转发自 MapRipper）————————
     /** @brief 抓取进度百分比（0-100） */
     void mapDownloadProgress(int percent);
@@ -759,6 +792,11 @@ public slots:
 
     /// 停止导航并清除路线绘制
     void StopNavigation();
+
+    // —— 地图点选（库内防抖/多点累积/右键结束）——
+    /// 进入/切换/退出取点模式；设为 PickNone 或右键 = 结束（围栏按顶点数闭合或清理）
+    void SetPickMode(PickMode mode);
+    PickMode GetPickMode() const { return pickMode; }   ///< 当前取点模式
 
     /**
      * @brief 发起一次 IP 定位（城市级兜底，双源自动回退，8 秒超时），

@@ -60,7 +60,8 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     geofenceItem(0),
     geofenceBreached(false),
     vehiclePosValid(false),
-    followVehicle(false)
+    followVehicle(false),
+    pickMode(PickNone)
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
@@ -592,12 +593,26 @@ void OPMapWidget::mouseMoveEvent(QMouseEvent *event)
     p=map->mapFromParent(p);
     currentmouseposition=map->FromLocalToLatLng(p.x(),p.y());
 
+    // 围栏橡皮筋预览：末段线实时跟随鼠标，点击地图即固化一个顶点
+    if (pickMode == PickFence && !pickPoints.isEmpty()) {
+        QList<opmap::PointLatLng> preview = pickPoints;
+        preview.append(currentmouseposition);
+        SetGeofence(preview);
+    }
+
     emit mouseMove(event);
 }
 
 void OPMapWidget::mousePressEvent(QMouseEvent *event)
 {
     QGraphicsView::mousePressEvent(event);
+
+    // 点选模式（仅左键）：记录按下位置做防抖基线；单发模式（航点/起点/目的地）按下即取点
+    if (pickMode != PickNone && event->button() == Qt::LeftButton) {
+        pickPressPos = event->pos();
+        if (pickMode != PickFence && pickMode != PickPosition)
+            HandlePickClick(currentMousePosition());
+    }
 
     emit mousePress(event);
 }
@@ -606,7 +621,62 @@ void OPMapWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     QGraphicsView::mouseReleaseEvent(event);
 
+    // 连续取点模式（围栏/喂位置）左键：抬起位移 <6px 才固化一次选点，拖动地图不算
+    if (event->button() == Qt::LeftButton
+            && (pickMode == PickFence || pickMode == PickPosition)
+            && (event->pos() - pickPressPos).manhattanLength() <= 6)
+        HandlePickClick(currentMousePosition());
+
     emit mouseRelease(event);
+}
+
+void OPMapWidget::contextMenuEvent(QContextMenuEvent *event)
+{
+    // 取点模式中右键 = 结束取点（围栏闭合/喂点停止），并拦下上层右键菜单
+    if (pickMode != PickNone) {
+        EndPick();
+        event->accept();
+        return;
+    }
+    // 非取点：转发场景处理，同时发右键菜单信号供上层弹自定义菜单
+    QGraphicsView::contextMenuEvent(event);
+    emit mapContextMenuRequested(event->pos());
+}
+
+// ———————— 地图点选（SetPickMode）————————
+
+void OPMapWidget::SetPickMode(PickMode mode)
+{
+    if (pickMode == mode)
+        return;
+    if (pickMode != PickNone)
+        EndPick();   // 模式切换前收尾当前取点（发 pickFinished + 围栏收尾）
+    pickMode = mode;
+    pickPoints.clear();
+}
+
+/// 结束当前取点：围栏按顶点数固化/清理预览，随后发 pickFinished
+void OPMapWidget::EndPick()
+{
+    const PickMode finished = pickMode;
+    pickMode = PickNone;
+    if (finished == PickFence) {
+        if (pickPoints.size() >= 3)
+            SetGeofence(pickPoints);                     // 顶点足够：固化为有效围栏
+        else
+            SetGeofence(QList<opmap::PointLatLng>());    // 不足 3 点：清取点预览残留
+    }
+    emit pickFinished((int)finished, pickPoints);
+    pickPoints.clear();
+}
+
+/// 一次有效选点：入库累积并发信号；单发模式取一次即自动结束
+void OPMapWidget::HandlePickClick(opmap::PointLatLng const& pos)
+{
+    pickPoints.append(pos);
+    emit positionPicked((int)pickMode, pos);
+    if (pickMode == PickWaypoint || pickMode == PickOrigin || pickMode == PickDest)
+        SetPickMode(PickNone);   // 单发模式：内部再发 pickFinished
 }
 
 

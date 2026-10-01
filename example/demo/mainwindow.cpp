@@ -89,11 +89,9 @@ MainWindow::MainWindow()
       m_fenceBtn(new QPushButton(QString::fromUtf8("绘制围栏"), this)),
       m_originMarker(0),
       m_destMarker(0),
-      m_pressScreenPos(),
       m_flightSpeedMps(80),
       m_hasRealPos(false),
       m_lastRealPos(0, 0),
-      m_pickMode(PickNone),
       m_origin(0, 0),
       m_dest(0, 0),
       m_hasOrigin(false),
@@ -110,11 +108,14 @@ MainWindow::MainWindow()
     m_map->SetShowHome(true);   // 打开 Home 返航点图标（惰性创建，默认不显示）
 
     // 地图信号 → 本窗口
-    connect(m_map, SIGNAL(mousePress(QMouseEvent*)), this, SLOT(onMapMousePress(QMouseEvent*)));
-    connect(m_map, SIGNAL(mouseRelease(QMouseEvent*)), this, SLOT(onMapMouseRelease(QMouseEvent*)));
     connect(m_map, SIGNAL(mouseMove(QMouseEvent*)), this, SLOT(onMapMouseMove(QMouseEvent*)));
     connect(m_map, SIGNAL(zoomChanged(double,double,double)), this, SLOT(onZoomChanged(double,double,double)));
     connect(m_map, SIGNAL(OnTilesStillToLoad(int)), this, SLOT(onTilesStill(int)));
+    // 库点选交互：取点/结束由库防抖与多点累积统一分发（航点/起终点/围栏/喂位置）
+    connect(m_map, SIGNAL(positionPicked(int,opmap::PointLatLng)),
+            this, SLOT(onPositionPicked(int,opmap::PointLatLng)));
+    connect(m_map, SIGNAL(pickFinished(int,QList<opmap::PointLatLng>)),
+            this, SLOT(onPickFinished(int,QList<opmap::PointLatLng>)));
 
     // 库导航信号 → 面板/横幅
     connect(m_map, SIGNAL(navigationRouteReady(opmap::Route)), this, SLOT(onNavigationRouteReady(opmap::Route)));
@@ -139,7 +140,6 @@ MainWindow::MainWindow()
     m_followCheck->setChecked(true);
     m_trailCheck->setChecked(true);
     m_map->SetFollowVehicle(true);   // 跟随开关下沉到库：喂点自动居中，UAV 创建时套用
-    setPickMode(PickNone);
 
     // 指令横幅：地图底部叠加，默认隐藏
     m_banner->setTextFormat(Qt::RichText);
@@ -180,9 +180,8 @@ void MainWindow::setupMenus()
     QAction *ripAct = mapMenu->addAction(QString::fromUtf8("下载框选区域离线瓦片…"));
     connect(ripAct, SIGNAL(triggered()), this, SLOT(onRipMapClicked()));
 
-    // 右键菜单：切换地图源 / 航点增删（与旧版示例一致）
-    m_map->setContextMenuPolicy(Qt::CustomContextMenu);
-    connect(m_map, SIGNAL(customContextMenuRequested(QPoint)),
+    // 右键菜单：切换地图源 / 航点增删（库转发右键事件，取点中的右键已被库拦截为"结束取点"）
+    connect(m_map, SIGNAL(mapContextMenuRequested(QPoint)),
             this, SLOT(onMapContextMenu(QPoint)));
 
     // 工具栏（缩放与定位）
@@ -763,35 +762,24 @@ void MainWindow::onFlightClicked()
              .arg(wps.size()).arg(photoCount).arg(hoverCount).arg(m_flightSpeedMps));
 }
 
-/** 围栏按钮三态：绘制围栏 →（地图连续取点）→ 结束围栏 → 清除围栏 → 绘制围栏。 */
+/** 围栏按钮三态：绘制围栏 →（库内连续取点+橡皮筋预览）→ 结束围栏 → 清除围栏 → 绘制围栏。 */
 void MainWindow::onFenceClicked()
 {
-    if (m_pickMode == PickFence) {          // 第二次点击：结束取点并闭合
-        setPickMode(PickNone);
-        if (m_fencePts.size() >= 3) {
-            m_map->SetGeofence(m_fencePts);
-            m_fenceBtn->setText(QString::fromUtf8("清除围栏"));
-            logEvent(QString::fromUtf8("多边形地理围栏生效：%1 个顶点。配合航点飞行或行车模拟，飞机飞出红区即在日志报越界").arg(m_fencePts.size()));
-        } else {
-            m_fencePts.clear();
-            m_map->SetGeofence(QList<opmap::PointLatLng>());   // 清掉取点预览残留
-            m_fenceBtn->setText(QString::fromUtf8("绘制围栏"));
-            logEvent(QString::fromUtf8("围栏顶点不足 3 个，已取消"));
-        }
+    // 取点中：再点按钮 = 结束（库按顶点数固化/清理，pickFinished 回调恢复按钮文案）
+    if (m_map->GetPickMode() == opmap::OPMapWidget::PickFence) {
+        m_map->SetPickMode(opmap::OPMapWidget::PickNone);
         return;
     }
 
     if (m_map->HasGeofence()) {             // 已有围栏：清除
         m_map->ClearGeofence();
-        m_fencePts.clear();
         m_fenceBtn->setText(QString::fromUtf8("绘制围栏"));
         logEvent(QString::fromUtf8("地理围栏已清除"));
         return;
     }
 
-    // 开始取点：地图上依次点击放置顶点，完成后再次点击本按钮闭合
-    m_fencePts.clear();
-    setPickMode(PickFence);
+    // 开始取点：地图上依次点击放置顶点（防抖/预览/累积全在库内），完成后再次点击本按钮闭合
+    m_map->SetPickMode(opmap::OPMapWidget::PickFence);
     m_fenceBtn->setText(QString::fromUtf8("结束围栏"));
     statusBar()->showMessage(QString::fromUtf8("在地图上点击放置围栏顶点（至少 3 个），完成后点击“结束围栏”"), 10000);
 }
@@ -823,17 +811,7 @@ void MainWindow::SyncMapTypeActions()
 
 void MainWindow::onMapContextMenu(const QPoint &pos)
 {
-    // 连续取点模式下右键 = 结束取点（不弹地图菜单）
-    if (m_pickMode == PickFence) {
-        onFenceClicked();
-        return;
-    }
-    if (m_pickMode == PickMock) {
-        setPickMode(PickNone);
-        statusBar()->showMessage(QString::fromUtf8("已结束喂点"), 5000);
-        return;
-    }
-
+    // 取点模式中的右键已由库拦截为"结束取点"，此槽只会收到正常浏览的右键
     QMenu menu(this);
     QMenu *typeMenu = menu.addMenu(QString::fromUtf8("切换地图类型"));
     for (int i = 0; i < kMapSourceCount; ++i) {
@@ -895,40 +873,11 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     }
 }
 
-void MainWindow::onMapMousePress(QMouseEvent *e)
-{
-    if (m_pickMode == PickNone)
-        return;
-    if (m_pickMode == PickFence || m_pickMode == PickMock) {
-        // 连续取点模式防抖：按下只记位置，抬起时位移小于阈值才固化（拖动地图不算选点）
-        m_pressScreenPos = e->pos();
-        return;
-    }
-    applyPickPoint(m_map->currentMousePosition());
-}
-
-void MainWindow::onMapMouseRelease(QMouseEvent *e)
-{
-    if (m_pickMode != PickFence && m_pickMode != PickMock)
-        return;
-    // 位移守卫：按下与抬起几乎未移动（<6px）才算一次选点点击，拖动地图不算
-    if ((e->pos() - m_pressScreenPos).manhattanLength() > 6)
-        return;
-    applyPickPoint(m_map->currentMousePosition());
-}
-
 void MainWindow::onMapMouseMove(QMouseEvent *)
 {
     const opmap::PointLatLng p = m_map->currentMousePosition();
     m_posLabel->setText(QString::fromUtf8("lng: %1, lat: %2 (WGS-84)")
                         .arg(p.Lng(), 0, 'f', 6).arg(p.Lat(), 0, 'f', 6));
-
-    // 围栏橡皮筋预览：末段线实时跟随鼠标，点击地图即固化一个顶点
-    if (m_pickMode == PickFence && !m_fencePts.isEmpty()) {
-        QList<opmap::PointLatLng> preview = m_fencePts;
-        preview.append(p);
-        m_map->SetGeofence(preview);
-    }
 }
 
 void MainWindow::onZoomChanged(double, double, double)
@@ -945,7 +894,8 @@ void MainWindow::onTilesStill(int number)
 
 void MainWindow::onAddWaypointClicked()
 {
-    setPickMode(PickWaypoint);
+    m_map->SetPickMode(opmap::OPMapWidget::PickWaypoint);   // 单发：取一次库自动结束
+    m_addWpBtn->setEnabled(false);
     statusBar()->showMessage(QString::fromUtf8("在地图上点击以放置航点"), 5000);
 }
 
@@ -1022,13 +972,13 @@ void MainWindow::refreshWaypointList()
 
 void MainWindow::onPickOriginClicked()
 {
-    setPickMode(PickOrigin);
+    m_map->SetPickMode(opmap::OPMapWidget::PickOrigin);   // 单发：取一次库自动结束
     statusBar()->showMessage(QString::fromUtf8("在地图上点击设置起点"), 5000);
 }
 
 void MainWindow::onPickDestClicked()
 {
-    setPickMode(PickDest);
+    m_map->SetPickMode(opmap::OPMapWidget::PickDest);
     statusBar()->showMessage(QString::fromUtf8("在地图上点击设置目的地"), 5000);
 }
 
@@ -1044,8 +994,7 @@ void MainWindow::onPlanClicked()
                                  QString::fromUtf8("正在导航中，请先停止导航再规划预览"));
         return;
     }
-    if (m_pickMode != PickNone)
-        setPickMode(PickNone);
+    m_map->SetPickMode(opmap::OPMapWidget::PickNone);   // 中止未完成的取点（无取点时为空操作）
     applyProviderFromUI();
     m_navInfo->setText(QString::fromUtf8("规划中…"));
     m_map->PlanRoute(m_origin, m_dest);
@@ -1058,8 +1007,7 @@ void MainWindow::onNavigateClicked()
                                  QString::fromUtf8("请先在地图上点选目的地"));
         return;
     }
-    if (m_pickMode != PickNone)
-        setPickMode(PickNone);
+    m_map->SetPickMode(opmap::OPMapWidget::PickNone);   // 中止未完成的取点
     applyProviderFromUI();
     // 新导航任务：清空旧轨迹，从头记录（否则起点瞬移会与旧轨迹终点拉出连线）
     if (opmap::UAVItem *u = m_map->GetUAV(0))
@@ -1171,8 +1119,7 @@ void MainWindow::onSimStartClicked()
                                  QString::fromUtf8("请先开始导航，路线规划成功后再跟车模拟"));
         return;
     }
-    if (m_pickMode != PickNone)
-        setPickMode(PickNone);
+    m_map->SetPickMode(opmap::OPMapWidget::PickNone);   // 中止未完成的取点
 
     if (opmap::UAVItem *u = m_map->GetUAV(0))
         u->DeleteTrail();   // 跟车从头记录轨迹（UAV 尚未出现则无可清理）
@@ -1194,14 +1141,14 @@ void MainWindow::onSimStopClicked()
 
 void MainWindow::onMockPosClicked()
 {
-    // 切换"点选喂位置"模式：开启后点哪喂哪（所见即所得），可连续喂点；
-    // 右键或再点本按钮结束
-    if (m_pickMode == PickMock) {
-        setPickMode(PickNone);
-        statusBar()->showMessage(QString::fromUtf8("已结束喂点"), 5000);
+    // 切换"点选喂位置"模式：开启后点哪喂哪（所见即所得）；
+    // 库内连续取点（防抖/多点累积），右键或再点本按钮结束
+    if (m_map->GetPickMode() == opmap::OPMapWidget::PickPosition) {
+        m_map->SetPickMode(opmap::OPMapWidget::PickNone);
         return;
     }
-    setPickMode(PickMock);
+    m_map->SetPickMode(opmap::OPMapWidget::PickPosition);
+    m_mockPosBtn->setText(QString::fromUtf8("结束喂点"));
     statusBar()->showMessage(QString::fromUtf8("点选喂位置模式：在地图上点击任意位置即喂入该点"), 8000);
 }
 
@@ -1438,21 +1385,13 @@ void MainWindow::onRipMapClicked()
     statusBar()->showMessage(QString::fromUtf8("离线瓦片下载已启动"), 5000);
 }
 
-// ————————————————— 内部工具 —————————————————
+// ————————————————— 库点选分发（防抖/多点累积/右键结束全在库内） —————————————————
 
-void MainWindow::setPickMode(PickMode mode)
+/// 库 positionPicked：一次有效选点（mode 为 PickMode 枚举值）
+void MainWindow::onPositionPicked(int mode, const opmap::PointLatLng &p)
 {
-    m_pickMode = mode;
-    m_addWpBtn->setEnabled(mode != PickWaypoint);
-    m_mockPosBtn->setText(mode == PickMock
-                          ? QString::fromUtf8("结束喂点")
-                          : QString::fromUtf8("点选喂位置"));
-}
-
-void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
-{
-    switch (m_pickMode) {
-    case PickWaypoint:
+    switch (mode) {
+    case opmap::OPMapWidget::PickWaypoint:
     {
         opmap::WayPointItem *wp = m_map->WPCreate(p, 100);
         wp->SetDescription(QString::fromUtf8("WP%1").arg(m_map->WPAll().size()));
@@ -1469,7 +1408,7 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
         refreshWaypointList();
         break;
     }
-    case PickOrigin: {
+    case opmap::OPMapWidget::PickOrigin: {
         m_origin = p;
         m_hasOrigin = true;
         // 起点/目的地即时标记：地理锚定（走航点刷新链），不进 WPAll 不影响飞行序列
@@ -1484,7 +1423,7 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
                                .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         break;
     }
-    case PickDest: {
+    case opmap::OPMapWidget::PickDest: {
         m_dest = p;
         m_hasDest = true;
         if (!m_destMarker) {
@@ -1498,14 +1437,12 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
                              .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
         break;
     }
-    case PickFence:
-        // 围栏取点：逐点加入并实时预览（1 点=顶点圆点，2 点=连线，≥3 点闭合生效），模式保持不退出
-        m_fencePts.append(p);
-        m_map->SetGeofence(m_fencePts);
-        logEvent(QString::fromUtf8("围栏顶点 %1: lat %2, lng %3")
-                 .arg(m_fencePts.size()).arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
-        return;   // 保持 PickFence，直到点"结束围栏"
-    case PickMock:
+    case opmap::OPMapWidget::PickFence:
+        // 围栏顶点逐点记录（预览与累积在库内），模式保持直到右键/按钮结束
+        logEvent(QString::fromUtf8("围栏顶点: lat %1, lng %2")
+                 .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5));
+        break;
+    case opmap::OPMapWidget::PickPosition:
     {
         // 点选喂位置：点哪喂哪（所见即所得），模式保持可连续喂点
         m_map->UpdateVehiclePosition(p);   // 惰性创建 UAV（库默认大头针/每秒轨迹点）
@@ -1522,12 +1459,38 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
             tip += QString::fromUtf8("，偏航计数 %1/3").arg(m_map->GetNavigationEngine()->OffRouteCount());
         logEvent(tip);
         statusBar()->showMessage(tip + QString::fromUtf8("，继续点击可连续喂点，右键/按钮结束"), 8000);
-        return;   // 保持 PickMock，直到右键或点"结束喂点"
+        break;
     }
     default:
         break;
     }
-    setPickMode(PickNone);
+}
+
+/// 库 pickFinished：取点结束（单发自动结束/右键/按钮），恢复交互状态
+void MainWindow::onPickFinished(int mode, const QList<opmap::PointLatLng> &points)
+{
+    switch (mode) {
+    case opmap::OPMapWidget::PickWaypoint:
+        m_addWpBtn->setEnabled(true);
+        break;
+    case opmap::OPMapWidget::PickFence:
+        // 库内已按顶点数固化（≥3）/清理预览（<3）
+        if (m_map->HasGeofence()) {
+            m_fenceBtn->setText(QString::fromUtf8("清除围栏"));
+            logEvent(QString::fromUtf8("多边形地理围栏生效：%1 个顶点。配合航点飞行或行车模拟，飞机飞出红区即在日志报越界")
+                     .arg(points.size()));
+        } else {
+            m_fenceBtn->setText(QString::fromUtf8("绘制围栏"));
+            logEvent(QString::fromUtf8("围栏顶点不足 3 个，已取消"));
+        }
+        break;
+    case opmap::OPMapWidget::PickPosition:
+        m_mockPosBtn->setText(QString::fromUtf8("点选喂位置"));
+        statusBar()->showMessage(QString::fromUtf8("已结束喂点"), 5000);
+        break;
+    default:
+        break;
+    }
 }
 
 void MainWindow::setBanner(const QString &headline, const QString &subText, const QString &bgColor)

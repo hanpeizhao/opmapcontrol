@@ -48,9 +48,10 @@ public:
 private slots:
     // 地图交互
     void onMapSourceTriggered();
-    void onMapMousePress(QMouseEvent *event);  ///< 地图左键按下（取点/记录防抖起点）
-    void onMapMouseRelease(QMouseEvent *event);  ///< 地图左键抬起（位移小于阈值才视为选点，避免拖图误加点）
     void onMapMouseMove(QMouseEvent *event);
+    // 库点选信号：取点/结束由库防抖分发（航点/起终点/围栏/喂位置共用）
+    void onPositionPicked(int mode, const opmap::PointLatLng &p);
+    void onPickFinished(int mode, const QList<opmap::PointLatLng> &points);
     void onZoomChanged(double zoomt, double zoom, double zoomd);
     void onTilesStill(int number);
 
@@ -127,21 +128,9 @@ protected:
     void resizeEvent(QResizeEvent *event);
 
 private:
-    enum PickMode
-    {
-        PickNone,
-        PickWaypoint,
-        PickOrigin,
-        PickDest,
-        PickFence,      ///< 围栏取点：连续多点模式，点"结束围栏"闭合
-        PickMock        ///< 点选喂位置：点哪喂哪，连续取点，点按钮/右键结束
-    };
-
     void setupMenus();
     void setupDocks();
     void setupStatusBar();
-    void applyPickPoint(const opmap::PointLatLng &p);
-    void setPickMode(PickMode mode);
     void refreshWaypointList();
     void applyProviderFromUI();   ///< 按面板选择创建/更新库内路由 provider
     void stopGps();               ///< 停止系统 GPS 位置源（若有）
@@ -199,15 +188,12 @@ private:
     QLabel *m_navStateLabel;         ///< 导航状态行（导航中/路线摘要/请求状态）
     int m_lastDlPct;                 ///< 下载日志节流（上个 10% 档位）
     QPushButton *m_fenceBtn;         ///< 多边形围栏三态按钮
-    QList<opmap::PointLatLng> m_fencePts;   ///< 围栏取点缓存（取点过程中逐点更新）
     opmap::WayPointItem *m_originMarker;    ///< 导航起点标记（地理锚定，选中时立即显示）
     opmap::WayPointItem *m_destMarker;      ///< 导航目的地标记
-    QPoint m_pressScreenPos;         ///< 左键按下屏幕位置（选点防抖：抬起时位移小才算点）
     int m_flightSpeedMps;            ///< 航点飞行巡航速度（m/s，右键菜单可调）
     bool m_hasRealPos;               ///< 是否有过真实位置源（GPS/IP/MAVLink/模拟）喂入的位置
     opmap::PointLatLng m_lastRealPos;///< 最近一次真实位置（导航起点等假想喂点不参与记录）
 
-    PickMode m_pickMode;
     opmap::PointLatLng m_origin;     ///< 点选的起点（缺省用当前位置）
     opmap::PointLatLng m_dest;
     bool m_hasOrigin;
