@@ -24,10 +24,22 @@
 **库 API**（facade OPMapWidget）：
 - `WPInsert(坐标, 高度, 描述, 位置)` / `WPDelete` / `WPRenumber` / `WPAll()` / `WPSelected()`
 - 航点项：`SetDescription`（说明文字）、`SetAltitude`（该点高度）、`SetReached(bool)`（打勾）
-- 航点动作：`SetAction(WayPointAction)`——`WayPointActionNone`（无）/ `WayPointActionPhoto`（到达即拍照）/ `WayPointActionHover`（到达后悬停），配合 `SetHoverTime(秒)`；库只携带动作数据并在到达信号里转发，实际执行由上层在 `UAVReachedWayPoint` 处下发任务指令
+- 航点动作：`SetAction(WayPointAction)`——`WayPointActionNone`（无）/ `WayPointActionPhoto`（到达即拍照）/ `WayPointActionHover`（到达后悬停），配合 `SetHoverTime(秒)`；枚举定义在任务引擎 `WaypointMissionEngine::WaypointAction`（WayPointItem 为引用别名），动作触发统一由任务引擎信号表达
 - 信号：`WPInserted` / `WPDeleted` / `WPNumberChanged` / `WPValuesChanged` / `WPReached`
 
 **demo 状态**：✅ 地图点选添加、删除、`.wp` 文件导入导出、中点插入、编号重排（航点面板）；✅ 航点面板"到达动作"下拉（无/拍照/悬停 30 秒），点选航点前先选动作，飞行日志中显示"【动作】触发拍照 / 原地悬停 30 秒"。
+
+### 2.1 航点任务飞行：WaypointMissionEngine（库内状态机）
+
+**是什么**：任务飞行的全部状态逻辑——到达判定、悬停计时、动作触发、航点推进、任务完成——都在库内完成（`src/engine/waypointmissionengine.h/.cpp`）。**纯喂点驱动，无内部定时器**：真机（飞控自己沿航点飞，地面站只喂遥测）与模拟器（插值生成位置流）同构接入。
+
+**库 API**（facade OPMapWidget）：
+- `StartWaypointMission(WPAll() 航点列表, 到达半径米=15)`：从航点图元提取坐标/悬停时长/动作组装任务并启动
+- `StopWaypointMission()` / `IsWaypointMissionActive()`
+- 喂点即驱动：`UpdateVehiclePosition` 或 `SetUAVPos` 每喂一个位置，库自动推进状态机
+- 信号：`missionStarted` / `missionCurrentWaypointChanged(下标)`（目标切换）/ `missionWaypointReached(下标, 动作)` / `missionHoverStateChanged(bool, 秒)` / `missionActionTriggered(下标, 动作)`（拍照立即发、悬停进入时发）/ `missionFinished`
+
+**demo 状态**：✅ 模拟器已退化为**纯假遥测源**（`WaypointFlightSimulator` 只剩"朝库下发的目标匀速推进 + 悬停原地心跳"），目标切换/悬停/动作/完成全部由库信号驱动。**真机接入 = 整体删除模拟器，遥测直接喂 `SetUAVPos`，任务判定链路不变。**
 
 ## 3. UAVItem —— 遥测实时位置图标
 

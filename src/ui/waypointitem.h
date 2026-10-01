@@ -32,6 +32,7 @@
 #include <QLabel>
 #include "pointlatlng.h"
 #include "mapgraphicitem.h"
+#include "waypointmissionengine.h"
 #include <QObject>
 
 namespace opmap {
@@ -102,15 +103,13 @@ public:
     void SetReached(bool const& value);
 
     /**
-    * @brief 航点动作：到达该点时由上层执行的任务动作（库只携带数据并转发，
-    *        实际拍照/悬停由上层在 UAVReachedWayPoint 信号里响应）
+    * @brief 航点动作：到达该点时由任务状态机执行的动作（枚举定义在
+    *        WaypointMissionEngine，此处引用别名；数值序列与 .wp 兼容）
     */
-    enum WayPointAction
-    {
-        WayPointActionNone,    ///< 无动作（普通途经点）
-        WayPointActionPhoto,   ///< 到达即触发拍照
-        WayPointActionHover    ///< 到达后悬停
-    };
+    typedef WaypointMissionEngine::WaypointAction WayPointAction;
+    static const WayPointAction WayPointActionNone  = WaypointMissionEngine::ActionNone;
+    static const WayPointAction WayPointActionPhoto = WaypointMissionEngine::ActionPhoto;
+    static const WayPointAction WayPointActionHover = WaypointMissionEngine::ActionHover;
 
     WayPointAction Action() const { return action; }
     void SetAction(WayPointAction const& value) { action = value; }

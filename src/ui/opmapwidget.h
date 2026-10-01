@@ -64,6 +64,7 @@ class AbstractRouteProvider;
 class IpLocationProvider;
 class GeofenceItem;
 class NavigationEngine;
+class WaypointMissionEngine;
 class RouteItem;
 
 /**
@@ -526,6 +527,7 @@ private:
 
     opmap::AbstractRouteProvider *routeProvider;   ///< 路由规划服务（接管外部传入者）
     opmap::NavigationEngine *navEngine;            ///< 导航状态机
+    opmap::WaypointMissionEngine *missionEngine;   ///< 航点任务状态机（喂点驱动）
     opmap::RouteItem *routeItem;                   ///< 路线绘制项（随 map 析构）
     opmap::IpLocationProvider *ipLocator;          ///< IP 定位服务（城市级兜底）
     opmap::GeofenceItem *geofenceItem;             ///< 多边形地理围栏（多边形内为允许区）
@@ -537,6 +539,13 @@ private slots:
     void diagRefresh();
     void onNavProgress(double traveledM, double remainingM, int remainingS, const QString &instruction);
     //   WayPointItem* item;//apagar
+    // 航点任务引擎信号 → facade 信号转发
+    void onMissionStarted();
+    void onMissionCurrentWaypointChanged(int index);
+    void onMissionWaypointReached(int index, int action);
+    void onMissionHoverStateChanged(bool hovering, int seconds);
+    void onMissionActionTriggered(int index, int action);
+    void onMissionFinished();
 
 protected:
     MapGraphicItem *map;
@@ -692,6 +701,14 @@ signals:
     /** @brief IP 定位失败（双源均不可用或返回异常） */
     void ipLocationFailed(QString reason);
     void geofenceBreach(opmap::PointLatLng position);   ///< UAV 飞出多边形围栏
+
+    // —— 航点任务飞行（WaypointMissionEngine 转发）——
+    void missionStarted();                              ///< 任务启动
+    void missionCurrentWaypointChanged(int index);      ///< 当前目标航点切换（0 起）
+    void missionWaypointReached(int index, int action); ///< 抵达某航点
+    void missionHoverStateChanged(bool hovering, int seconds); ///< 悬停开始/结束
+    void missionActionTriggered(int index, int action); ///< 到达动作触发（拍照/悬停）
+    void missionFinished();                             ///< 全部航点完成
     void geofenceEntered(opmap::PointLatLng position);  ///< UAV 回到多边形围栏内
 
     // ———————— 离线下载进度信号（转发自 MapRipper）————————
@@ -747,6 +764,15 @@ public slots:
 
     /// 导航引擎访问器（调整偏航阈值/到达阈值/重规划参数等引擎默认行为）
     opmap::NavigationEngine *GetNavigationEngine() const;
+
+    // —— 航点任务飞行（库内状态机，喂点驱动）——
+    /// 启动航点任务：从航点图元提取坐标/悬停时长/动作组装任务并启动。
+    /// 之后每次喂点（UpdateVehiclePosition/SetUAVPos）由库自动推进状态：
+    /// 到达判定→悬停计时→动作信号→下一航点→missionFinished
+    void StartWaypointMission(QList<WayPointItem*> const& waypoints,
+                              double arrivalRadiusMeters = 15.0);
+    void StopWaypointMission();                            ///< 中止当前任务
+    bool IsWaypointMissionActive() const;                  ///< 任务是否进行中
 
     /**
      * @brief Sets the map zoom level

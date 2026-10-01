@@ -18,6 +18,7 @@
 #include "osrmrouteprovider.h"
 #include "amaprouteprovider.h"
 #include "navigationengine.h"
+#include "waypointmissionengine.h"
 #include "routeitem.h"
 #include "geofenceitem.h"
 #include "mavlinktelemetryprovider.h"

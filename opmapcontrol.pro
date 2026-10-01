@@ -61,6 +61,7 @@ HEADERS += \
     ./src/engine/mapservice.h \
     ./src/engine/mapengine.h \
     ./src/engine/navigationengine.h \
+    ./src/engine/waypointmissionengine.h \
     ./src/engine/tile.h \
     ./src/engine/tilematrix.h \
     ./src/engine/loadtask.h \
@@ -114,6 +115,7 @@ SOURCES += \
     ./src/engine/mapservice.cpp \
     ./src/engine/mapengine.cpp \
     ./src/engine/navigationengine.cpp \
+    ./src/engine/waypointmissionengine.cpp \
     ./src/engine/tile.cpp \
     ./src/engine/tilematrix.cpp \
     ./src/engine/loadtask.cpp \

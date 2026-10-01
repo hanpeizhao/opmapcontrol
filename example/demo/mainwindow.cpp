@@ -670,8 +670,9 @@ void MainWindow::onRenumberClicked()
 
 void MainWindow::onFlightClicked()
 {
-    // 二次点击 = 停止飞行
+    // 二次点击 = 停止飞行（库任务状态机 + 模拟遥测源一起停）
     if (m_flightSim && m_flightSim->isActive()) {
+        m_map->StopWaypointMission();
         m_flightSim->stop();
         m_flightBtn->setText(QString::fromUtf8("航点飞行"));
         // 恢复位置源图标语义（大头针=位置标记，四旋翼=飞行目标）
@@ -681,18 +682,14 @@ void MainWindow::onFlightClicked()
         return;
     }
 
-    // 收集航点坐标（WPAll 按编号有序）
+    // 收集航点（WPAll 按编号有序）；坐标/悬停/动作由库 StartWaypointMission 提取
     QMap<int, opmap::WayPointItem*> wps = m_map->WPAll();
     if (wps.isEmpty()) {
         statusBar()->showMessage(QString::fromUtf8("请先在地图点选添加航点"), 5000);
         return;
     }
-    QList<opmap::PointLatLng> coords;
-    QList<int> hoverSecs;
     int photoCount = 0, hoverCount = 0;
     for (QMap<int, opmap::WayPointItem*>::const_iterator it = wps.constBegin(); it != wps.constEnd(); ++it) {
-        coords.append(it.value()->Coord());
-        hoverSecs.append(it.value()->HoverTime());
         if (it.value()->Action() == opmap::WayPointItem::WayPointActionPhoto)
             ++photoCount;
         else if (it.value()->Action() == opmap::WayPointItem::WayPointActionHover)
@@ -726,37 +723,56 @@ void MainWindow::onFlightClicked()
     if (!m_flightSim) {
         m_flightSim = new WaypointFlightSimulator(this);
         connect(m_flightSim, &WaypointFlightSimulator::positionChanged, this,
-                [this](opmap::PointLatLng p, double heading, int idx, int total) {
-            // 真机接入点：替换为遥测回调喂 SetUAVPos 即可（facade 槽，围栏越界判定在库内生效）
+                [this](opmap::PointLatLng p, double heading) {
+            // 真机接入点：整体替换本模拟器，遥测直接喂 SetUAVPos——
+            // 围栏判定、到达判定、动作触发全在库内，链路不变
             m_map->SetUAVPos(0, p, 120);
             opmap::UAVItem *u = m_map->GetUAV(0);
             if (u)
                 u->SetUAVHeading(heading);
-            m_flightBtn->setText(QString::fromUtf8("停止飞行（目标 %1/%2）")
-                                 .arg(qMin(idx + 1, total)).arg(total));
-        });
-        connect(m_flightSim, &WaypointFlightSimulator::waypointPassed, this,
-                [this](int idx, int total) {
-            // 库只携带动作数据，实际拍照/悬停由上层在到达信号里响应（真机=下发任务指令）
-            opmap::WayPointItem *wp = m_map->WPAll().values().value(idx);
-            if (wp && wp->Action() == opmap::WayPointItem::WayPointActionPhoto) {
-                logEvent(QString::fromUtf8("【动作】触发拍照 [航点 %1]").arg(idx));
-                statusBar()->showMessage(QString::fromUtf8("已触发拍照 [航点 %1]（真机上此处下发相机指令）").arg(idx), 8000);
-            } else if (wp && wp->Action() == opmap::WayPointItem::WayPointActionHover) {
-                logEvent(QString::fromUtf8("【动作】原地悬停 %1 秒 [航点 %2]").arg(wp->HoverTime()).arg(idx));
-                statusBar()->showMessage(QString::fromUtf8("悬停中：%1 秒后飞向下一航点").arg(wp->HoverTime()), 8000);
-            }
-            logEvent(QString::fromUtf8("航点飞行：已到达 %1/%2（库侧 UAVReachedWayPoint 同步打勾）").arg(idx).arg(total));
-        });
-        connect(m_flightSim, &WaypointFlightSimulator::finished, this, [this]() {
-            m_flightBtn->setText(QString::fromUtf8("航点飞行"));
-            logEvent(QString::fromUtf8("航点任务完成：全部航点已到达"));
         });
     }
+    // 模拟器跟随库任务状态机：目标切换/悬停开关/动作日志/完成收尾全部来自库信号
+    connect(m_map, &opmap::OPMapWidget::missionCurrentWaypointChanged, m_flightSim,
+            [this](int idx) {
+        QMap<int, opmap::WayPointItem*> all = m_map->WPAll();
+        opmap::WayPointItem *wp = all.values().value(idx);
+        if (wp)
+            m_flightSim->setTarget(wp->Coord());
+        m_flightBtn->setText(QString::fromUtf8("停止飞行（目标 %1/%2）")
+                             .arg(idx + 1).arg(all.size()));
+    });
+    connect(m_map, &opmap::OPMapWidget::missionHoverStateChanged, m_flightSim,
+            &WaypointFlightSimulator::setHovering);
+    connect(m_map, &opmap::OPMapWidget::missionActionTriggered, this,
+            [this](int idx, int action) {
+        // 实际拍照/悬停由上层在动作信号里响应（真机=下发任务指令）
+        QMap<int, opmap::WayPointItem*> all = m_map->WPAll();
+        opmap::WayPointItem *wp = all.values().value(idx);
+        if (action == (int)opmap::WayPointItem::WayPointActionPhoto) {
+            logEvent(QString::fromUtf8("【动作】触发拍照 [航点 %1]").arg(idx));
+            statusBar()->showMessage(QString::fromUtf8("已触发拍照 [航点 %1]（真机上此处下发相机指令）").arg(idx), 8000);
+        } else if (action == (int)opmap::WayPointItem::WayPointActionHover && wp) {
+            logEvent(QString::fromUtf8("【动作】原地悬停 %1 秒 [航点 %2]").arg(wp->HoverTime()).arg(idx));
+            statusBar()->showMessage(QString::fromUtf8("悬停中：%1 秒后飞向下一航点").arg(wp->HoverTime()), 8000);
+        }
+    });
+    connect(m_map, &opmap::OPMapWidget::missionWaypointReached, this,
+            [this](int idx, int total_) {
+        Q_UNUSED(total_);
+        logEvent(QString::fromUtf8("航点飞行：已到达 [航点 %1]（库侧 UAVReachedWayPoint 同步打勾）").arg(idx));
+    });
+    connect(m_map, &opmap::OPMapWidget::missionFinished, this, [this]() {
+        m_flightSim->stop();
+        m_flightBtn->setText(QString::fromUtf8("航点飞行"));
+        logEvent(QString::fromUtf8("航点任务完成：全部航点已到达（库任务状态机 missionFinished）"));
+    });
 
-    m_flightSim->start(start, coords, hoverSecs, double(m_flightSpeedMps));
+    // 启动：库状态机 + 假遥测源（真机接入时删除模拟器，遥测直接喂 SetUAVPos）
+    m_flightSim->start(start, double(m_flightSpeedMps));
+    m_map->StartWaypointMission(wps.values(), 15.0);
     logEvent(QString::fromUtf8("航点飞行开始：%1 个航点（拍照 %2、悬停 %3），从 Home 图标处起飞，巡航 %4 m/s，安全围栏 3000 m")
-             .arg(coords.size()).arg(photoCount).arg(hoverCount).arg(m_flightSpeedMps));
+             .arg(wps.size()).arg(photoCount).arg(hoverCount).arg(m_flightSpeedMps));
 }
 
 /** 围栏按钮三态：绘制围栏 →（地图连续取点）→ 结束围栏 → 清除围栏 → 绘制围栏。 */

@@ -35,6 +35,7 @@
 #include "iplocationprovider.h"
 #include "geofenceitem.h"
 #include "navigationengine.h"
+#include "waypointmissionengine.h"
 #include "routeitem.h"
 
 namespace opmap {
@@ -53,6 +54,7 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     diagGraphItem(0),
     routeProvider(0),
     navEngine(0),
+    missionEngine(0),
     routeItem(0),
     ipLocator(0),
     geofenceItem(0),
@@ -96,6 +98,15 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
             this, SIGNAL(ipLocationReady(opmap::PointLatLng,QString)));
     connect(ipLocator, SIGNAL(locationFailed(QString)),
             this, SIGNAL(ipLocationFailed(QString)));
+
+    // —— 航点任务：引擎信号 → facade 信号转发（喂点驱动，见 UpdatePosition）——
+    missionEngine = new WaypointMissionEngine(this);
+    connect(missionEngine, SIGNAL(missionStarted()), this, SLOT(onMissionStarted()));
+    connect(missionEngine, SIGNAL(currentWaypointChanged(int)), this, SLOT(onMissionCurrentWaypointChanged(int)));
+    connect(missionEngine, SIGNAL(waypointReached(int,int)), this, SLOT(onMissionWaypointReached(int,int)));
+    connect(missionEngine, SIGNAL(hoverStateChanged(bool,int)), this, SLOT(onMissionHoverStateChanged(bool,int)));
+    connect(missionEngine, SIGNAL(actionTriggered(int,int)), this, SLOT(onMissionActionTriggered(int,int)));
+    connect(missionEngine, SIGNAL(missionFinished()), this, SLOT(onMissionFinished()));
 
     connect(navEngine, SIGNAL(routePlanned(opmap::Route)), routeItem, SLOT(SetRoute(opmap::Route)));
     connect(navEngine, SIGNAL(routePlanned(opmap::Route)), this, SIGNAL(navigationRouteReady(opmap::Route)));
@@ -287,6 +298,8 @@ void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
     vehiclePosValid = true;
     navEngine->UpdatePosition(pos);
     CheckGeofence(pos);   // 围栏判定对所有位置源（模拟/GPS/MAVLink）统一生效
+    if (missionEngine && missionEngine->IsMissionActive())
+        missionEngine->UpdatePosition(pos);   // 航点任务状态推进（喂点驱动）
 }
 
 void OPMapWidget::SetUAVPos(int const& id, opmap::PointLatLng const& pos, int const& alt)
@@ -296,6 +309,8 @@ void OPMapWidget::SetUAVPos(int const& id, opmap::PointLatLng const& pos, int co
         uav = AddUAV(id);
     uav->SetUAVPos(pos, alt);
     CheckGeofence(pos);   // 任务飞行喂点同样接入围栏越界判定
+    if (missionEngine && missionEngine->IsMissionActive())
+        missionEngine->UpdatePosition(pos);   // 任务状态推进（真机遥测喂点同构）
 }
 
 void OPMapWidget::StopNavigation()
@@ -319,6 +334,57 @@ opmap::NavigationEngine *OPMapWidget::GetNavigationEngine() const
 {
     return navEngine;
 }
+
+// ———————— 航点任务飞行 ————————
+
+void OPMapWidget::StartWaypointMission(QList<WayPointItem*> const& waypoints,
+                                       double arrivalRadiusMeters)
+{
+    QList<WaypointMissionEngine::MissionWaypoint> mission;
+    for (int i = 0; i < waypoints.size(); ++i) {
+        WayPointItem *wp = waypoints.at(i);
+        mission.append(WaypointMissionEngine::MissionWaypoint(
+                           wp->Coord(), wp->HoverTime(), (int)wp->Action()));
+    }
+    missionEngine->SetMission(mission, arrivalRadiusMeters);
+    missionEngine->StartMission();
+}
+
+void OPMapWidget::StopWaypointMission()
+{
+    missionEngine->StopMission();
+}
+
+bool OPMapWidget::IsWaypointMissionActive() const
+{
+    return missionEngine->IsMissionActive();
+}
+
+// 任务引擎信号 → facade 信号原样转发
+
+void OPMapWidget::onMissionStarted() { emit missionStarted(); }
+
+void OPMapWidget::onMissionCurrentWaypointChanged(int index)
+{
+    emit missionCurrentWaypointChanged(index);
+}
+
+void OPMapWidget::onMissionWaypointReached(int index, int action)
+{
+    emit missionWaypointReached(index, action);
+}
+
+void OPMapWidget::onMissionHoverStateChanged(bool hovering, int seconds)
+{
+    emit missionHoverStateChanged(hovering, seconds);
+}
+
+void OPMapWidget::onMissionActionTriggered(int index, int action)
+{
+    emit missionActionTriggered(index, action);
+}
+
+void OPMapWidget::onMissionFinished() { emit missionFinished(); }
 
 // ———————— 多边形地理围栏 ————————
 
