@@ -556,8 +556,10 @@ UAVItem *OPMapWidget::EnsureUAV(int id)
     uav->SetTrailType(UAVTrailType::ByTimeElapsed);
     uav->SetTrailTime(1);
     uav->SetShowTrailLine(true);
-    uav->SetMapFollowType(followVehicle ? UAVMapFollowType::CenterMap
-                                        : UAVMapFollowType::None);
+    // 地图中心跟随只归主机：多机场景若僚机也跟随，每次喂点互相拉扯
+    // 地图中心（每秒十几次中心跳变），地图乱跳且持续触发瓦片重排风暴
+    uav->SetMapFollowType((followVehicle && id == 0) ? UAVMapFollowType::CenterMap
+                                                     : UAVMapFollowType::None);
     return uav;
 }
 
