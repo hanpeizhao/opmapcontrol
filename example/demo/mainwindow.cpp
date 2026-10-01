@@ -843,10 +843,11 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     setSafeArea->setEnabled(m_map->Home != 0);
     QAction *setSpeed = menu.addAction(QString::fromUtf8("设置航点飞行速度…"));
 
-    // 通用标记演示：图片/文字/清除
+    // 通用标记演示：图片/文字/图文组合/清除
     menu.addSeparator();
     QAction *addImgMarker = menu.addAction(QString::fromUtf8("在此处添加图片标记"));
     QAction *addTextMarker = menu.addAction(QString::fromUtf8("在此处添加文字标记…"));
+    QAction *addBothMarker = menu.addAction(QString::fromUtf8("在此处添加图文标记…"));
     QAction *clearMarkers = menu.addAction(QString::fromUtf8("清除所有标记"));
 
     QAction *chosen = menu.exec(m_map->mapToGlobal(pos));
@@ -902,6 +903,20 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
             m->SetText(label);
             m->SetFontSize(11);
             logEvent(QString::fromUtf8("已添加文字标记：%1").arg(label));
+        }
+    } else if (chosen == addBothMarker) {
+        bool ok = false;
+        QString label = QInputDialog::getText(this, QString::fromUtf8("图文标记"),
+                                              QString::fromUtf8("标签内容："), QLineEdit::Normal,
+                                              QString(), &ok);
+        if (ok) {
+            // 图文组合：SetImage + SetText 叠加生效——图片底边钉在坐标上，标签在其正下方
+            opmap::MapMarkerItem *m = m_map->AddMarker(m_map->currentMousePosition(),
+                                                       QString::fromUtf8(":/markers/images/marker.png"));
+            m->SetImageSize(32, 32);
+            if (!label.isEmpty())
+                m->SetText(label);
+            logEvent(QString::fromUtf8("已添加图文标记%1").arg(label.isEmpty() ? QString() : QString::fromUtf8("：%1").arg(label)));
         }
     } else if (chosen == clearMarkers) {
         m_map->ClearMarkers();
