@@ -192,18 +192,21 @@ IP 定位信号：
 
 | 功能 | API | example |
 |------|:---:|:----:|
-| 开始/停止记录（喂点自动采样：经纬度+高度+相对毫秒时间轴） | `StartTrailRecording()` / `StopTrailRecording()` | ✅ |
-| 记录状态/点数查询 | `IsTrailRecording()` / `TrailPointCount()` | ✅ |
-| 清空轨迹缓冲 | `ClearTrailRecording()` | ✅ |
-| 保存为 JSON（`opmap-trail` 格式：t/lat/lng/alt） | `SaveTrailToFile(路径, *错误)` | ✅（QFileDialog） |
-| 加载轨迹文件 | `LoadTrailFromFile(路径, *错误)` | ✅ |
-| 按时间轴回放（QTimer 50ms × 倍速，相邻点线性插值喂 SetUAVPos，图标/轨迹/围栏/任务机全联动） | `StartTrailReplay(倍速=1.0)` / `StopTrailReplay()` / `IsTrailReplaying()` | ✅（倍速 0.5~16） |
+| 开始/停止记录（喂点自动采样：经纬度+高度+相对毫秒时间轴） | `StartTrailRecording(uavId=0)` / `StopTrailRecording(uavId=0)` | ✅ |
+| 记录状态/点数查询 | `IsTrailRecording(uavId=0)` / `TrailPointCount(uavId=0)` | ✅ |
+| **多机分道记录**（各机同时记录互不混流，uavId 默认 0 老代码零改动） | `StartTrailRecording(机id)` 等 | ✅（多机编队演示三道同录） |
+| 清空轨迹缓冲（全部道） | `ClearTrailRecording()` | ✅ |
+| 保存为 JSON（`opmap-trail` 格式：t/lat/lng/alt + uavId 来源标注） | `SaveTrailToFile(路径, *错误, 机id=0)` | ✅（QFileDialog） |
+| 加载轨迹文件（装入指定机道） | `LoadTrailFromFile(路径, *错误, 机id=0)` | ✅ |
+| 按时间轴回放指定机（QTimer 50ms × 倍速，相邻点线性插值喂 SetUAVPos(机id)，图标/轨迹/围栏全联动） | `StartTrailReplay(倍速=1.0, 机id=0)` / `StopTrailReplay()` / `IsTrailReplaying()` | ✅（倍速 0.5~16） |
 
 | 信号 | 触发时机 | example |
 |------|----------|:----:|
 | `trailReplayFinished()` | 回放推进到末点 | ✅ |
 
 **迁徙图示例**（demo 层）：4 只候鸟沿**贝塞尔弧线航线**飞往越冬地（贝加尔湖→鄱阳湖、蒙古高原→荣成等），库内 `ArcLineItem` 提供拱弧航线 + 沿弧方向箭头 + 流动光效动画（ECharts 迁徙图风格），鸟按 `ArcPointAt(t)` 沿弧飞行与线严格重合；个体间/段间交替拱向呈 S 形；与多人位置演示互斥（共用标记层，双向守卫）。
+
+**多机编队监控示例**（demo 层）：3 架 UAV（0=长机/1/2 僚机）沿三条彩色弧线航线从西安同时飞往兰州/太原/重庆，各机独立图标 + 航向（沿弧方向自动推算），库按机分道自动记录三机轨迹（互不混流）；与航点飞行（0 号机占用）、迁徙演示（共用弧线层）双向互斥守卫。配套库能力：`SetUAVPos(id)` 任务状态机只认主机 0（僚机喂点不误推主机任务进度）。
 
 ## 11. example 未覆盖的能力汇总
 

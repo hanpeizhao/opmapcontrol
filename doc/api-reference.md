@@ -131,9 +131,9 @@ map->SetUAVPos(0, pos, 120);       // 任务飞行喂点（带围栏判定）
 | 方法 | 参数 | 功能 |
 |------|------|------|
 | `UpdateVehiclePosition(PointLatLng)` | WGS-84 位置 | **运动位置流**喂点（行车模拟/系统 GPS/MAVLink 遥测）：移动车辆图标 + 驱动导航引擎 + 围栏判定 + 任务推进 |
-| `SetUAVPos(int id, PointLatLng, int alt)` | 机 id（主机 0）、位置、高度 m | **任务飞行**喂点（等价于 UpdateVehiclePosition + 围栏判定的语义入口） |
+| `SetUAVPos(int id, PointLatLng, int alt)` | 机 id（主机 0）、位置、高度 m | **任务飞行**喂点（等价于 UpdateVehiclePosition + 围栏判定的语义入口；**任务状态机只认主机 0**，僚机喂点不推主机任务进度；轨迹按机分道记录） |
 | `GetUAV(int id)` → `UAVItem*` | — | 取 UAV 图元；`GetUAV(0)->SetUAVHeading(角度)` 设置航向 |
-| `AddUAV(int id)` / `DeleteUAV(int id)` / `GetUAVS()` | — | 多机管理（僚机等） |
+| `AddUAV(int id)` / `DeleteUAV(int id)` / `GetUAVS()` | — | 多机管理（僚机等；多机轨迹分道见 §8） |
 | `SetShowUAV(bool)` | — | UAV 图元开关（注意：当前实现会连带创建/删除 GPSItem，多机场景用 `AddUAV(0)` 规避） |
 | `SetShowHome(bool)` / `ShowHome()` | — | Home 返航点开关 |
 | `SetUavPic(路径)` | qrc 路径（`/uavs` 前缀） | UAV 默认图标；单架换图标用 `GetUAV(0)->SetIcon(全路径)` |
@@ -254,22 +254,27 @@ map->ClearMeasurements();                           // 清除全部测距折线
 | `ClearMeasurements()` / `HasMeasurements()` | 清除全部 / 是否有测距内容 |
 | 信号 `measureFinished(totalMeters, points)` | 一段测距结束（总距离米 + 顶点序列） |
 
-**运动轨迹记录与回放**（engine 层 `TrailRecorder`，纯数据 + 定时回放）：
+**运动轨迹记录与回放**（engine 层 `TrailRecorder`，纯数据 + 定时回放，**按机分道**）：
 
 ```cpp
-map->StartTrailRecording();               // 开始：所有位置源喂点自动入库（含时间戳）
+map->StartTrailRecording();               // 开始：主机 0 的喂点自动入库（含时间戳）
 map->StopTrailRecording();                // 停止（缓冲保留）
 map->SaveTrailToFile("flight.json");      // 存盘（opmap-trail JSON：位置+高度+相对毫秒）
 map->LoadTrailFromFile("flight.json");    // 加载
 map->StartTrailReplay(2.0);               // 2 倍速回放：插值喂 SetUAVPos，图标/轨迹/围栏全联动
+
+// 多机场景：全部 API 带可选 uavId（默认 0，老代码零改动）
+map->StartTrailRecording(1);              // 单独记录 1 号机（各机同时记录互不混流）
+map->SaveTrailToFile("uav1.json", &err, 1);   // 保存 1 号机轨迹
+map->StartTrailReplay(2.0, 1);            // 回放 1 号机（插值喂 SetUAVPos(1)）
 ```
 
 | 方法 | 功能 |
 |------|------|
-| `StartTrailRecording()` / `StopTrailRecording()` / `IsTrailRecording()` | 记录控制（与回放互斥） |
-| `ClearTrailRecording()` / `TrailPointCount()` | 清空缓冲 / 采样点数 |
-| `SaveTrailToFile(path, *error)` / `LoadTrailFromFile(path, *error)` | JSON 文件存取（格式 `opmap-trail`，人类可读） |
-| `StartTrailReplay(speed=1.0)` / `StopTrailReplay()` / `IsTrailReplaying()` | 时间轴变速回放（播完自动停） |
+| `StartTrailRecording(uavId=0)` / `StopTrailRecording(uavId=0)` / `IsTrailRecording(uavId=0)` | 记录控制（按机分道，多机同时记录互不混流；与回放互斥） |
+| `ClearTrailRecording()` / `TrailPointCount(uavId=0)` | 清空全部道 / 指定机采样点数 |
+| `SaveTrailToFile(path, *error, uavId=0)` / `LoadTrailFromFile(path, *error, uavId=0)` | JSON 文件存取（格式 `opmap-trail`，人类可读；加载目标机由参数决定） |
+| `StartTrailReplay(speed=1.0, uavId=0)` / `StopTrailReplay()` / `IsTrailReplaying()` | 时间轴变速回放指定机（播完自动停） |
 | 信号 `trailReplayFinished()` | 回放自然播完（主动中止不发） |
 
 ## 9. IP 定位兜底 / MAVLink 遥测 / 离线下载

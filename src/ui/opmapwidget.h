@@ -507,24 +507,24 @@ public:
     void ClearMeasurements();              ///< 清除全部测距折线（含进行中的一段）
     bool HasMeasurements() const;          ///< 是否存在测距内容（完成段或进行中段）
 
-    // ———————— 运动轨迹记录与回放 ————————
-    /** @brief 开始记录位置流（UpdateVehiclePosition/SetUAVPos 的每个喂点，
-     *         含所有位置源：模拟/GPS/IP/MAVLink/回放），自动停止回放 */
-    void StartTrailRecording();
-    void StopTrailRecording();             ///< 停止记录（缓冲保留，可存盘/回放）
-    bool IsTrailRecording() const;         ///< 是否记录中
-    void ClearTrailRecording();            ///< 清空轨迹缓冲（自动停止记录/回放）
-    int TrailPointCount() const;           ///< 当前轨迹缓冲采样点数
-    /** @brief 轨迹缓冲存为 JSON 文件（opmap-trail 格式，保留原始时序）
+    // ———————— 运动轨迹记录与回放（按机分道，多机同时记录互不混流）———————
+    /** @brief 开始记录指定机的位置流（SetUAVPos(uavId)/UpdateVehiclePosition(0)
+     *         的每个喂点），该道清空重启，自动停止回放；其他道记录不受影响 */
+    void StartTrailRecording(int uavId = 0);
+    void StopTrailRecording(int uavId = 0);    ///< 停止指定机记录（缓冲保留，可存盘/回放）
+    bool IsTrailRecording(int uavId = 0) const;///< 指定机是否记录中
+    void ClearTrailRecording();            ///< 清空全部机的轨迹缓冲（自动停止回放）
+    int TrailPointCount(int uavId = 0) const;  ///< 指定机轨迹缓冲采样点数
+    /** @brief 指定机的轨迹存为 JSON 文件（opmap-trail 格式，保留原始时序）
      *  @return 成功 true；失败 false 并填充 *error */
-    bool SaveTrailToFile(const QString &path, QString *error = 0);
-    /** @brief 从 JSON 轨迹文件加载（接管缓冲，加载后即可 StartTrailReplay）
+    bool SaveTrailToFile(const QString &path, QString *error = 0, int uavId = 0);
+    /** @brief 从 JSON 轨迹文件加载到指定机（接管该道缓冲，加载后即可回放该机）
      *  @return 成功 true；失败 false 并填充 *error */
-    bool LoadTrailFromFile(const QString &path, QString *error = 0);
-    /** @brief 按时间轴回放轨迹：插值喂 SetUAVPos（图标/轨迹/围栏/任务机全联动），
+    bool LoadTrailFromFile(const QString &path, QString *error = 0, int uavId = 0);
+    /** @brief 按时间轴回放指定机轨迹：插值喂 SetUAVPos(uavId)（图标/轨迹/围栏全联动），
      *         speed 为倍速（1=原速），播完发 trailReplayFinished
-     *  @return 缓冲有效（≥2 点）返回 true */
-    bool StartTrailReplay(double speed = 1.0);
+     *  @return 该道缓冲有效（≥2 点）返回 true */
+    bool StartTrailReplay(double speed = 1.0, int uavId = 0);
     void StopTrailReplay();                ///< 中止回放（不发 trailReplayFinished）
     bool IsTrailReplaying() const;         ///< 是否回放中
 
@@ -717,7 +717,7 @@ private slots:
     /// 位置源喂点：记录真实源（GPS/MAVLink）位置供一键定位取用，并同步 GPS 图标
     void onPositionUpdate(opmap::PointLatLng pos, double altM, double headingDeg, int source);
     /// 轨迹回放插值点 → SetUAVPos（图标/轨迹/围栏/任务机全联动）
-    void onTrailReplayPosition(opmap::PointLatLng pos, int altM);
+    void onTrailReplayPosition(opmap::PointLatLng pos, int altM, int uavId);
 
 protected:
     MapGraphicItem *map;

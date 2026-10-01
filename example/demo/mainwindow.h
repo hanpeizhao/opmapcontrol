@@ -115,6 +115,10 @@ private slots:
     void onMigrationToggled(bool on);
     void onMigrantTick();
 
+    // 多机编队监控演示：3 架 UAV 沿弧线同时飞行，轨迹按机分道记录
+    void onSwarmToggled(bool on);
+    void onSwarmTick();
+
     // 量测与轨迹：测距 / 轨迹记录保存回放
     void onMeasureClicked();                 ///< 多点测距三态按钮（开始 → 结束一段）
     void onMeasureFinished(double totalMeters, const QList<opmap::PointLatLng> &points);
@@ -237,6 +241,18 @@ private:
     QHash<QString, opmap::MapMarkerItem *> m_migrantMarkers; ///< 个体名 → 地图标记
     QTimer *m_migrantTimer;      ///< 迁徙推进定时器
     qint64 m_migrantElapsed;     ///< 迁徙已推进毫秒数
+
+    // 多机编队监控演示（真 UAV 图标 + 按机分道轨迹）
+    struct SwarmUAV {                    ///< 编队单机运动参数
+        int uavId;                       // 机 id（0=长机，1/2=僚机）
+        QString name;
+        opmap::ArcLineItem *arc;         // 航线弧线（机沿 ArcPointAt(t) 飞）
+        int durationMs;                  // 全程飞行时长（演示加速）
+        bool arrived;
+    };
+    QVector<SwarmUAV> m_swarm;           ///< 编队单机参数表
+    QTimer *m_swarmTimer;                ///< 编队推进定时器
+    qint64 m_swarmElapsed;               ///< 编队已推进毫秒数
 
     // 量测与轨迹面板
     QPushButton *m_measureBtn;      ///< 多点测距三态按钮（开始测距 → 结束测距）

@@ -114,8 +114,8 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     // —— 比例尺 / 测距 / 轨迹记录：比例尺默认开，测距折线空态不可见 ——
     measureItem = new MeasureItem(map);
     trailRecorder = new TrailRecorder(this);
-    connect(trailRecorder, SIGNAL(replayPosition(opmap::PointLatLng,int)),
-            this, SLOT(onTrailReplayPosition(opmap::PointLatLng,int)));
+    connect(trailRecorder, SIGNAL(replayPosition(opmap::PointLatLng,int,int)),
+            this, SLOT(onTrailReplayPosition(opmap::PointLatLng,int,int)));
     connect(trailRecorder, SIGNAL(replayFinished()),
             this, SIGNAL(trailReplayFinished()));
     SetShowScale(true);
@@ -571,8 +571,8 @@ void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
 
     vehiclePos = pos;
     vehiclePosValid = true;
-    if (trailRecorder->IsRecording())
-        trailRecorder->AddPoint(pos, 0);   // 轨迹记录（所有位置源统一在此截获）
+    if (trailRecorder->IsRecording(0))
+        trailRecorder->AddPoint(0, pos, 0);   // 轨迹记录进主机道（所有位置源统一在此截获）
     navEngine->UpdatePosition(pos);
     CheckGeofence(pos);   // 围栏判定对所有位置源（模拟/GPS/MAVLink）统一生效
     if (missionEngine && missionEngine->IsMissionActive())
@@ -583,10 +583,11 @@ void OPMapWidget::SetUAVPos(int const& id, opmap::PointLatLng const& pos, int co
 {
     UAVItem *uav = EnsureUAV(id);
     uav->SetUAVPos(pos, alt);
-    if (trailRecorder->IsRecording())
-        trailRecorder->AddPoint(pos, alt);   // 任务飞行喂点同样进轨迹记录
+    if (trailRecorder->IsRecording(id))
+        trailRecorder->AddPoint(id, pos, alt);   // 按机分道记录，多机互不混流
     CheckGeofence(pos);   // 任务飞行喂点同样接入围栏越界判定
-    if (missionEngine && missionEngine->IsMissionActive())
+    // 任务状态机只认主机（僚机喂点不得误推主机的任务进度）
+    if (id == 0 && missionEngine && missionEngine->IsMissionActive())
         missionEngine->UpdatePosition(pos);   // 任务状态推进（真机遥测喂点同构）
 }
 
@@ -1353,19 +1354,19 @@ bool OPMapWidget::HasMeasurements() const
 
 // ———————— 运动轨迹记录与回放 ————————
 
-void OPMapWidget::StartTrailRecording()
+void OPMapWidget::StartTrailRecording(int uavId)
 {
-    trailRecorder->StartRecording();
+    trailRecorder->StartRecording(uavId);
 }
 
-void OPMapWidget::StopTrailRecording()
+void OPMapWidget::StopTrailRecording(int uavId)
 {
-    trailRecorder->StopRecording();
+    trailRecorder->StopRecording(uavId);
 }
 
-bool OPMapWidget::IsTrailRecording() const
+bool OPMapWidget::IsTrailRecording(int uavId) const
 {
-    return trailRecorder->IsRecording();
+    return trailRecorder->IsRecording(uavId);
 }
 
 void OPMapWidget::ClearTrailRecording()
@@ -1373,29 +1374,29 @@ void OPMapWidget::ClearTrailRecording()
     trailRecorder->Clear();
 }
 
-int OPMapWidget::TrailPointCount() const
+int OPMapWidget::TrailPointCount(int uavId) const
 {
-    return trailRecorder->PointCount();
+    return trailRecorder->PointCount(uavId);
 }
 
-bool OPMapWidget::SaveTrailToFile(const QString &path, QString *error)
+bool OPMapWidget::SaveTrailToFile(const QString &path, QString *error, int uavId)
 {
-    return trailRecorder->SaveToFile(path, error);
+    return trailRecorder->SaveToFile(path, error, uavId);
 }
 
-bool OPMapWidget::LoadTrailFromFile(const QString &path, QString *error)
+bool OPMapWidget::LoadTrailFromFile(const QString &path, QString *error, int uavId)
 {
-    return trailRecorder->LoadFromFile(path, error);
+    return trailRecorder->LoadFromFile(path, error, uavId);
 }
 
-bool OPMapWidget::StartTrailReplay(double speed)
+bool OPMapWidget::StartTrailReplay(double speed, int uavId)
 {
-    const bool ok = trailRecorder->StartReplay(speed);
+    const bool ok = trailRecorder->StartReplay(speed, uavId);
     if (ok) {
-        // 回放重演=轨迹从头展示：清主机旧轨迹，否则旧轨迹终点会与回放起点
+        // 回放重演=轨迹从头展示：清该机旧轨迹，否则旧轨迹终点会与回放起点
         // （多为起飞点）连出跨场直线（与 StartWaypointMission 启动清轨迹同理）；
         // UAV 尚不存在（仅导入文件未飞过）则无需清理，首帧喂点时才惰性创建
-        if (UAVItem *uav = GetUAV(0))
+        if (UAVItem *uav = GetUAV(uavId))
             uav->DeleteTrail();
     }
     return ok;
@@ -1411,9 +1412,9 @@ bool OPMapWidget::IsTrailReplaying() const
     return trailRecorder->IsReplaying();
 }
 
-void OPMapWidget::onTrailReplayPosition(opmap::PointLatLng pos, int altM)
+void OPMapWidget::onTrailReplayPosition(opmap::PointLatLng pos, int altM, int uavId)
 {
-    SetUAVPos(0, pos, altM);   // 回放=重演：图标/轨迹/围栏/任务机全联动
+    SetUAVPos(uavId, pos, altM);   // 回放=重演对应机：图标/轨迹/围栏全联动
 }
 
 void OPMapWidget::SetRotate(qreal const& value)

@@ -2,7 +2,7 @@
 ******************************************************************************
 *
 * @file       trailrecorder.cpp
-* @brief      运动轨迹记录器实现（记录/JSON 存取/时间轴变速回放）
+* @brief      运动轨迹记录器实现（按机分道记录/JSON 存取/时间轴变速回放）
 * @see        The GNU Public License (GPL) Version 3
 * @{
 *
@@ -40,7 +40,7 @@ const int kReplayIntervalMs = 50;        ///< 回放 tick 周期
 
 TrailRecorder::TrailRecorder(QObject *parent)
     : QObject(parent),
-      recording(false),
+      replayUavId(0),
       replaying(false),
       replaySpeed(1.0),
       replayIdx(0)
@@ -50,54 +50,68 @@ TrailRecorder::TrailRecorder(QObject *parent)
     connect(replayTimer, SIGNAL(timeout()), this, SLOT(onReplayTick()));
 }
 
-// ———————— 记录 ————————
+// ———————— 通道访问 ————————
 
-void TrailRecorder::StartRecording()
+const TrailRecorder::Channel &TrailRecorder::channelOf(int uavId) const
 {
-    if (recording)
-        return;
-    StopReplay();                       // 记录与回放互斥
-    points.clear();
-    recording = true;
-    recordClock.start();
+    static const Channel emptyChannel;
+    return channels.contains(uavId) ? channels.value(uavId) : emptyChannel;
 }
 
-void TrailRecorder::StopRecording()
+TrailRecorder::Channel &TrailRecorder::channelRef(int uavId)
 {
-    recording = false;
+    return channels[uavId];
 }
 
-void TrailRecorder::AddPoint(opmap::PointLatLng const& pos, int altM)
+// ———————— 记录（按机分道）———————
+
+void TrailRecorder::StartRecording(int uavId)
 {
-    if (!recording)
+    StopReplay();                       // 记录与回放互斥（不影响其他道记录）
+    Channel &ch = channelRef(uavId);
+    ch.points.clear();                  // 该道清空重启；其他道记录继续
+    ch.recording = true;
+    ch.recordClock.start();
+}
+
+void TrailRecorder::StopRecording(int uavId)
+{
+    if (channels.contains(uavId))
+        channels[uavId].recording = false;
+}
+
+void TrailRecorder::AddPoint(int uavId, opmap::PointLatLng const& pos, int altM)
+{
+    QMap<int, Channel>::iterator it = channels.find(uavId);
+    if (it == channels.end() || !it.value().recording)
         return;
     TrailPoint p;
     p.lat = pos.Lat();
     p.lng = pos.Lng();
     p.altM = altM;
-    p.tMs = recordClock.elapsed();
-    points.append(p);
+    p.tMs = it.value().recordClock.elapsed();
+    it.value().points.append(p);
 }
 
 void TrailRecorder::Clear()
 {
     StopReplay();
-    recording = false;
-    points.clear();
+    channels.clear();
 }
 
 // ———————— JSON 文件 ————————
 
-bool TrailRecorder::SaveToFile(const QString &path, QString *error) const
+bool TrailRecorder::SaveToFile(const QString &path, QString *error, int uavId) const
 {
-    if (points.isEmpty()) {
+    const QList<TrailPoint> &pts = channelOf(uavId).points;
+    if (pts.isEmpty()) {
         if (error)
-            *error = QString::fromUtf8("轨迹为空：未记录任何点（需先 StartTrailRecording 再喂点）");
+            *error = QString::fromUtf8("轨迹为空：%1 号机未记录任何点（需先 StartTrailRecording(%1) 再喂点）").arg(uavId);
         return false;
     }
     QJsonArray arr;
-    for (int i = 0; i < points.size(); ++i) {
-        const TrailPoint &p = points.at(i);
+    for (int i = 0; i < pts.size(); ++i) {
+        const TrailPoint &p = pts.at(i);
         QJsonObject o;
         o.insert(QLatin1String("t"), (double)p.tMs);
         o.insert(QLatin1String("lat"), p.lat);
@@ -108,9 +122,10 @@ bool TrailRecorder::SaveToFile(const QString &path, QString *error) const
     QJsonObject root;
     root.insert(QLatin1String("format"), QLatin1String(kFormatId));
     root.insert(QLatin1String("version"), kVersion);
+    root.insert(QLatin1String("uavId"), uavId);   // 来源机标注（加载目标由参数决定）
     root.insert(QLatin1String("created"),
                 QDateTime::currentDateTime().toString(Qt::ISODate));
-    root.insert(QLatin1String("count"), points.size());
+    root.insert(QLatin1String("count"), pts.size());
     root.insert(QLatin1String("points"), arr);
 
     QFile file(path);
@@ -124,7 +139,7 @@ bool TrailRecorder::SaveToFile(const QString &path, QString *error) const
     return true;
 }
 
-bool TrailRecorder::LoadFromFile(const QString &path, QString *error)
+bool TrailRecorder::LoadFromFile(const QString &path, QString *error, int uavId)
 {
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
@@ -157,26 +172,33 @@ bool TrailRecorder::LoadFromFile(const QString &path, QString *error)
         p.altM = o.value(QLatin1String("alt")).toInt();
         loaded.append(p);
     }
-    // 加载即接管缓冲：停掉进行中的记录/回放，避免状态错乱
+    // 加载即接管指定道：停回放（全局互斥），该道记录停止并装入数据，
+    // 其他道的记录不受影响
     StopReplay();
-    recording = false;
-    points = loaded;
+    Channel &ch = channelRef(uavId);
+    ch.recording = false;
+    ch.points = loaded;
     return true;
 }
 
 // ———————— 回放 ————————
 
-bool TrailRecorder::StartReplay(double speed)
+bool TrailRecorder::StartReplay(double speed, int uavId)
 {
     if (replaying)
         StopReplay();
-    if (points.size() < 2)
+    // 快照该道数据：回放期间该道继续记录不影响回放
+    replayBuf = channelOf(uavId).points;
+    if (replayBuf.size() < 2)
         return false;
     if (speed <= 0.0)
         speed = 1.0;
     replaySpeed = speed;
     replayIdx = 0;
-    recording = false;                  // 回放期间不再收记录点
+    replayUavId = uavId;
+    // 回放期间停掉所有道的记录（全局互斥，避免回放喂点与实时喂点混流）
+    for (QMap<int, Channel>::iterator it = channels.begin(); it != channels.end(); ++it)
+        it.value().recording = false;
     replaying = true;
     replayClock.start();
     replayTimer->start();
@@ -193,40 +215,40 @@ void TrailRecorder::StopReplay()
 
 void TrailRecorder::onReplayTick()
 {
-    if (!replaying || points.isEmpty())
+    if (!replaying || replayBuf.isEmpty())
         return;
     // 回放时钟 × 倍速 = 轨迹时间轴位置（毫秒）
     const qint64 t = (qint64)(replayClock.elapsed() * replaySpeed);
 
     // 越过末点：补发末点位置并自然收尾
-    if (t >= points.last().tMs) {
+    if (t >= replayBuf.last().tMs) {
         replaying = false;
         replayTimer->stop();
-        emit replayPosition(PointLatLng(points.last().lat, points.last().lng),
-                            points.last().altM);
+        emit replayPosition(PointLatLng(replayBuf.last().lat, replayBuf.last().lng),
+                            replayBuf.last().altM, replayUavId);
         emit replayFinished();
         return;
     }
 
     // 区间左端点单调推进（时间轴只前进，无需从头查找）
-    while (replayIdx + 2 < points.size() && points.at(replayIdx + 1).tMs <= t)
+    while (replayIdx + 2 < replayBuf.size() && replayBuf.at(replayIdx + 1).tMs <= t)
         ++replayIdx;
     // t 早于首点（理论上首帧 elapsed≈0 即命中）：直接发首点
-    if (t <= points.first().tMs) {
-        emit replayPosition(PointLatLng(points.first().lat, points.first().lng),
-                            points.first().altM);
+    if (t <= replayBuf.first().tMs) {
+        emit replayPosition(PointLatLng(replayBuf.first().lat, replayBuf.first().lng),
+                            replayBuf.first().altM, replayUavId);
         return;
     }
 
     // 相邻点线性插值（lat/lng/alt 三分量独立线性，短间隔下与球面插值差异可忽略）
-    const TrailPoint &a = points.at(replayIdx);
-    const TrailPoint &b = points.at(replayIdx + 1);
+    const TrailPoint &a = replayBuf.at(replayIdx);
+    const TrailPoint &b = replayBuf.at(replayIdx + 1);
     const double span = (double)(b.tMs - a.tMs);
     const double f = span > 0.0 ? (double)(t - a.tMs) / span : 0.0;
     const double lat = a.lat + (b.lat - a.lat) * f;
     const double lng = a.lng + (b.lng - a.lng) * f;
     const int alt = (int)(a.altM + (b.altM - a.altM) * f + 0.5);
-    emit replayPosition(PointLatLng(lat, lng), alt);
+    emit replayPosition(PointLatLng(lat, lng), alt, replayUavId);
 }
 
 } // end of namespace opmap

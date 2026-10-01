@@ -35,6 +35,7 @@
 #include "waypointitem.h"
 #include "mapmarkeritem.h"
 #include "arclineitem.h"
+#include "geoutils.h"
 #include <QtMath>
 
 namespace {
@@ -94,6 +95,8 @@ MainWindow::MainWindow()
       m_peerAngle(0),
       m_migrantTimer(new QTimer(this)),
       m_migrantElapsed(0),
+      m_swarmTimer(new QTimer(this)),
+      m_swarmElapsed(0),
       m_measureBtn(new QPushButton(QString::fromUtf8("开始测距"), this)),
       m_recTrailBtn(new QPushButton(QString::fromUtf8("记录轨迹"), this)),
       m_replayBtn(new QPushButton(QString::fromUtf8("回放轨迹…"), this)),
@@ -143,6 +146,7 @@ MainWindow::MainWindow()
 
     // 候鸟迁徙演示：定时器沿大圆弧路线推进各个体
     connect(m_migrantTimer, SIGNAL(timeout()), this, SLOT(onMigrantTick()));
+    connect(m_swarmTimer, SIGNAL(timeout()), this, SLOT(onSwarmTick()));
 
     // 量测与轨迹：库信号 → 按钮状态/日志
     connect(m_map, SIGNAL(measureFinished(double,QList<opmap::PointLatLng>)),
@@ -555,6 +559,9 @@ void MainWindow::setupCapabilityDock()
     QPushButton *migrationBtn = new QPushButton(QString::fromUtf8("候鸟迁徙演示"), measureBox);
     migrationBtn->setCheckable(true);
     measureLayout->addWidget(migrationBtn);
+    QPushButton *swarmBtn = new QPushButton(QString::fromUtf8("多机编队演示"), measureBox);
+    swarmBtn->setCheckable(true);
+    measureLayout->addWidget(swarmBtn);
     connect(m_measureBtn, &QPushButton::clicked, this, &MainWindow::onMeasureClicked);
     connect(clearMeasureBtn, &QPushButton::clicked, [this]() {
         m_map->ClearMeasurements();
@@ -585,6 +592,7 @@ void MainWindow::setupCapabilityDock()
     connect(m_replayBtn, &QPushButton::clicked, this, &MainWindow::onReplayClicked);
     connect(m_stopReplayBtn, &QPushButton::clicked, this, &MainWindow::onStopReplayClicked);
     connect(migrationBtn, &QPushButton::toggled, this, &MainWindow::onMigrationToggled);
+    connect(swarmBtn, &QPushButton::toggled, this, &MainWindow::onSwarmToggled);
     layout->addWidget(measureBox);
 
     // —— 地理围栏 ——
@@ -1201,6 +1209,95 @@ void MainWindow::onMigrantTick()
     if (arrivedCount == m_migrants.size()) {
         m_migrantTimer->stop();
         logEvent(QString::fromUtf8("迁徙演示完成：全部候鸟抵达越冬地（标记与轨迹保留，关闭按钮可清除）"));
+    }
+}
+
+// ————————————————— 多机编队监控演示 —————————————————
+// 3 架 UAV 沿各自弧线同时飞行：真 UAV 图标（id 0/1/2）+ 按机分道轨迹
+// 自动记录（库 StartTrailRecording(id)），演示完可分别保存/回放任一架
+
+void MainWindow::onSwarmToggled(bool on)
+{
+    if (on) {
+        // 主机 0 冲突守卫：航点飞行也在喂 0 号机，双源同时驱动会互抢位置
+        if (m_flightSim && m_flightSim->isActive()) {
+            logEvent(QString::fromUtf8("多机编队演示与航点飞行冲突（0 号机被占用），请先停止航点飞行"));
+            if (QPushButton *b = qobject_cast<QPushButton*>(sender()))
+                b->setChecked(false);
+            return;
+        }
+        // 迁徙演示互斥：ClearArcLines 会清掉迁徙航线，避免相互破坏画面
+        if (m_migrantTimer->isActive()) {
+            logEvent(QString::fromUtf8("多机编队演示与迁徙演示共用弧线航线层，请先关闭候鸟迁徙演示"));
+            if (QPushButton *b = qobject_cast<QPushButton*>(sender()))
+                b->setChecked(false);
+            return;
+        }
+        m_swarm.clear();
+        struct Seed { int uavId; const char *name; int durationS; QColor color;
+                      double from[2], to[2]; };
+        const Seed seeds[] = {
+            { 0, "长机", 35, QColor(255, 150, 0),   { 34.26, 108.94 }, { 36.06, 103.83 } },  // 西安→兰州
+            { 1, "僚机一", 30, QColor(0, 190, 255),  { 34.26, 108.94 }, { 37.87, 112.55 } },  // 西安→太原
+            { 2, "僚机二", 40, QColor(190, 90, 255), { 34.26, 108.94 }, { 29.56, 106.55 } },  // 西安→重庆
+        };
+        for (int i = 0; i < 3; ++i) {
+            SwarmUAV s;
+            s.uavId = seeds[i].uavId;
+            s.name = QString::fromUtf8(seeds[i].name);
+            s.durationMs = seeds[i].durationS * 1000;
+            s.arrived = false;
+            s.arc = m_map->AddArcLine(
+                opmap::PointLatLng(seeds[i].from[0], seeds[i].from[1]),
+                opmap::PointLatLng(seeds[i].to[0], seeds[i].to[1]),
+                seeds[i].color, (i % 2 == 0 ? 1 : -1));
+            m_swarm.append(s);
+            // 轨迹按机分道自动记录：三机同时录、互不混流（库多机轨迹能力）
+            m_map->StartTrailRecording(s.uavId);
+        }
+        m_swarmElapsed = 0;
+        m_map->SetCurrentPosition(opmap::PointLatLng(34.0, 109.0));   // 视野罩住三条航线
+        m_map->SetZoom(5);
+        m_swarmTimer->start(200);
+        logEvent(QString::fromUtf8("多机编队演示开始：3 架 UAV（0=长机/1/2）沿弧线同时飞行，轨迹已按机分道自动记录"));
+        logEvent(QString::fromUtf8("演示结束后：面板「保存轨迹」默认存 0 号机；库 API SaveTrailToFile(path, err, 机id)/StartTrailReplay(speed, 机id) 可分机操作"));
+    } else {
+        m_swarmTimer->stop();
+        for (int i = 0; i < m_swarm.size(); ++i) {
+            m_map->StopTrailRecording(m_swarm.at(i).uavId);
+            m_map->DeleteUAV(m_swarm.at(i).uavId);   // 图标与轨迹线随图元删除
+        }
+        m_map->ClearArcLines();   // 编队与迁徙互斥，此处清弧线不会误伤迁徙航线
+        m_swarm.clear();
+        logEvent(QString::fromUtf8("多机编队演示停止：UAV 图标与航线已清除（各机轨迹缓冲保留，可保存/回放）"));
+    }
+}
+
+void MainWindow::onSwarmTick()
+{
+    m_swarmElapsed += 200;
+    int arrivedCount = 0;
+    for (int i = 0; i < m_swarm.size(); ++i) {
+        SwarmUAV &s = m_swarm[i];
+        const double f = qMin(1.0, (double)m_swarmElapsed / s.durationMs);
+        // 机沿弧线推进：位置由 ArcPointAt 严格取自航线（真机=遥测直接喂 SetUAVPos）
+        const opmap::PointLatLng pos = s.arc->ArcPointAt(f);
+        const opmap::PointLatLng ahead = s.arc->ArcPointAt(qMin(1.0, f + 0.01));
+        m_map->SetUAVPos(s.uavId, pos, 500);
+        if (ahead.Lat() != pos.Lat() || ahead.Lng() != pos.Lng())
+            m_map->SetUAVHeading(s.uavId, opmap::geoutils::bearingDeg(pos, ahead));
+        if (f >= 1.0) {
+            ++arrivedCount;
+            if (!s.arrived) {
+                s.arrived = true;
+                logEvent(QString::fromUtf8("%1（%2 号机）已抵达目的地，轨迹 %3 个采样点")
+                             .arg(s.name).arg(s.uavId).arg(m_map->TrailPointCount(s.uavId)));
+            }
+        }
+    }
+    if (arrivedCount == m_swarm.size()) {
+        m_swarmTimer->stop();
+        logEvent(QString::fromUtf8("编队演示完成：三机轨迹分道保留，可分别保存（第三参传机 id）或回放（StartTrailReplay 倍速 + 机 id）"));
     }
 }
 
