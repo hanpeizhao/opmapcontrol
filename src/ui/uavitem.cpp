@@ -28,6 +28,7 @@
 
 #include "pureprojection.h"
 #include "uavitem.h"
+#include "geoutils.h"
 
 namespace opmap {
 
@@ -82,6 +83,30 @@ QRectF UAVItem::boundingRect()const
     return QRectF(-pic.width()/2,-pic.height()/2,pic.width(),pic.height());
 }
 
+/**
+ * @brief 轨迹采样统一入口：先做瞬移检测，再加轨迹点、连线
+ *
+ * 根治"跨场直线"问题：位置瞬移（任务重启回摆、轨迹回放换场、位置源切换等）
+ * 不代表真实运动，若仍从上一采样点连线就会拉出一条假直线。判据为单帧球面
+ * 位移超过物理上限 kTeleportThresholdM——本机巡航 80 m/s、喂点帧距百米级，
+ * 1000 m 只可能是瞬移。触发即清空旧轨迹（点+线），从新位置重新记录。
+ * 各瞬移入口处的手动 DeleteTrail 因此从"必须记得调"降级为"提前清更及时"
+ * 的可选项，新增瞬移场景无需再逐处打补丁。
+ */
+void UAVItem::AppendTrailSample(const opmap::PointLatLng &position, const int &altitude,
+                                const QColor &color)
+{
+    const double kTeleportThresholdM = 1000.0;
+    if(!lasttrailline.IsEmpty()
+       && opmap::geoutils::haversineDistanceM(lasttrailline, position) > kTeleportThresholdM)
+        DeleteTrail();   // 瞬移：旧轨迹作废，从新位置重记
+
+    trail->addToGroup(new TrailItem(position,altitude,color,map));
+    if(!lasttrailline.IsEmpty())
+        trailLine->addToGroup(new TrailLineItem(lasttrailline,position,color,map));
+    lasttrailline=position;
+}
+
 void UAVItem::SetUAVPos(const opmap::PointLatLng &position, const int &altitude,
                         const QColor &color)
 {
@@ -91,18 +116,12 @@ void UAVItem::SetUAVPos(const opmap::PointLatLng &position, const int &altitude,
     if(coord!=position) {
         if(trailtype==UAVTrailType::ByTimeElapsed) {
             if(timer.elapsed() > trailtime*1000) {
-                trail->addToGroup(new TrailItem(position,altitude,color,map));
-                if(!lasttrailline.IsEmpty())
-                    trailLine->addToGroup((new TrailLineItem(lasttrailline,position,color,map)));
-                lasttrailline=position;
+                AppendTrailSample(position,altitude,color);
                 timer.restart();
             }
         } else if(trailtype==UAVTrailType::ByDistance) {
             if(qAbs(opmap::PureProjection::DistanceBetweenLatLng(lastcoord,position)*1000) > traildistance) {
-                trail->addToGroup(new TrailItem(position,altitude,color,map));
-                if(!lasttrailline.IsEmpty())
-                    trailLine->addToGroup((new TrailLineItem(lasttrailline,position,color,map)));
-                lasttrailline=position;
+                AppendTrailSample(position,altitude,color);
                 lastcoord=position;
             }
         }

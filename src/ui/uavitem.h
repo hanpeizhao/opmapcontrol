@@ -248,6 +248,8 @@ private:
     int traildistance;
     bool autosetreached;
     double Distance3D(opmap::PointLatLng const& coord, int const& altitude);
+    /// 轨迹采样统一入口：瞬移检测（防跨场直线）+ 加轨迹点 + 连线
+    void AppendTrailSample(const opmap::PointLatLng &position, const int &altitude, const QColor &color);
     double autosetdistance;
     //  QRectF rect;
 
