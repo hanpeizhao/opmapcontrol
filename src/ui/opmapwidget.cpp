@@ -1364,7 +1364,15 @@ bool OPMapWidget::LoadTrailFromFile(const QString &path, QString *error)
 
 bool OPMapWidget::StartTrailReplay(double speed)
 {
-    return trailRecorder->StartReplay(speed);
+    const bool ok = trailRecorder->StartReplay(speed);
+    if (ok) {
+        // 回放重演=轨迹从头展示：清主机旧轨迹，否则旧轨迹终点会与回放起点
+        // （多为起飞点）连出跨场直线（与 StartWaypointMission 启动清轨迹同理）；
+        // UAV 尚不存在（仅导入文件未飞过）则无需清理，首帧喂点时才惰性创建
+        if (UAVItem *uav = GetUAV(0))
+            uav->DeleteTrail();
+    }
+    return ok;
 }
 
 void OPMapWidget::StopTrailReplay()

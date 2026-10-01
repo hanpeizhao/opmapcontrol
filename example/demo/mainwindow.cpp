@@ -561,6 +561,12 @@ void MainWindow::setupCapabilityDock()
     });
     connect(m_recTrailBtn, &QPushButton::clicked, this, &MainWindow::onRecTrailClicked);
     connect(saveTrailBtn, &QPushButton::clicked, [this]() {
+        if (m_map->TrailPointCount() == 0) {
+            // 空轨迹前置拦截：引导正确操作序列，避免存出无效文件
+            logEvent(QString::fromUtf8("还没有可保存的轨迹。正确用法：① 点「记录轨迹」开始 → ② 点「航点飞行」或行车模拟运动一段 → ③ 再点「记录轨迹」停止 → ④ 保存/回放"));
+            statusBar()->showMessage(QString::fromUtf8("轨迹为空：请先点「记录轨迹」并运动一段"), 8000);
+            return;
+        }
         const QString path = QFileDialog::getSaveFileName(
                     this, QString::fromUtf8("保存运动轨迹"), QString::fromUtf8("flight.trail.json"),
                     QString::fromUtf8("轨迹文件 (*.trail.json *.json);;所有文件 (*.*)"));
@@ -570,7 +576,7 @@ void MainWindow::setupCapabilityDock()
         if (m_map->SaveTrailToFile(path, &err)) {
             m_recTrailBtn->setText(QString::fromUtf8("记录轨迹"));   // 存盘即收笔（缓冲保留可回放）
             m_map->StopTrailRecording();
-            logEvent(QString::fromUtf8("轨迹已保存 → %1").arg(path));
+            logEvent(QString::fromUtf8("轨迹已保存（%1 个采样点）→ %2").arg(m_map->TrailPointCount()).arg(path));
         } else {
             logEvent(QString::fromUtf8("轨迹保存失败：%1").arg(err));
         }
@@ -1292,6 +1298,7 @@ void MainWindow::onReplayClicked()
     const double speed = m_replaySpeedSpin->value();
     if (!m_map->StartTrailReplay(speed)) {
         logEvent(QString::fromUtf8("轨迹点数不足（至少 2 个），无法回放"));
+        statusBar()->showMessage(QString::fromUtf8("轨迹点数不足（至少 2 个），无法回放"), 8000);
         return;
     }
     m_recTrailBtn->setText(QString::fromUtf8("记录轨迹"));
@@ -1356,7 +1363,12 @@ void MainWindow::onDeleteWaypointClicked()
 void MainWindow::onClearWaypointsClicked()
 {
     m_map->WPDeleteAll();
+    // 飞行轨迹挂在 UAV 图元上、不随航点删除：清航点时一并清掉，
+    // 否则上次任务的轨迹点/连线会永久残留在地图上
+    if (opmap::UAVItem *u = m_map->GetUAV(0))
+        u->DeleteTrail();
     refreshWaypointList();
+    logEvent(QString::fromUtf8("已清除全部航点及飞行轨迹"));
 }
 
 void MainWindow::onImportWaypointsClicked()

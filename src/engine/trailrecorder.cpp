@@ -90,6 +90,11 @@ void TrailRecorder::Clear()
 
 bool TrailRecorder::SaveToFile(const QString &path, QString *error) const
 {
+    if (points.isEmpty()) {
+        if (error)
+            *error = QString::fromUtf8("轨迹为空：未记录任何点（需先 StartTrailRecording 再喂点）");
+        return false;
+    }
     QJsonArray arr;
     for (int i = 0; i < points.size(); ++i) {
         const TrailPoint &p = points.at(i);
