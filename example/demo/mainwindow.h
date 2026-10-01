@@ -115,9 +115,10 @@ private slots:
     void onMigrationToggled(bool on);
     void onMigrantTick();
 
-    // 多机编队监控演示：3 架 UAV 沿弧线同时飞行，轨迹按机分道记录
-    void onSwarmToggled(bool on);
-    void onSwarmTick();
+    // 多机任务飞行：用户摆航点 → 选架数 → 自动分段 → 各机独立任务状态机
+    void onMultiMissionToggled(bool on);
+    void onMultiMissionFinished(int uavId);   ///< 单机任务完成计数收尾
+    void stopMultiMission();                  ///< 停止全部多机任务（按钮二态复用）
 
     // 量测与轨迹：测距 / 轨迹记录保存回放
     void onMeasureClicked();                 ///< 多点测距三态按钮（开始 → 结束一段）
@@ -242,17 +243,16 @@ private:
     QTimer *m_migrantTimer;      ///< 迁徙推进定时器
     qint64 m_migrantElapsed;     ///< 迁徙已推进毫秒数
 
-    // 多机编队监控演示（真 UAV 图标 + 按机分道轨迹）
-    struct SwarmUAV {                    ///< 编队单机运动参数
-        int uavId;                       // 机 id（0=长机，1/2=僚机）
-        QString name;
-        opmap::ArcLineItem *arc;         // 航线弧线（机沿 ArcPointAt(t) 飞）
-        int durationMs;                  // 全程飞行时长（演示加速）
-        bool arrived;
+    // 多机任务飞行（用户指定航点分段，各机独立任务状态机）
+    struct MultiMissionUAV {             ///< 多机任务单机参数
+        int uavId;                       // 机 id（0=主机，1..N-1=僚机）
+        QString name;                    // 显示名（主机/僚机一/…）
+        QList<opmap::WayPointItem *> seg;   // 该机任务分段（航点图元，不与其他机交叉）
+        WaypointFlightSimulator *sim;    // 该机模拟遥测源（真机=遥测直接喂 SetUAVPos(id)）
     };
-    QVector<SwarmUAV> m_swarm;           ///< 编队单机参数表
-    QTimer *m_swarmTimer;                ///< 编队推进定时器
-    qint64 m_swarmElapsed;               ///< 编队已推进毫秒数
+    QVector<MultiMissionUAV> m_multiMission;   ///< 多机任务单机参数表（非空=任务进行中）
+    int m_multiFinishedCount;                  ///< 已完成任务数的机数（收尾判定用）
+    QPushButton *m_multiBtn;                   ///< 多机任务飞行二态按钮（开始/停止复用）
 
     // 量测与轨迹面板
     QPushButton *m_measureBtn;      ///< 多点测距三态按钮（开始测距 → 结束测距）

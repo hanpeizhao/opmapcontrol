@@ -212,8 +212,8 @@ map->StartWaypointMission(map->WPAll().values(), 15.0);  // 15m 到达半径
 | 方法 | 参数 | 功能 |
 |------|------|------|
 | `StartWaypointMission(QList<WayPointItem*>, double arrivalRadiusMeters=15.0)` | 航点列表、到达半径 | 组装并启动任务（坐标/悬停/动作从航点图元自动提取） |
-| `StopWaypointMission()` | — | 中止 |
-| `IsWaypointMissionActive()` | — | 任务是否进行中 |
+| `StopWaypointMission()` | — | 中止（多机任务启动时=中止全部机） |
+| `IsWaypointMissionActive()` | — | 主机（0 号）任务是否进行中 |
 
 **任务信号**（上层在此响应业务动作，如拍照=下发相机指令）：
 
@@ -225,6 +225,36 @@ map->StartWaypointMission(map->WPAll().values(), 15.0);  // 15m 到达半径
 | `missionHoverStateChanged(bool hovering, int seconds)` | 悬停开始/结束 |
 | `missionActionTriggered(int index, int action)` | 到达动作触发（拍照立即发、悬停进入时发） |
 | `missionFinished()` | 全部航点完成 |
+
+### 6.1 多机任务（每机独立状态机）
+
+任务引擎按机号实例化（`QMap<int, WaypointMissionEngine*>`，惰性创建），各机喂点只推进各自任务，互不干扰。给指定机启动任务：
+
+```cpp
+map->StartWaypointMission(uavId, segment, 15.0);  // uavId=0 即主机单机语义
+// 此后 SetUAVPos(uavId, pos, alt) 只推进该机自己的任务状态机
+```
+
+| 方法 | 参数 | 功能 |
+|------|------|------|
+| `StartWaypointMission(int uavId, QList<WayPointItem*>, double arrivalRadiusMeters=15.0)` | 机号、该机专属航点分段、到达半径 | 为指定机启动独立任务；uavId>0 时起飞位=首航点（无 Home 编排），uavId=0 保留完整主机编排 |
+| `StopWaypointMission(int uavId)` | 机号 | 中止指定机任务 |
+| `StopWaypointMission()` | — | 中止全部机任务 |
+| `IsWaypointMissionActive(int uavId)` | 机号 | 指定机任务是否进行中 |
+| `IsAnyWaypointMissionActive()` | — | 是否存在任意机进行中的任务 |
+
+**多机信号**（所有机号都发 `*For` 系列；0 号机会与上面旧信号**同时**发，单机消费者零改动兼容）：
+
+| 信号 | 触发时机 |
+|------|---------|
+| `missionStartedFor(int uavId)` | 指定机任务启动 |
+| `missionCurrentWaypointChangedFor(int uavId, int index)` | 指定机目标航点切换 |
+| `missionWaypointReachedFor(int uavId, int index, int action)` | 指定机抵达某航点 |
+| `missionHoverStateChangedFor(int uavId, bool hovering, int seconds)` | 指定机悬停开始/结束 |
+| `missionActionTriggeredFor(int uavId, int index, int action)` | 指定机到达动作触发 |
+| `missionFinishedFor(int uavId)` | 指定机全部航点完成 |
+
+注意：各机航点分段不可交叉共享同一 `WayPointItem` 图元（每段交给一台机）。
 
 ## 7. 多边形地理围栏
 
@@ -353,7 +383,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 航点 | `WPInserted` / `WPDeleted` / `WPNumberChanged` / `WPValuesChanged` / `WPReached` |
 | UAV | `UAVReachedWayPoint`、`UAVLeftSafetyBouble` |
 | 导航 | `navigationRouteReady` / `navigationProgress` / `offRouteDetected` / `rerouteReady` / `navigationArrived` / `navigationFailed` / `routeAlternativesReady` / `routeSelected` |
-| 任务 | `missionStarted` / `missionCurrentWaypointChanged` / `missionWaypointReached` / `missionHoverStateChanged` / `missionActionTriggered` / `missionFinished` |
+| 任务 | `missionStarted` / `missionCurrentWaypointChanged` / `missionWaypointReached` / `missionHoverStateChanged` / `missionActionTriggered` / `missionFinished`；多机同名 `*For(int uavId)` 系列（0 号机双发兼容） |
 | 围栏 | `geofenceBreach` / `geofenceEntered` |
 | IP 定位 | `ipLocationReady` / `ipLocationFailed` |
 | 海拔查询 | `elevationReady(pos, 海拔米)` / `elevationFailed` |

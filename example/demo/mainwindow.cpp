@@ -95,8 +95,7 @@ MainWindow::MainWindow()
       m_peerAngle(0),
       m_migrantTimer(new QTimer(this)),
       m_migrantElapsed(0),
-      m_swarmTimer(new QTimer(this)),
-      m_swarmElapsed(0),
+      m_multiFinishedCount(0),
       m_measureBtn(new QPushButton(QString::fromUtf8("开始测距"), this)),
       m_recTrailBtn(new QPushButton(QString::fromUtf8("记录轨迹"), this)),
       m_replayBtn(new QPushButton(QString::fromUtf8("回放轨迹…"), this)),
@@ -146,7 +145,94 @@ MainWindow::MainWindow()
 
     // 候鸟迁徙演示：定时器沿大圆弧路线推进各个体
     connect(m_migrantTimer, SIGNAL(timeout()), this, SLOT(onMigrantTick()));
-    connect(m_swarmTimer, SIGNAL(timeout()), this, SLOT(onSwarmTick()));
+
+    // —— 单机航点飞行任务信号（一次性连接，onFlightClicked 不再重复 connect）——
+    // 多机任务进行中跳过（0 号机会同时发 For 系列信号，由多机日志负责）
+    connect(m_map, &opmap::OPMapWidget::missionCurrentWaypointChanged, this,
+            [this](int idx) {
+        if (!m_multiMission.isEmpty())
+            return;
+        QMap<int, opmap::WayPointItem*> all = m_map->WPAll();
+        opmap::WayPointItem *wp = all.values().value(idx);
+        if (m_flightSim && wp)
+            m_flightSim->setTarget(wp->Coord());
+        m_flightBtn->setText(QString::fromUtf8("停止飞行（目标 %1/%2）")
+                             .arg(idx + 1).arg(all.size()));
+    });
+    connect(m_map, &opmap::OPMapWidget::missionHoverStateChanged, this,
+            [this](bool hovering, int seconds) {
+        if (!m_multiMission.isEmpty())
+            return;
+        if (m_flightSim)
+            m_flightSim->setHovering(hovering);
+        Q_UNUSED(seconds);
+    });
+    connect(m_map, &opmap::OPMapWidget::missionActionTriggered, this,
+            [this](int idx, int action) {
+        if (!m_multiMission.isEmpty())
+            return;
+        QMap<int, opmap::WayPointItem*> all = m_map->WPAll();
+        opmap::WayPointItem *wp = all.values().value(idx);
+        if (action == (int)opmap::WayPointItem::WayPointActionPhoto) {
+            logEvent(QString::fromUtf8("【动作】触发拍照 [航点 %1]").arg(idx));
+            statusBar()->showMessage(QString::fromUtf8("已触发拍照 [航点 %1]（真机上此处下发相机指令）").arg(idx), 8000);
+        } else if (action == (int)opmap::WayPointItem::WayPointActionHover && wp) {
+            logEvent(QString::fromUtf8("【动作】原地悬停 %1 秒 [航点 %2]").arg(wp->HoverTime()).arg(idx));
+            statusBar()->showMessage(QString::fromUtf8("悬停中：%1 秒后飞向下一航点").arg(wp->HoverTime()), 8000);
+        }
+    });
+    connect(m_map, &opmap::OPMapWidget::missionWaypointReached, this,
+            [this](int idx, int total_) {
+        if (!m_multiMission.isEmpty())
+            return;
+        Q_UNUSED(total_);
+        logEvent(QString::fromUtf8("航点飞行：已到达 [航点 %1]（库侧 UAVReachedWayPoint 同步打勾）").arg(idx));
+    });
+    connect(m_map, &opmap::OPMapWidget::missionFinished, this, [this]() {
+        if (!m_multiMission.isEmpty())
+            return;
+        if (m_flightSim)
+            m_flightSim->stop();
+        m_flightBtn->setText(QString::fromUtf8("航点飞行"));
+        logEvent(QString::fromUtf8("航点任务完成：全部航点已到达（库任务状态机 missionFinished）"));
+    });
+
+    // —— 多机任务信号（*For 系列带机号，一次性连接）——
+    connect(m_map, &opmap::OPMapWidget::missionCurrentWaypointChangedFor, this,
+            [this](int uavId, int idx) {
+        for (int i = 0; i < m_multiMission.size(); ++i) {
+            if (m_multiMission[i].uavId != uavId)
+                continue;
+            opmap::WayPointItem *wp = m_multiMission[i].seg.value(idx);
+            if (m_multiMission[i].sim && wp)
+                m_multiMission[i].sim->setTarget(wp->Coord());
+            logEvent(QString::fromUtf8("[机%1] 目标切换 → 航点 %2/%3")
+                     .arg(uavId).arg(idx + 1).arg(m_multiMission[i].seg.size()));
+            break;
+        }
+    });
+    connect(m_map, &opmap::OPMapWidget::missionHoverStateChangedFor, this,
+            [this](int uavId, bool hovering, int seconds) {
+        for (int i = 0; i < m_multiMission.size(); ++i) {
+            if (m_multiMission[i].uavId == uavId && m_multiMission[i].sim) {
+                m_multiMission[i].sim->setHovering(hovering);
+                break;
+            }
+        }
+        if (hovering)
+            logEvent(QString::fromUtf8("[机%1] 进入悬停 %2 秒").arg(uavId).arg(seconds));
+    });
+    connect(m_map, &opmap::OPMapWidget::missionWaypointReachedFor, this,
+            [this](int uavId, int idx, int action) {
+        Q_UNUSED(action);
+        logEvent(QString::fromUtf8("[机%1] 已到达航点 %2").arg(uavId).arg(idx));
+    });
+    connect(m_map, &opmap::OPMapWidget::missionActionTriggeredFor, this,
+            [this](int uavId, int idx, int action) {
+        if (action == (int)opmap::WayPointItem::WayPointActionPhoto)
+            logEvent(QString::fromUtf8("[机%1]【动作】触发拍照 [航点 %2]").arg(uavId).arg(idx));
+    });
+    connect(m_map, SIGNAL(missionFinishedFor(int)), this, SLOT(onMultiMissionFinished(int)));
 
     // 量测与轨迹：库信号 → 按钮状态/日志
     connect(m_map, SIGNAL(measureFinished(double,QList<opmap::PointLatLng>)),
@@ -559,9 +645,10 @@ void MainWindow::setupCapabilityDock()
     QPushButton *migrationBtn = new QPushButton(QString::fromUtf8("候鸟迁徙演示"), measureBox);
     migrationBtn->setCheckable(true);
     measureLayout->addWidget(migrationBtn);
-    QPushButton *swarmBtn = new QPushButton(QString::fromUtf8("多机编队演示"), measureBox);
-    swarmBtn->setCheckable(true);
-    measureLayout->addWidget(swarmBtn);
+    m_multiBtn = new QPushButton(QString::fromUtf8("多机任务飞行"), measureBox);
+    m_multiBtn->setCheckable(true);
+    m_multiBtn->setToolTip(QString::fromUtf8("先在地图摆好航点（≥4 个），点此选架数：航点自动按序分段，各机沿自己分段独立执行任务"));
+    measureLayout->addWidget(m_multiBtn);
     connect(m_measureBtn, &QPushButton::clicked, this, &MainWindow::onMeasureClicked);
     connect(clearMeasureBtn, &QPushButton::clicked, [this]() {
         m_map->ClearMeasurements();
@@ -592,7 +679,7 @@ void MainWindow::setupCapabilityDock()
     connect(m_replayBtn, &QPushButton::clicked, this, &MainWindow::onReplayClicked);
     connect(m_stopReplayBtn, &QPushButton::clicked, this, &MainWindow::onStopReplayClicked);
     connect(migrationBtn, &QPushButton::toggled, this, &MainWindow::onMigrationToggled);
-    connect(swarmBtn, &QPushButton::toggled, this, &MainWindow::onSwarmToggled);
+    connect(m_multiBtn, &QPushButton::toggled, this, &MainWindow::onMultiMissionToggled);
     layout->addWidget(measureBox);
 
     // —— 地理围栏 ——
@@ -795,8 +882,8 @@ void MainWindow::onFlightClicked()
         statusBar()->showMessage(QString::fromUtf8("请先在地图点选添加航点"), 5000);
         return;
     }
-    if (!m_swarm.isEmpty()) {   // 编队演示占用 0 号机，双源同时驱动会互抢位置
-        logEvent(QString::fromUtf8("航点飞行与多机编队演示冲突（0 号机被占用），请先关闭多机编队演示"));
+    if (!m_multiMission.isEmpty()) {   // 多机任务占用 0 号机，双源同时驱动会互抢位置
+        logEvent(QString::fromUtf8("航点飞行与多机任务冲突（0 号机被占用），请先停止多机任务飞行"));
         return;
     }
     int photoCount = 0, hoverCount = 0;
@@ -826,41 +913,8 @@ void MainWindow::onFlightClicked()
             m_map->SetUAVHeading(0, heading);
         });
     }
-    // 模拟器跟随库任务状态机：目标切换/悬停开关/动作日志/完成收尾全部来自库信号
-    connect(m_map, &opmap::OPMapWidget::missionCurrentWaypointChanged, m_flightSim,
-            [this](int idx) {
-        QMap<int, opmap::WayPointItem*> all = m_map->WPAll();
-        opmap::WayPointItem *wp = all.values().value(idx);
-        if (wp)
-            m_flightSim->setTarget(wp->Coord());
-        m_flightBtn->setText(QString::fromUtf8("停止飞行（目标 %1/%2）")
-                             .arg(idx + 1).arg(all.size()));
-    });
-    connect(m_map, &opmap::OPMapWidget::missionHoverStateChanged, m_flightSim,
-            &WaypointFlightSimulator::setHovering);
-    connect(m_map, &opmap::OPMapWidget::missionActionTriggered, this,
-            [this](int idx, int action) {
-        // 实际拍照/悬停由上层在动作信号里响应（真机=下发任务指令）
-        QMap<int, opmap::WayPointItem*> all = m_map->WPAll();
-        opmap::WayPointItem *wp = all.values().value(idx);
-        if (action == (int)opmap::WayPointItem::WayPointActionPhoto) {
-            logEvent(QString::fromUtf8("【动作】触发拍照 [航点 %1]").arg(idx));
-            statusBar()->showMessage(QString::fromUtf8("已触发拍照 [航点 %1]（真机上此处下发相机指令）").arg(idx), 8000);
-        } else if (action == (int)opmap::WayPointItem::WayPointActionHover && wp) {
-            logEvent(QString::fromUtf8("【动作】原地悬停 %1 秒 [航点 %2]").arg(wp->HoverTime()).arg(idx));
-            statusBar()->showMessage(QString::fromUtf8("悬停中：%1 秒后飞向下一航点").arg(wp->HoverTime()), 8000);
-        }
-    });
-    connect(m_map, &opmap::OPMapWidget::missionWaypointReached, this,
-            [this](int idx, int total_) {
-        Q_UNUSED(total_);
-        logEvent(QString::fromUtf8("航点飞行：已到达 [航点 %1]（库侧 UAVReachedWayPoint 同步打勾）").arg(idx));
-    });
-    connect(m_map, &opmap::OPMapWidget::missionFinished, this, [this]() {
-        m_flightSim->stop();
-        m_flightBtn->setText(QString::fromUtf8("航点飞行"));
-        logEvent(QString::fromUtf8("航点任务完成：全部航点已到达（库任务状态机 missionFinished）"));
-    });
+    // 模拟器跟随库任务状态机：目标切换/悬停/动作/到达/完成信号已一次性连接在
+    // 构造函数（多机任务进行中由守卫跳过），此处只负责启动
 
     // 启动：库状态机 + 假遥测源（真机接入时删除模拟器，遥测直接喂 SetUAVPos）
     m_flightSim->start(start, double(m_flightSpeedMps));
@@ -1141,12 +1195,7 @@ void MainWindow::onMigrationToggled(bool on)
                 b->setChecked(false);
             return;
         }
-        if (!m_swarm.isEmpty()) {   // 编队演示占用 0 号机与弧线层，混开互删弧线会崩
-            logEvent(QString::fromUtf8("迁徙演示与多机编队演示冲突（0 号机/弧线层被占用），请先关闭多机编队演示"));
-            if (QPushButton *b = qobject_cast<QPushButton*>(sender()))
-                b->setChecked(false);
-            return;
-        }
+        // 多机任务使用 UAV 图元层（不占标记/弧线层），与迁徙演示互不影响，无需互斥
         // 4 只候鸟各自真实迁徙路线（繁殖地 → 中停地 → 越冬地），时长不同
         // 长途演示压缩到 1 分钟级：tick 200ms，全程 45~75s
         m_migrants.clear();
@@ -1227,93 +1276,118 @@ void MainWindow::onMigrantTick()
     }
 }
 
-// ————————————————— 多机编队监控演示 —————————————————
-// 3 架 UAV 沿各自弧线同时飞行：真 UAV 图标（id 0/1/2）+ 按机分道轨迹
-// 自动记录（库 StartTrailRecording(id)），演示完可分别保存/回放任一架
+// ————————————————— 多机任务飞行 —————————————————
+// 用户在地图摆航点 → 选架数 → 航点按编号连续分段 → 各机独立任务状态机
+// （真机接入：把每机的 WaypointFlightSimulator 换成各自遥测，直喂 SetUAVPos(id)）
 
-void MainWindow::onSwarmToggled(bool on)
+void MainWindow::onMultiMissionToggled(bool on)
 {
-    if (on) {
-        // 主机 0 冲突守卫：航点飞行也在喂 0 号机，双源同时驱动会互抢位置
-        if (m_flightSim && m_flightSim->isActive()) {
-            logEvent(QString::fromUtf8("多机编队演示与航点飞行冲突（0 号机被占用），请先停止航点飞行"));
-            if (QPushButton *b = qobject_cast<QPushButton*>(sender()))
-                b->setChecked(false);
-            return;
-        }
-        // 迁徙演示互斥：标记层/弧线层未清（含飞完后的残留态）都拒绝，
-        // 防止任一方关闭时误删对方正在使用的弧线（悬空指针崩溃）
-        if (m_migrantTimer->isActive() || !m_migrantMarkers.isEmpty()) {
-            logEvent(QString::fromUtf8("多机编队演示与迁徙演示冲突（标记/弧线层被占用），请先关闭候鸟迁徙演示"));
-            if (QPushButton *b = qobject_cast<QPushButton*>(sender()))
-                b->setChecked(false);
-            return;
-        }
-        m_swarm.clear();
-        struct Seed { int uavId; const char *name; int durationS; QColor color;
-                      double from[2], to[2]; };
-        const Seed seeds[] = {
-            { 0, "长机", 35, QColor(255, 150, 0),   { 34.26, 108.94 }, { 36.06, 103.83 } },  // 西安→兰州
-            { 1, "僚机一", 30, QColor(0, 190, 255),  { 34.26, 108.94 }, { 37.87, 112.55 } },  // 西安→太原
-            { 2, "僚机二", 40, QColor(190, 90, 255), { 34.26, 108.94 }, { 29.56, 106.55 } },  // 西安→重庆
-        };
-        for (int i = 0; i < 3; ++i) {
-            SwarmUAV s;
-            s.uavId = seeds[i].uavId;
-            s.name = QString::fromUtf8(seeds[i].name);
-            s.durationMs = seeds[i].durationS * 1000;
-            s.arrived = false;
-            s.arc = m_map->AddArcLine(
-                opmap::PointLatLng(seeds[i].from[0], seeds[i].from[1]),
-                opmap::PointLatLng(seeds[i].to[0], seeds[i].to[1]),
-                seeds[i].color, (i % 2 == 0 ? 1 : -1));
-            m_swarm.append(s);
-            // 轨迹按机分道自动记录：三机同时录、互不混流（库多机轨迹能力）
-            m_map->StartTrailRecording(s.uavId);
-        }
-        m_swarmElapsed = 0;
-        m_map->SetCurrentPosition(opmap::PointLatLng(34.0, 109.0));   // 视野罩住三条航线
-        m_map->SetZoom(5);
-        m_swarmTimer->start(200);
-        logEvent(QString::fromUtf8("多机编队演示开始：3 架 UAV（0=长机/1/2）沿弧线同时飞行，轨迹已按机分道自动记录"));
-        logEvent(QString::fromUtf8("演示结束后：面板「保存轨迹」默认存 0 号机；库 API SaveTrailToFile(path, err, 机id)/StartTrailReplay(speed, 机id) 可分机操作"));
-    } else {
-        m_swarmTimer->stop();
-        for (int i = 0; i < m_swarm.size(); ++i) {
-            m_map->StopTrailRecording(m_swarm.at(i).uavId);
-            m_map->RemoveArcLine(m_swarm.at(i).arc);   // 只删编队自己的弧线
-            m_map->DeleteUAV(m_swarm.at(i).uavId);     // 图标与轨迹线随图元删除
-        }
-        m_swarm.clear();
-        logEvent(QString::fromUtf8("多机编队演示停止：UAV 图标与航线已清除（各机轨迹缓冲保留，可保存/回放）"));
+    if (!on) {
+        stopMultiMission();
+        return;
     }
+    // 0 号机冲突守卫：航点飞行也在喂 0 号机，双源同时驱动会互抢位置
+    if (m_flightSim && m_flightSim->isActive()) {
+        logEvent(QString::fromUtf8("多机任务与航点飞行冲突（0 号机被占用），请先停止航点飞行"));
+        m_multiBtn->setChecked(false);
+        return;
+    }
+    // 收集航点（WPAll 按编号有序）并校验规模
+    QMap<int, opmap::WayPointItem*> wps = m_map->WPAll();
+    if (wps.size() < 4) {
+        statusBar()->showMessage(QString::fromUtf8("多机任务：请先在地图点选至少 4 个航点"), 5000);
+        m_multiBtn->setChecked(false);
+        return;
+    }
+    bool ok = false;
+    const int n = QInputDialog::getInt(this, QString::fromUtf8("多机任务飞行"),
+                                       QString::fromUtf8("出动架数（航点按编号连续分段，每机至少 2 个）"),
+                                       2, 2, 3, 1, &ok);
+    if (!ok) {   // 用户取消
+        m_multiBtn->setChecked(false);
+        return;
+    }
+    if (wps.size() < 2 * n) {
+        statusBar()->showMessage(QString::fromUtf8("航点数 %1 不足以分给 %2 架（每机至少 2 个）")
+                                 .arg(wps.size()).arg(n), 8000);
+        m_multiBtn->setChecked(false);
+        return;
+    }
+
+    // 连续均分：base = total/n，前 extra 架各多 1 个（段间无交叉，总点数不变）
+    const QList<opmap::WayPointItem*> ordered = wps.values();
+    const int total = ordered.size();
+    const int base = total / n, extra = total % n;
+    m_multiMission.clear();
+    m_multiFinishedCount = 0;
+    int cursor = 0;
+    for (int i = 0; i < n; ++i) {
+        MultiMissionUAV mu;
+        mu.uavId = i;   // 0=主机（库内走 Home 起飞编排），1..N-1=僚机（起飞位=首航点）
+        mu.name = (i == 0) ? QString::fromUtf8("主机") : QString::fromUtf8("僚机%1").arg(i);
+        mu.seg = ordered.mid(cursor, base + (i < extra ? 1 : 0));
+        cursor += mu.seg.size();
+        mu.sim = new WaypointFlightSimulator(this);
+        const int uavId = mu.uavId;
+        connect(mu.sim, &WaypointFlightSimulator::positionChanged, this,
+                [this, uavId](opmap::PointLatLng p, double heading) {
+            // 真机接入点：替换为该机遥测直喂 SetUAVPos(id)——任务推进/围栏/轨迹全在库内
+            m_map->SetUAVPos(uavId, p, 500);
+            m_map->SetUAVHeading(uavId, heading);
+        });
+        m_multiMission.append(mu);
+        // 模拟遥测先起飞（start 会清目标），StartWaypointMission 随后同步发首目标信号
+        opmap::PointLatLng takeoff = mu.seg.first()->Coord();   // 僚机：分段首航点=集结点
+        if (i == 0) {   // 主机起飞位与库编排一致：Home 优先，其次车辆位置
+            if (m_map->Home)
+                takeoff = m_map->Home->Coord();
+            else if (m_map->HasVehiclePosition())
+                takeoff = m_map->VehiclePosition();
+        }
+        mu.sim->start(takeoff, 80.0);
+        m_map->StartWaypointMission(i, mu.seg, 15.0);   // 库：建 UAV/任务状态机/发首目标
+        m_map->StartTrailRecording(i);                  // 按机分道自动记录轨迹
+        logEvent(QString::fromUtf8("[机%1]%2 任务开始：航点 %3~%4（共 %5 个），巡航 80 m/s")
+                 .arg(i).arg(mu.name).arg(mu.seg.first()->Number())
+                 .arg(mu.seg.last()->Number()).arg(mu.seg.size()));
+    }
+    m_multiBtn->setText(QString::fromUtf8("停止多机任务"));
+    logEvent(QString::fromUtf8("多机任务开始：%1 架沿各自分段独立飞行（航点已连续均分），目标切换/悬停/动作全部来自库任务状态机")
+             .arg(n));
 }
 
-void MainWindow::onSwarmTick()
+void MainWindow::stopMultiMission()
 {
-    m_swarmElapsed += 200;
-    int arrivedCount = 0;
-    for (int i = 0; i < m_swarm.size(); ++i) {
-        SwarmUAV &s = m_swarm[i];
-        const double f = qMin(1.0, (double)m_swarmElapsed / s.durationMs);
-        // 机沿弧线推进：位置由 ArcPointAt 严格取自航线（真机=遥测直接喂 SetUAVPos）
-        const opmap::PointLatLng pos = s.arc->ArcPointAt(f);
-        const opmap::PointLatLng ahead = s.arc->ArcPointAt(qMin(1.0, f + 0.01));
-        m_map->SetUAVPos(s.uavId, pos, 500);
-        if (ahead.Lat() != pos.Lat() || ahead.Lng() != pos.Lng())
-            m_map->SetUAVHeading(s.uavId, opmap::geoutils::bearingDeg(pos, ahead));
-        if (f >= 1.0) {
-            ++arrivedCount;
-            if (!s.arrived) {
-                s.arrived = true;
-                logEvent(QString::fromUtf8("%1（%2 号机）已抵达目的地，轨迹 %3 个采样点")
-                             .arg(s.name).arg(s.uavId).arg(m_map->TrailPointCount(s.uavId)));
-            }
+    if (m_multiMission.isEmpty())
+        return;
+    m_map->StopWaypointMission();   // 全机任务状态机中止
+    for (int i = 0; i < m_multiMission.size(); ++i) {
+        MultiMissionUAV &mu = m_multiMission[i];
+        if (mu.sim) {
+            mu.sim->stop();
+            mu.sim->deleteLater();
         }
+        m_map->StopTrailRecording(mu.uavId);   // 停该机分道记录（缓冲保留可保存/回放）
     }
-    if (arrivedCount == m_swarm.size()) {
-        m_swarmTimer->stop();
-        logEvent(QString::fromUtf8("编队演示完成：三机轨迹分道保留，可分别保存（第三参传机 id）或回放（StartTrailReplay 倍速 + 机 id）"));
+    m_multiMission.clear();
+    m_multiFinishedCount = 0;
+    m_multiBtn->setChecked(false);
+    m_multiBtn->setText(QString::fromUtf8("多机任务飞行"));
+    // 不删 UAV 图标与轨迹：保留供查看/保存/回放（DeleteUAV 由用户或下次任务重摆处理）
+    logEvent(QString::fromUtf8("多机任务已停止：航点与各机轨迹保留，可分别保存/回放"));
+}
+
+void MainWindow::onMultiMissionFinished(int uavId)
+{
+    if (m_multiMission.isEmpty())
+        return;   // 手动停止后的迟到信号，忽略
+    ++m_multiFinishedCount;
+    logEvent(QString::fromUtf8("[机%1] 任务完成（%2/%3）")
+             .arg(uavId).arg(m_multiFinishedCount).arg(m_multiMission.size()));
+    if (m_multiFinishedCount >= m_multiMission.size()) {
+        logEvent(QString::fromUtf8("多机任务全部完成：%1 架均已到达各自分段终点（图标/轨迹保留，可分别保存/回放）")
+                 .arg(m_multiMission.size()));
+        stopMultiMission();
     }
 }
 

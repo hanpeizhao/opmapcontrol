@@ -637,6 +637,7 @@ private:
     void ConnectUAV(UAVItem *uav);   ///< UAV 事件 → facade 信号转发（到达/飞出安全圈/回圈）
     void ShowRealLocation(opmap::PointLatLng const& pos);   ///< "我的位置"落到地图：GPS 图标+居中+街区级缩放
     void RepositionScaleBar();    ///< 比例尺重排到左下角（窗口 resize 时）
+    WaypointMissionEngine *ensureMissionEngine(int uavId);   ///< 按机号惰性创建任务引擎并接线信号
     void HandlePickClick(opmap::PointLatLng const& pos);   ///< 一次有效选点：累积+发信号+单发自动收尾
     void EndPick();               ///< 结束当前取点（围栏收尾 + pickFinished）
     WayPointItem *EnsureRouteMarker(WayPointItem *&marker, opmap::PointLatLng const& pos, QString const& text);   ///< 惰性取用路线端点图钉（auxiliary 装饰航点）
@@ -662,7 +663,7 @@ private:
     opmap::AbstractRouteProvider *routeProvider;   ///< 路由规划服务（接管外部传入者）
     opmap::NavigationEngine *navEngine;            ///< 导航状态机
     QList<opmap::Route> routeAlternatives;         ///< 最近一次规划的备选路线全集（SelectRoute 取用）
-    opmap::WaypointMissionEngine *missionEngine;   ///< 航点任务状态机（喂点驱动）
+    QMap<int, WaypointMissionEngine *> missionEngines;  ///< 各机任务状态机（按机号惰性创建，喂点驱动）
     opmap::RouteItem *routeItem;                   ///< 路线绘制项（随 map 析构）
     opmap::IpLocationProvider *ipLocator;          ///< IP 定位服务（城市级兜底）
     opmap::ElevationProvider *elevProvider;        ///< 地面高程查询服务（open-meteo）
@@ -700,13 +701,7 @@ private slots:
     /// 缓存本次规划的备选路线并转发 routeAlternativesReady
     void onRouteAlternatives(QList<opmap::Route> routes);
     //   WayPointItem* item;//apagar
-    // 航点任务引擎信号 → facade 信号转发
-    void onMissionStarted();
-    void onMissionCurrentWaypointChanged(int index);
-    void onMissionWaypointReached(int index, int action);
-    void onMissionHoverStateChanged(bool hovering, int seconds);
-    void onMissionActionTriggered(int index, int action);
-    void onMissionFinished();
+    // 航点任务引擎信号 → facade 信号转发（引擎接线见 ensureMissionEngine）
     /// IP 定位结果：先处理一键定位兜底（只居中），再转发 ipLocationReady
     void onIpLocated(opmap::PointLatLng pos, QString city);
     /// IP 定位失败：清一键定位兜底标记再转发（防残留 locatePending 误居中后续结果）
@@ -886,13 +881,20 @@ signals:
     void elevationFailed(QString reason);
     void geofenceBreach(opmap::PointLatLng position);   ///< UAV 飞出多边形围栏
 
-    // —— 航点任务飞行（WaypointMissionEngine 转发）——
+    // —— 航点任务飞行（WaypointMissionEngine 转发，下列为主机 0 号任务信号）——
     void missionStarted();                              ///< 任务启动
     void missionCurrentWaypointChanged(int index);      ///< 当前目标航点切换（0 起）
     void missionWaypointReached(int index, int action); ///< 抵达某航点
     void missionHoverStateChanged(bool hovering, int seconds); ///< 悬停开始/结束
     void missionActionTriggered(int index, int action); ///< 到达动作触发（拍照/悬停）
     void missionFinished();                             ///< 全部航点完成
+    // —— 多机任务（所有机号都发 *For 系列；0 号机会与上面旧信号同时发）——
+    void missionStartedFor(int uavId);                              ///< uavId 任务启动
+    void missionCurrentWaypointChangedFor(int uavId, int index);    ///< uavId 目标航点切换
+    void missionWaypointReachedFor(int uavId, int index, int action); ///< uavId 抵达航点
+    void missionHoverStateChangedFor(int uavId, bool hovering, int seconds); ///< uavId 悬停切换
+    void missionActionTriggeredFor(int uavId, int index, int action); ///< uavId 到达动作触发
+    void missionFinishedFor(int uavId);                             ///< uavId 全部航点完成
     void geofenceEntered(opmap::PointLatLng position);  ///< UAV 回到多边形围栏内
     void mapFollowChanged(bool following);              ///< 地图跟随车辆开关变化（供 UI 复选框同步）
 
@@ -1040,8 +1042,16 @@ public slots:
     /// 到达判定→悬停计时→动作信号→下一航点→missionFinished
     void StartWaypointMission(QList<WayPointItem*> const& waypoints,
                               double arrivalRadiusMeters = 15.0);
-    void StopWaypointMission();                            ///< 中止当前任务
-    bool IsWaypointMissionActive() const;                  ///< 任务是否进行中
+    /// 多机任务重载：为指定机号启动独立任务状态机（每机一个引擎实例，
+    /// 各机喂点只推进各自任务；航点列表为该机专属分段，不可与其他机交叉共享图元）。
+    /// uavId>0 时起飞位=列表首航点（无 Home 编排），信号走 *For(int uavId) 系列
+    void StartWaypointMission(int uavId, QList<WayPointItem*> const& waypoints,
+                              double arrivalRadiusMeters = 15.0);
+    void StopWaypointMission();                            ///< 中止所有机的任务
+    void StopWaypointMission(int uavId);                   ///< 中止指定机的任务
+    bool IsWaypointMissionActive() const;                  ///< 主机（0 号）任务是否进行中
+    bool IsWaypointMissionActive(int uavId) const;         ///< 指定机任务是否进行中
+    bool IsAnyWaypointMissionActive() const;               ///< 是否存在任意机在进行中的任务
 
     /**
      * @brief Sets the map zoom level

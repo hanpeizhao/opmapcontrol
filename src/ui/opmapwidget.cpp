@@ -70,7 +70,6 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     diagGraphItem(0),
     routeProvider(0),
     navEngine(0),
-    missionEngine(0),
     routeItem(0),
     ipLocator(0),
     elevProvider(0),
@@ -156,14 +155,7 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     connect(posSourceManager, SIGNAL(linkAlive()), this, SIGNAL(positionLinkAlive()));
     connect(posSourceManager, SIGNAL(linkTimeout()), this, SIGNAL(positionLinkTimeout()));
 
-    // —— 航点任务：引擎信号 → facade 信号转发（喂点驱动，见 UpdatePosition）——
-    missionEngine = new WaypointMissionEngine(this);
-    connect(missionEngine, SIGNAL(missionStarted()), this, SLOT(onMissionStarted()));
-    connect(missionEngine, SIGNAL(currentWaypointChanged(int)), this, SLOT(onMissionCurrentWaypointChanged(int)));
-    connect(missionEngine, SIGNAL(waypointReached(int,int)), this, SLOT(onMissionWaypointReached(int,int)));
-    connect(missionEngine, SIGNAL(hoverStateChanged(bool,int)), this, SLOT(onMissionHoverStateChanged(bool,int)));
-    connect(missionEngine, SIGNAL(actionTriggered(int,int)), this, SLOT(onMissionActionTriggered(int,int)));
-    connect(missionEngine, SIGNAL(missionFinished()), this, SLOT(onMissionFinished()));
+    // —— 航点任务：按机号惰性创建引擎（ensureMissionEngine），喂点驱动见 SetUAVPos/UpdateVehiclePosition ——
 
     connect(navEngine, SIGNAL(routePlanned(opmap::Route)), routeItem, SLOT(SetRoute(opmap::Route)));
     connect(navEngine, SIGNAL(routePlanned(opmap::Route)), this, SIGNAL(navigationRouteReady(opmap::Route)));
@@ -577,8 +569,10 @@ void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
         trailRecorder->AddPoint(0, pos, 0);   // 轨迹记录进主机道（所有位置源统一在此截获）
     navEngine->UpdatePosition(pos);
     CheckGeofence(pos);   // 围栏判定对所有位置源（模拟/GPS/MAVLink）统一生效
-    if (missionEngine && missionEngine->IsMissionActive())
-        missionEngine->UpdatePosition(pos);   // 航点任务状态推进（喂点驱动）
+    // 任务状态机只认各自机号：喂点只推进该机自己的任务（多机互不干扰）
+    WaypointMissionEngine *engine = missionEngines.value(0, 0);
+    if (engine && engine->IsMissionActive())
+        engine->UpdatePosition(pos);   // 航点任务状态推进（喂点驱动）
 }
 
 void OPMapWidget::SetUAVPos(int const& id, opmap::PointLatLng const& pos, int const& alt)
@@ -588,9 +582,10 @@ void OPMapWidget::SetUAVPos(int const& id, opmap::PointLatLng const& pos, int co
     if (trailRecorder->IsRecording(id))
         trailRecorder->AddPoint(id, pos, alt);   // 按机分道记录，多机互不混流
     CheckGeofence(pos);   // 任务飞行喂点同样接入围栏越界判定
-    // 任务状态机只认主机（僚机喂点不得误推主机的任务进度）
-    if (id == 0 && missionEngine && missionEngine->IsMissionActive())
-        missionEngine->UpdatePosition(pos);   // 任务状态推进（真机遥测喂点同构）
+    // 各机任务状态机独立推进：该机喂点只推该机任务（多机互不干扰，真机遥测喂点同构）
+    WaypointMissionEngine *engine = missionEngines.value(id, 0);
+    if (engine && engine->IsMissionActive())
+        engine->UpdatePosition(pos);
 }
 
 void OPMapWidget::SetUAVHeading(int const& id, qreal const& deg)
@@ -781,36 +776,90 @@ opmap::NavigationEngine *OPMapWidget::GetNavigationEngine() const
 
 // ———————— 航点任务飞行 ————————
 
+/// 按机号惰性创建任务引擎并接线：*For 信号全机发射并携带机号；
+/// 0 号机额外发不带机号的旧信号（保持既有单机消费者兼容）
+WaypointMissionEngine *OPMapWidget::ensureMissionEngine(int uavId)
+{
+    WaypointMissionEngine *engine = missionEngines.value(uavId, 0);
+    if (engine)
+        return engine;
+    engine = new WaypointMissionEngine(this);
+    missionEngines.insert(uavId, engine);
+    // 引擎信号 → facade *For 信号（lambda 携带机号，避免按发信者反查）
+    connect(engine, &WaypointMissionEngine::missionStarted, this, [this, uavId] {
+        emit missionStartedFor(uavId);
+        if (uavId == 0) emit missionStarted();
+    });
+    connect(engine, &WaypointMissionEngine::currentWaypointChanged, this,
+            [this, uavId](int index) {
+        emit missionCurrentWaypointChangedFor(uavId, index);
+        if (uavId == 0) emit missionCurrentWaypointChanged(index);
+    });
+    connect(engine, &WaypointMissionEngine::waypointReached, this,
+            [this, uavId](int index, int action) {
+        emit missionWaypointReachedFor(uavId, index, action);
+        if (uavId == 0) emit missionWaypointReached(index, action);
+    });
+    connect(engine, &WaypointMissionEngine::hoverStateChanged, this,
+            [this, uavId](bool hovering, int seconds) {
+        emit missionHoverStateChangedFor(uavId, hovering, seconds);
+        if (uavId == 0) emit missionHoverStateChanged(hovering, seconds);
+    });
+    connect(engine, &WaypointMissionEngine::actionTriggered, this,
+            [this, uavId](int index, int action) {
+        emit missionActionTriggeredFor(uavId, index, action);
+        if (uavId == 0) emit missionActionTriggered(index, action);
+    });
+    connect(engine, &WaypointMissionEngine::missionFinished, this, [this, uavId] {
+        emit missionFinishedFor(uavId);
+        if (uavId == 0) emit missionFinished();
+    });
+    return engine;
+}
+
 void OPMapWidget::StartWaypointMission(QList<WayPointItem*> const& waypoints,
+                                       double arrivalRadiusMeters)
+{
+    StartWaypointMission(0, waypoints, arrivalRadiusMeters);   // 无机号版本=主机 0
+}
+
+void OPMapWidget::StartWaypointMission(int uavId, QList<WayPointItem*> const& waypoints,
                                        double arrivalRadiusMeters)
 {
     if (waypoints.isEmpty())
         return;
     // —— 任务启动默认编排（上层无需再手工铺垫）——
     // 惰性建 UAV 并打开自动到达判定（进入 arrivalRadiusMeters 即到达信号）
-    UAVItem *uav = EnsureUAV(0);
+    UAVItem *uav = EnsureUAV(uavId);
     uav->SetAutoSetReached(true);
     uav->SetAutoSetDistance(arrivalRadiusMeters);
     uav->DeleteTrail();   // 任务（重）启动=轨迹从头记录，否则上次飞行终点会与新起飞点拉出跨场连线
-    if (Home)
-        Home->SetShowSafeArea(true);   // 起飞点安全圈可见
-    // 起飞点取位：Home 返航点优先，其次车辆位置；有则摆好机位并跳转视图
+    uav->SetUAVHeading(0);
+
     opmap::PointLatLng start;
-    bool haveStart = false;
-    if (Home) {
-        start = Home->Coord();
-        haveStart = true;
-    } else if (vehiclePosValid) {
-        start = vehiclePos;
-        haveStart = true;
-    }
-    if (haveStart) {
+    if (uavId == 0) {
+        // 主机保留完整编排：Home 安全圈、起飞点取位（Home 优先，其次车辆位置）、视图跳转
+        if (Home)
+            Home->SetShowSafeArea(true);
+        bool haveStart = false;
+        if (Home) {
+            start = Home->Coord();
+            haveStart = true;
+        } else if (vehiclePosValid) {
+            start = vehiclePos;
+            haveStart = true;
+        }
+        if (haveStart) {
+            uav->SetUAVPos(start, 120);
+            SetCurrentPosition(start);   // 地图跳到起飞点，起飞位置一目了然
+        }
+        // 跟随会让 UAV 钉在屏幕中央、看起来"原地不动"，任务观察期间自动暂停
+        SetFollowVehicle(false);
+    } else {
+        // 僚机：起飞位=首航点（集结点），不做视图跳转（由主机/调用方决定视野）
+        start = waypoints.first()->Coord();
         uav->SetUAVPos(start, 120);
-        uav->SetUAVHeading(0);
-        SetCurrentPosition(start);   // 地图跳到起飞点，起飞位置一目了然
     }
-    // 跟随会让 UAV 钉在屏幕中央、看起来"原地不动"，任务观察期间自动暂停
-    SetFollowVehicle(false);
 
     QList<WaypointMissionEngine::MissionWaypoint> mission;
     for (int i = 0; i < waypoints.size(); ++i) {
@@ -818,45 +867,44 @@ void OPMapWidget::StartWaypointMission(QList<WayPointItem*> const& waypoints,
         mission.append(WaypointMissionEngine::MissionWaypoint(
                            wp->Coord(), wp->HoverTime(), (int)wp->Action()));
     }
-    missionEngine->SetMission(mission, arrivalRadiusMeters);
-    missionEngine->StartMission();
+    WaypointMissionEngine *engine = ensureMissionEngine(uavId);
+    engine->SetMission(mission, arrivalRadiusMeters);
+    engine->StartMission();
 }
 
 void OPMapWidget::StopWaypointMission()
 {
-    missionEngine->StopMission();
+    // 无机号版本=全部中止（原单机语义的自然推广）
+    for (QMap<int, WaypointMissionEngine *>::const_iterator it = missionEngines.constBegin();
+         it != missionEngines.constEnd(); ++it)
+        it.value()->StopMission();
+}
+
+void OPMapWidget::StopWaypointMission(int uavId)
+{
+    if (WaypointMissionEngine *engine = missionEngines.value(uavId, 0))
+        engine->StopMission();
 }
 
 bool OPMapWidget::IsWaypointMissionActive() const
 {
-    return missionEngine->IsMissionActive();
+    return IsWaypointMissionActive(0);
 }
 
-// 任务引擎信号 → facade 信号原样转发
-
-void OPMapWidget::onMissionStarted() { emit missionStarted(); }
-
-void OPMapWidget::onMissionCurrentWaypointChanged(int index)
+bool OPMapWidget::IsWaypointMissionActive(int uavId) const
 {
-    emit missionCurrentWaypointChanged(index);
+    WaypointMissionEngine *engine = missionEngines.value(uavId, 0);
+    return engine && engine->IsMissionActive();
 }
 
-void OPMapWidget::onMissionWaypointReached(int index, int action)
+bool OPMapWidget::IsAnyWaypointMissionActive() const
 {
-    emit missionWaypointReached(index, action);
+    for (QMap<int, WaypointMissionEngine *>::const_iterator it = missionEngines.constBegin();
+         it != missionEngines.constEnd(); ++it)
+        if (it.value()->IsMissionActive())
+            return true;
+    return false;
 }
-
-void OPMapWidget::onMissionHoverStateChanged(bool hovering, int seconds)
-{
-    emit missionHoverStateChanged(hovering, seconds);
-}
-
-void OPMapWidget::onMissionActionTriggered(int index, int action)
-{
-    emit missionActionTriggered(index, action);
-}
-
-void OPMapWidget::onMissionFinished() { emit missionFinished(); }
 
 // ———————— 多边形地理围栏 ————————
 
