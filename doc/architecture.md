@@ -1,6 +1,6 @@
 # 实现原理
 
-本文说明 opmapcontrol_ex 的内部实现。API 功能清单见 [features.md](features.md)。
+本文说明 opmapcontrol_ex 的内部实现。全量 API 参考（权威）见 [api-reference.md](api-reference.md)；按 example 视角整理的功能清单见 [features.md](features.md)。
 
 ## 1. 总体架构
 

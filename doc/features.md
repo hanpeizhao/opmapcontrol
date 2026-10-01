@@ -1,5 +1,7 @@
 # 功能清单与 API 参考
 
+> 全量 API 参考以 [api-reference.md](api-reference.md) 为准（含任务飞行/围栏/MAVLink 等新增能力）；本文保留为按 example 视角整理的功能清单。
+
 库的全部公开能力按模块整理。**example 一列**标注 `opmapcontrol_example` 是否演示了该能力——example 以"库能力示范"面板 + 事件日志面板 + 各功能面板覆盖了绝大多数 API，其余多为样式定制类低频配置。
 
 ## 1. 地图控制（OPMapWidget）
