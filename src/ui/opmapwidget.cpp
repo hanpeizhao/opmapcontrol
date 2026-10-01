@@ -59,7 +59,8 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     ipLocator(0),
     geofenceItem(0),
     geofenceBreached(false),
-    vehiclePosValid(false)
+    vehiclePosValid(false),
+    followVehicle(false)
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
 
@@ -284,12 +285,28 @@ void OPMapWidget::PlanRoute(opmap::PointLatLng const& from, opmap::PointLatLng c
     routeItem->setVisible(true);   // 预览结果经 routePlanned 回来时绘制
 }
 
+/// 惰性取用 UAV：不存在则创建并套用默认跟踪样式——
+/// 图标=位置标记大头针（有位置数据才出现，语义为"这是实时位置"），
+/// 轨迹=每秒一个点 + 实线连线，跟随=SetFollowVehicle 设定的开关
+UAVItem *OPMapWidget::EnsureUAV(int id)
+{
+    UAVItem *uav = GetUAV(id);
+    if (uav)
+        return uav;
+    uav = AddUAV(id);
+    uav->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));
+    uav->SetTrailType(UAVTrailType::ByTimeElapsed);
+    uav->SetTrailTime(1);
+    uav->SetShowTrailLine(true);
+    uav->SetMapFollowType(followVehicle ? UAVMapFollowType::CenterMap
+                                        : UAVMapFollowType::None);
+    return uav;
+}
+
 void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
 {
-    // UAV 图标同步（直接用 AddUAV，避免 SetShowUAV 连带创建 GPSItem）
-    UAVItem *uav = GetUAV(0);
-    if (!uav)
-        uav = AddUAV(0);
+    // UAV 图标同步（EnsureUAV 惰性创建：首次喂点图标即出现，避免静默无效）
+    UAVItem *uav = EnsureUAV(0);
     if (vehiclePosValid && geoutils::haversineDistanceM(vehiclePos, pos) > 1.0)
         uav->SetUAVHeading(geoutils::bearingDeg(vehiclePos, pos));
     uav->SetUAVPos(pos, 0);
@@ -304,13 +321,27 @@ void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
 
 void OPMapWidget::SetUAVPos(int const& id, opmap::PointLatLng const& pos, int const& alt)
 {
-    UAVItem *uav = GetUAV(id);
-    if (!uav)
-        uav = AddUAV(id);
+    UAVItem *uav = EnsureUAV(id);
     uav->SetUAVPos(pos, alt);
     CheckGeofence(pos);   // 任务飞行喂点同样接入围栏越界判定
     if (missionEngine && missionEngine->IsMissionActive())
         missionEngine->UpdatePosition(pos);   // 任务状态推进（真机遥测喂点同构）
+}
+
+void OPMapWidget::SetUAVHeading(int const& id, qreal const& deg)
+{
+    if (UAVItem *uav = GetUAV(id))
+        uav->SetUAVHeading(deg);   // 无位置即无图标：航向没有意义，忽略
+}
+
+void OPMapWidget::SetFollowVehicle(bool const& on)
+{
+    if (followVehicle == on)
+        return;
+    followVehicle = on;
+    if (UAVItem *uav = GetUAV(0))
+        uav->SetMapFollowType(on ? UAVMapFollowType::CenterMap : UAVMapFollowType::None);
+    emit mapFollowChanged(on);   // 供上层 UI 开关同步
 }
 
 void OPMapWidget::StopNavigation()

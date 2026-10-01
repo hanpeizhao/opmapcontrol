@@ -138,6 +138,7 @@ MainWindow::MainWindow()
 
     m_followCheck->setChecked(true);
     m_trailCheck->setChecked(true);
+    m_map->SetFollowVehicle(true);   // 跟随开关下沉到库：喂点自动居中，UAV 创建时套用
     setPickMode(PickNone);
 
     // 指令横幅：地图底部叠加，默认隐藏
@@ -711,13 +712,14 @@ void MainWindow::onFlightClicked()
         logEvent(QString::fromUtf8("已暂停地图跟随，以便观察飞机依次飞向航点（可随时勾选恢复）"));
     }
 
-    // 主机 UAV：打开库内自动到达判定（进入 15 m 即 SetReached + UAVReachedWayPoint 信号）
-    opmap::UAVItem *uav = ensureUAV();
+    // 主机 UAV：惰性创建（库默认大头针 + 每秒轨迹点），打开库内自动到达判定
+    //（进入 15 m 即 SetReached + UAVReachedWayPoint 信号）
+    m_map->SetUAVPos(0, start, 120);
+    opmap::UAVItem *uav = m_map->GetUAV(0);
     uav->SetAutoSetReached(true);
     uav->SetAutoSetDistance(15);
     uav->SetIcon(QString::fromUtf8(":/uavs/images/mapquad.png"));   // 飞行=四旋翼图标
-    uav->SetUAVPos(start, 120);
-    uav->SetUAVHeading(0);
+    m_map->SetUAVHeading(0, 0);
     m_map->SetCurrentPosition(start);   // 地图跳到起飞点（Home 图标处），起飞位置一目了然
 
     if (!m_flightSim) {
@@ -727,9 +729,7 @@ void MainWindow::onFlightClicked()
             // 真机接入点：整体替换本模拟器，遥测直接喂 SetUAVPos——
             // 围栏判定、到达判定、动作触发全在库内，链路不变
             m_map->SetUAVPos(0, p, 120);
-            opmap::UAVItem *u = m_map->GetUAV(0);
-            if (u)
-                u->SetUAVHeading(heading);
+            m_map->SetUAVHeading(0, heading);
         });
     }
     // 模拟器跟随库任务状态机：目标切换/悬停开关/动作日志/完成收尾全部来自库信号
@@ -1080,8 +1080,7 @@ void MainWindow::onNavigateClicked()
         // 指定点选起点出发：先把车辆位置喂到起点（图标同步 + 作为规划起点）
         m_map->UpdateVehiclePosition(m_origin);
         // 瞬移无航向意义：复位图标竖直（原位置→起点的随机方位角会让大头针歪斜）
-        if (opmap::UAVItem *u = m_map->GetUAV(0))
-            u->SetUAVHeading(0);
+        m_map->SetUAVHeading(0, 0);
     }
     m_navInfo->setText(QString::fromUtf8("规划中…"));
     m_banner->show();
@@ -1187,9 +1186,8 @@ void MainWindow::onSimStartClicked()
     if (m_pickMode != PickNone)
         setPickMode(PickNone);
 
-    ensureUAV();
     if (opmap::UAVItem *u = m_map->GetUAV(0))
-        u->DeleteTrail();   // 跟车从头记录轨迹
+        u->DeleteTrail();   // 跟车从头记录轨迹（UAV 尚未出现则无可清理）
     m_simulator->setSpeed(m_speedCombo->currentIndex() == 0 ? 5.0
                           : m_speedCombo->currentIndex() == 1 ? 20.0 : 60.0);
     m_simulator->setPath(m_navRoute.polyline);
@@ -1235,14 +1233,14 @@ void MainWindow::onSpeedChanged(int index)
 
 void MainWindow::onFollowToggled(bool on)
 {
-    opmap::UAVItem *uav = ensureUAV();
-    uav->SetMapFollowType(on ? opmap::UAVMapFollowType::CenterMap
-                             : opmap::UAVMapFollowType::None);
+    m_map->SetFollowVehicle(on);   // 库内管理：喂点自动居中，UAV 未创建时先记忆
 }
 
 void MainWindow::onTrailToggled(bool on)
 {
-    opmap::UAVItem *uav = ensureUAV();
+    opmap::UAVItem *uav = m_map->GetUAV(0);
+    if (!uav)
+        return;   // UAV 由首次喂点惰性创建（库默认轨迹开启），出现后再调此开关
     uav->SetShowTrail(on);
     uav->SetTrailType(on ? opmap::UAVTrailType::ByTimeElapsed
                          : opmap::UAVTrailType::NoTrail);
@@ -1292,7 +1290,6 @@ void MainWindow::onPosSourceChanged(int index)
                     this, SLOT(onMavPositionUpdated(double,double,double,double)));
             connect(m_mavProvider, SIGNAL(linkAlive()), this, SLOT(onMavLinkAlive()));
             connect(m_mavProvider, SIGNAL(linkTimeout()), this, SLOT(onMavLinkTimeout()));
-            ensureUAV();        // 遥测喂车辆/UAV 图标，跟随/轨迹按面板开关生效
         }
         if (m_mavProvider->start(14550))
             statusBar()->showMessage(QString::fromUtf8("MAVLink 遥测监听中（UDP 14550），等待飞控数据…"), 8000);
@@ -1321,7 +1318,6 @@ void MainWindow::onPosSourceChanged(int index)
         }
         connect(m_gpsSource, SIGNAL(positionUpdated(QGeoPositionInfo)),
                 this, SLOT(onGpsPositionUpdated(QGeoPositionInfo)));
-        ensureUAV();            // GPS 模式下按面板开关应用跟随/轨迹设置
     }
     m_gpsSource->startUpdates();
     statusBar()->showMessage(QString::fromUtf8("已切换到系统 GPS 位置源"), 5000);
@@ -1415,10 +1411,7 @@ void MainWindow::onIpLocationReady(opmap::PointLatLng pos, QString city)
 {
     m_lastRealPos = pos;    // IP 兜底结果也计入真实位置记录（城市级精度）
     m_hasRealPos = true;
-    ensureUAV();
-    if (opmap::UAVItem *u = m_map->GetUAV(0))
-        u->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));   // 定位=位置标记图标
-    m_map->UpdateVehiclePosition(pos);
+    m_map->UpdateVehiclePosition(pos);   // 惰性创建 UAV（库默认即大头针位置标记）
     statusBar()->showMessage(QString::fromUtf8("IP 定位（城市级，精度约数公里）：%1 (%2, %3)")
                              .arg(city).arg(pos.Lat(), 0, 'f', 4).arg(pos.Lng(), 0, 'f', 4), 10000);
     if (m_locatePending) {
@@ -1520,14 +1513,13 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
     case PickMock:
     {
         // 点选喂位置：点哪喂哪（所见即所得），模式保持可连续喂点
-        ensureUAV();   // 统一经 ensureUAV 创建图标（库直连创建会落到无人机默认图）
-        if (opmap::UAVItem *u = m_map->GetUAV(0))
-            u->DeleteTrail();   // 手动喂点是瞬移定位不是运动：清旧轨迹避免乱线
-        m_map->UpdateVehiclePosition(p);
-        // 瞬移无航向意义：复位图标竖直（航向仅对连续运动流有意义，瞬移
-        // 两点间随机方位角会让大头针歪斜）
-        if (opmap::UAVItem *u = m_map->GetUAV(0))
+        m_map->UpdateVehiclePosition(p);   // 惰性创建 UAV（库默认大头针/每秒轨迹点）
+        // 手动喂点是瞬移定位不是运动：清旧轨迹避免乱线；瞬移无航向意义复位竖直
+        //（航向仅对连续运动流有意义，瞬移两点间随机方位角会让大头针歪斜）
+        if (opmap::UAVItem *u = m_map->GetUAV(0)) {
+            u->DeleteTrail();
             u->SetUAVHeading(0);
+        }
         // 偏航计数可见化：连续 3 次偏 50m 外才触发重规划（防 GPS 抖动），中间点到路线 50m 内即清零
         QString tip = QString::fromUtf8("已喂入模拟位置 (%1, %2)")
                 .arg(p.Lat(), 0, 'f', 4).arg(p.Lng(), 0, 'f', 4);
@@ -1541,30 +1533,6 @@ void MainWindow::applyPickPoint(const opmap::PointLatLng &p)
         break;
     }
     setPickMode(PickNone);
-}
-
-opmap::UAVItem* MainWindow::ensureUAV()
-{
-    const bool firstCreate = !m_map->GetUAV(0);
-    // 只用 UAVS 表管理（AddUAV），避免 SetShowUAV 连带创建 GPSItem 与重复图标
-    opmap::UAVItem *uav = m_map->GetUAV(0);
-    if (!uav)
-        uav = m_map->AddUAV(0);
-    if (firstCreate) {
-        logEvent(QString::fromUtf8("无人机图标已出现：它代表当前遥测位置（由位置源喂点驱动），"
-                                   "出现即说明有位置源/飞行模拟在工作"));
-        // 默认图标统一为位置标记（大头针）：所有位置源语义一致，
-        // 航点飞行开始时才换成四旋翼（SetIcon mapquad），停止后再恢复
-        uav->SetIcon(QString::fromUtf8(":/markers/images/bigMarkerGreen.png"));
-    }
-    uav->SetTrailType(opmap::UAVTrailType::ByTimeElapsed);
-    uav->SetTrailTime(1);   // 每 1 秒记录一个轨迹点，飞行轨迹清晰可见
-    uav->SetShowTrail(m_trailCheck->isChecked());
-    uav->SetShowTrailLine(true);   // 轨迹连线：飞过的路径连成实线，比孤立点直观
-    uav->SetMapFollowType(m_followCheck->isChecked()
-                          ? opmap::UAVMapFollowType::CenterMap
-                          : opmap::UAVMapFollowType::None);
-    return uav;
 }
 
 void MainWindow::setBanner(const QString &headline, const QString &subText, const QString &bgColor)

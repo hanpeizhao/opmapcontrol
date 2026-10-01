@@ -510,6 +510,7 @@ public:
     QMap<int, UAVItem*> UAVS;
 
 private:
+    UAVItem *EnsureUAV(int id);   ///< 惰性取用 UAV：不存在则创建并套用默认样式
     opmap::MapService *service;   ///< 地图数据服务（构造创建、析构释放）
     opmap::MapEngine *core;
     QGraphicsScene mscene;
@@ -534,6 +535,7 @@ private:
     bool geofenceBreached;                         ///< 当前是否处于越界状态（沿沿只发一次信号）
     opmap::PointLatLng vehiclePos;                 ///< 最近喂入的车位置
     bool vehiclePosValid;
+    bool followVehicle;                            ///< 地图跟随车辆开关（喂点时自动居中）
 
 private slots:
     void diagRefresh();
@@ -710,6 +712,7 @@ signals:
     void missionActionTriggered(int index, int action); ///< 到达动作触发（拍照/悬停）
     void missionFinished();                             ///< 全部航点完成
     void geofenceEntered(opmap::PointLatLng position);  ///< UAV 回到多边形围栏内
+    void mapFollowChanged(bool following);              ///< 地图跟随车辆开关变化（供 UI 复选框同步）
 
     // ———————— 离线下载进度信号（转发自 MapRipper）————————
     /** @brief 抓取进度百分比（0-100） */
@@ -739,8 +742,20 @@ public slots:
     /**
      * @brief 喂入 UAV 实时位置（WGS-84）：驱动轨迹/到达判定/围栏越界判定
      *        （与 UpdateVehiclePosition 的区别：此路径带围栏判定，供任务飞行喂点）
+     *        首次喂点自动创建 UAV 图标（默认位置标记大头针 + 每秒轨迹点）
      */
     void SetUAVPos(int const& id, opmap::PointLatLng const& pos, int const& alt);
+
+    /**
+     * @brief 设置 UAV 航向（度，正北 0 顺时针）；UAV 未创建时忽略
+     */
+    void SetUAVHeading(int const& id, qreal const& deg);
+
+    /**
+     * @brief 地图跟随车辆开关：开启后每次喂点地图自动居中到 UAV 位置；
+     *        每次喂点自动创建 UAV 时同样生效。状态变化经 mapFollowChanged 通知
+     */
+    void SetFollowVehicle(bool const& on);
 
     /// 停止导航并清除路线绘制
     void StopNavigation();

@@ -142,7 +142,6 @@ private:
     void applyPickPoint(const opmap::PointLatLng &p);
     void setPickMode(PickMode mode);
     void refreshWaypointList();
-    opmap::UAVItem* ensureUAV();
     void applyProviderFromUI();   ///< 按面板选择创建/更新库内路由 provider
     void stopGps();               ///< 停止系统 GPS 位置源（若有）
     void setBanner(const QString &headline, const QString &subText, const QString &bgColor);
