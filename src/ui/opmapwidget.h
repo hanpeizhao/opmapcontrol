@@ -489,6 +489,7 @@ public:
     MapGraphicItem* GetMap() const { return map; }
     QGraphicsItemGroup* waypointLine(int id);
     void SetShowUAV(bool const& value);
+    void SetShowGPS(bool const& value);   ///< 独立 GPS 位置标记（"我的位置"图标，与导航车互不相干）
     bool ShowUAV()const{return showuav;}
     void SetUavPic(QString UAVPic);
 
@@ -534,6 +535,7 @@ public:
 private:
     UAVItem *EnsureUAV(int id);   ///< 惰性取用 UAV：不存在则创建并套用默认样式
     void ConnectUAV(UAVItem *uav);   ///< UAV 事件 → facade 信号转发（到达/飞出安全圈/回圈）
+    void ShowRealLocation(opmap::PointLatLng const& pos);   ///< "我的位置"落到地图：GPS 图标+居中+街区缩放
     void HandlePickClick(opmap::PointLatLng const& pos);   ///< 一次有效选点：累积+发信号+单发自动收尾
     void EndPick();               ///< 结束当前取点（围栏收尾 + pickFinished）
     WayPointItem *EnsureRouteMarker(WayPointItem *&marker, opmap::PointLatLng const& pos, QString const& text);   ///< 惰性取用路线端点图钉（auxiliary 装饰航点）
@@ -563,7 +565,10 @@ private:
     bool geofenceBreached;                         ///< 当前是否处于越界状态（沿沿只发一次信号）
     opmap::PointLatLng vehiclePos;                 ///< 最近喂入的车位置
     bool vehiclePosValid;
-    QElapsedTimer vehiclePosAge;                   ///< 距上次喂点的时长（定位按钮判断"活位置流"用）
+    // —— "我的位置"（一键定位目标：只认真实源，模拟车位置不参与）——
+    opmap::PointLatLng lastRealPos;                ///< 最近真实源（GPS/MAVLink）位置
+    bool lastRealPosValid;
+    QElapsedTimer lastRealPosAge;                  ///< 距上次真实源喂点的时长（活性判断用）
     bool followVehicle;                            ///< 地图跟随车辆开关（喂点时自动居中）
     bool locatePending;                            ///< 定位按钮触发的 IP 兜底在途（结果只居中）
 
@@ -597,6 +602,8 @@ private slots:
     void onIpLocated(opmap::PointLatLng pos, QString city);
     /// IP 定位失败：清一键定位兜底标记再转发（防残留 locatePending 误居中后续结果）
     void onIpLocationFailed(QString reason);
+    /// 位置源喂点：记录真实源（GPS/MAVLink）位置供一键定位取用，并同步 GPS 图标
+    void onPositionUpdate(opmap::PointLatLng pos, double altM, double headingDeg, int source);
 
 protected:
     MapGraphicItem *map;

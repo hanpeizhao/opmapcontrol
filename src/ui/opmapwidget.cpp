@@ -61,6 +61,7 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     geofenceItem(0),
     geofenceBreached(false),
     vehiclePosValid(false),
+    lastRealPosValid(false),
     followVehicle(false),
     locatePending(false),
     pickMode(PickNone),
@@ -69,7 +70,7 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     routeToMarker(0)
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
-    vehiclePosAge.start();   // 未喂点状态从构造时刻起算（防无效计时器）
+    lastRealPosAge.start();   // 未喂点状态从构造时刻起算（防无效计时器）
 
     service=new opmap::MapService;
     configuration->SetMapService(service);
@@ -114,6 +115,8 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     posSourceManager = new PositionSourceManager(this);
     connect(posSourceManager, SIGNAL(positionUpdated(opmap::PointLatLng,double,double,int)),
             this, SLOT(UpdateVehiclePosition(opmap::PointLatLng)));
+    connect(posSourceManager, SIGNAL(positionUpdated(opmap::PointLatLng,double,double,int)),
+            this, SLOT(onPositionUpdate(opmap::PointLatLng,double,double,int)));
     connect(posSourceManager, SIGNAL(positionUpdated(opmap::PointLatLng,double,double,int)),
             this, SIGNAL(positionUpdated(opmap::PointLatLng,double,double,int)));
     connect(posSourceManager, SIGNAL(sourceError(QString,bool)),
@@ -272,10 +275,17 @@ void OPMapWidget::SetShowUAV(const bool &value)
     if( value && GPS==0 ) {
         GPS=new GPSItem(map,this);
         GPS->setParentItem(map);
+    }
+}
+
+void OPMapWidget::SetShowGPS(const bool &value)
+{
+    if(value && GPS==0) {
+        GPS=new GPSItem(map,this);
+        GPS->setParentItem(map);
     } else if(!value) {
         if(GPS!=0) {
             GPS->DeleteTrail();
-
             delete GPS;
             GPS=0;
         }
@@ -368,7 +378,6 @@ void OPMapWidget::UpdateVehiclePosition(opmap::PointLatLng const& pos)
 
     vehiclePos = pos;
     vehiclePosValid = true;
-    vehiclePosAge.restart();   // 活性计时：定位按钮据此区分"位置流"与"一次性摆位"
     navEngine->UpdatePosition(pos);
     CheckGeofence(pos);   // 围栏判定对所有位置源（模拟/GPS/MAVLink）统一生效
     if (missionEngine && missionEngine->IsMissionActive())
@@ -445,33 +454,50 @@ bool OPMapWidget::IsIpLocationBusy() const
     return ipLocator ? ipLocator->isBusy() : false;
 }
 
-// ———————— 一键定位（车载导航式） ————————
-// 定位语义分级：运动位置流（模拟/GPS/MAVLink）喂出的 vehiclePos 是权威位置，
-// 直接居中；从未有过位置时才用城市级 IP 定位兜底——只居中绝不喂 vehiclePos
-//（城市级进位置流会把导航引擎的进度推到错误位置，见路线着色缺失教训）
+// ———————— 一键定位（"我的位置"） ————————
+// 定位语义：找"我"在哪，而不是找车在哪——只认真实源（系统 GPS/MAVLink）的
+// 活位置（10 秒内有喂点）；没有就走城市级 IP 定位兜底。模拟车位置、导航
+// 起点摆位一律不参与（车辆跟随时用跟随开关，不占用定位按钮）
+//（城市级 IP 结果只落 GPS 图标+居中，绝不喂 vehiclePos——见路线着色缺失教训）
 
 void OPMapWidget::LocateCurrentPosition()
 {
-    // vehiclePos 只在"活的位置流"下作权威（10 秒内有喂点）：
-    // 一次性摆位（如开始导航把车瞬移到起点）过了时效就不算，
-    // 此时点定位应去找真实/IP 位置而不是回到陈旧摆位点
-    if (vehiclePosValid && vehiclePosAge.elapsed() < 10000) {
-        SetCurrentPosition(vehiclePos);
-        if (ZoomTotal() < 15.0)
-            SetZoom(15.0);          // 定位时切到街区级缩放
+    // 真实源活位置：GPS 图标落到该处并居中
+    if (lastRealPosValid && lastRealPosAge.elapsed() < 10000) {
+        ShowRealLocation(lastRealPos);
         return;
     }
-    locatePending = true;           // 结果在 onIpLocated 兜底居中
+    locatePending = true;           // 结果在 onIpLocated 兜底落图标+居中
     RequestIpLocation();
+}
+
+void OPMapWidget::ShowRealLocation(opmap::PointLatLng const& pos)
+{
+    SetShowGPS(true);
+    GPS->SetUAVPos(pos, 0);
+    SetCurrentPosition(pos);
+    if (ZoomTotal() < 15.0)
+        SetZoom(15.0);              // 定位时切到街区级缩放
+}
+
+void OPMapWidget::onPositionUpdate(opmap::PointLatLng pos, double altM, double headingDeg, int source)
+{
+    Q_UNUSED(altM);
+    Q_UNUSED(headingDeg);   // 海拔/航向暂不消费（GPS 图标只落平面位置）
+    if (source == SourceSystemGps || source == SourceMavlink) {
+        lastRealPos = pos;
+        lastRealPosValid = true;
+        lastRealPosAge.restart();
+    }
+    if (GPS && source != SourceExternal)   // 图标只跟随真实估计（GPS/MAVLink/IP），模拟喂点不动它
+        GPS->SetUAVPos(pos, 0);
 }
 
 void OPMapWidget::onIpLocated(opmap::PointLatLng pos, QString city)
 {
     if (locatePending) {
         locatePending = false;
-        SetCurrentPosition(pos);    // 只居中：城市级位置不喂导航车
-        if (ZoomTotal() < 15.0)
-            SetZoom(15.0);
+        ShowRealLocation(pos);      // 只落图标+居中：城市级位置不喂导航车
     }
     emit ipLocationReady(pos, city);
 }
