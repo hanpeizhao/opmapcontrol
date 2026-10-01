@@ -552,6 +552,7 @@ private:
     opmap::PointLatLng vehiclePos;                 ///< 最近喂入的车位置
     bool vehiclePosValid;
     bool followVehicle;                            ///< 地图跟随车辆开关（喂点时自动居中）
+    bool locatePending;                            ///< 定位按钮触发的 IP 兜底在途（结果只居中）
 
     // —— 地图点选状态 ——
     PickMode pickMode;                             ///< 当前取点模式
@@ -569,6 +570,8 @@ private slots:
     void onMissionHoverStateChanged(bool hovering, int seconds);
     void onMissionActionTriggered(int index, int action);
     void onMissionFinished();
+    /// IP 定位结果：先处理一键定位兜底（只居中），再转发 ipLocationReady
+    void onIpLocated(opmap::PointLatLng pos, QString city);
 
 protected:
     MapGraphicItem *map;
@@ -792,6 +795,14 @@ public slots:
 
     /// 停止导航并清除路线绘制
     void StopNavigation();
+
+    /**
+     * @brief 一键定位（车载导航式）：有车辆位置直接居中并切街区级缩放（zoom 15）；
+     *        从未喂过位置则自动 IP 定位兜底——结果只居中不喂导航车
+     *        （城市级精度进入位置流会污染导航引擎进度），完成/失败仍发
+     *        ipLocationReady/ipLocationFailed 供上层提示
+     */
+    void LocateCurrentPosition();
 
     // —— 地图点选（库内防抖/多点累积/右键结束）——
     /// 进入/切换/退出取点模式；设为 PickNone 或右键 = 结束（围栏按顶点数闭合或清理）

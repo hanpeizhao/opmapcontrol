@@ -61,6 +61,7 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     geofenceBreached(false),
     vehiclePosValid(false),
     followVehicle(false),
+    locatePending(false),
     pickMode(PickNone)
 {
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
@@ -96,8 +97,9 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     routeItem->hide();
 
     ipLocator = new IpLocationProvider(this);
+    // 结果先经 onIpLocated（处理一键定位兜底），再转发 ipLocationReady
     connect(ipLocator, SIGNAL(locationReady(opmap::PointLatLng,QString)),
-            this, SIGNAL(ipLocationReady(opmap::PointLatLng,QString)));
+            this, SLOT(onIpLocated(opmap::PointLatLng,QString)));
     connect(ipLocator, SIGNAL(locationFailed(QString)),
             this, SIGNAL(ipLocationFailed(QString)));
 
@@ -360,6 +362,34 @@ void OPMapWidget::RequestIpLocation()
 bool OPMapWidget::IsIpLocationBusy() const
 {
     return ipLocator ? ipLocator->isBusy() : false;
+}
+
+// ———————— 一键定位（车载导航式） ————————
+// 定位语义分级：运动位置流（模拟/GPS/MAVLink）喂出的 vehiclePos 是权威位置，
+// 直接居中；从未有过位置时才用城市级 IP 定位兜底——只居中绝不喂 vehiclePos
+//（城市级进位置流会把导航引擎的进度推到错误位置，见路线着色缺失教训）
+
+void OPMapWidget::LocateCurrentPosition()
+{
+    if (vehiclePosValid) {
+        SetCurrentPosition(vehiclePos);
+        if (ZoomTotal() < 15.0)
+            SetZoom(15.0);          // 定位时切到街区级缩放
+        return;
+    }
+    locatePending = true;           // 结果在 onIpLocated 兜底居中
+    RequestIpLocation();
+}
+
+void OPMapWidget::onIpLocated(opmap::PointLatLng pos, QString city)
+{
+    if (locatePending) {
+        locatePending = false;
+        SetCurrentPosition(pos);    // 只居中：城市级位置不喂导航车
+        if (ZoomTotal() < 15.0)
+            SetZoom(15.0);
+    }
+    emit ipLocationReady(pos, city);
 }
 
 opmap::NavigationEngine *OPMapWidget::GetNavigationEngine() const

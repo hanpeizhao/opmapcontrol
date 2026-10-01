@@ -104,9 +104,8 @@ private slots:
     // 库 IP 定位结果回调（OPMapWidget 的 ipLocationReady/ipLocationFailed 信号）
     void onIpLocationReady(opmap::PointLatLng pos, QString city);
     void onIpLocationFailed(QString reason);
-    // 工具栏定位：优先用已喂入的车辆位置，否则自动走一次 IP 兜底
+    // 工具栏定位：库内一键定位（有车辆位置直接居中，无则 IP 兜底只居中）
     void onLocateClicked();
-    void CenterOnVehicle();
 
     // 地图右键菜单：切换地图源 / 航点增删
     void onMapContextMenu(const QPoint &pos);
@@ -171,7 +170,6 @@ private:
     QGeoPositionInfoSource *m_gpsSource;   ///< 系统 GPS 源（惰性创建，可能为空）
     opmap::MavlinkTelemetryProvider *m_mavProvider;   ///< MAVLink UDP 遥测源（真机/SITL 接入点）
     QTimer *m_ipTimer;                     ///< IP 定位轮询定时器（触发库的 RequestIpLocation）
-    bool m_locatePending;                  ///< 定位按钮触发的 IP 兜底进行中
     QCheckBox *m_followCheck;
     QCheckBox *m_trailCheck;
     QLabel *m_simInfo;

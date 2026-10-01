@@ -76,7 +76,6 @@ MainWindow::MainWindow()
       m_gpsSource(0),
       m_mavProvider(0),
       m_ipTimer(new QTimer(this)),
-      m_locatePending(false),
       m_followCheck(new QCheckBox(QString::fromUtf8("地图跟随车辆"), this)),
       m_trailCheck(new QCheckBox(QString::fromUtf8("显示行车轨迹"), this)),
       m_simInfo(new QLabel(QString::fromUtf8("空闲"), this)),
@@ -1309,36 +1308,8 @@ void MainWindow::onMavLinkTimeout()
 
 void MainWindow::onLocateClicked()
 {
-    qDebug("[locate] onLocateClicked fired, hasVehicle=%d realPos=%d",
-           (int)m_map->HasVehiclePosition(), (int)m_hasRealPos);
-    // 定位按钮语义 = 回到"当前真实位置"，按位置源优先级取用，IP 定位仅兜底：
-    // 1) 真实位置流活跃（模拟/GPS/MAVLink）→ 车辆位置即实时位置，直接居中
-    // 2) 曾有真实位置记录 → 居中该位置（开始导航喂的手选起点等假想位置不参与记录）
-    // 3) 从未有真实位置 → IP 定位兜底（城市级），拿到后喂入并居中
-    if (m_simulator->isRunning()) {
-        CenterOnVehicle();
-        return;
-    }
-    if (m_hasRealPos) {
-        // 图标与窗口中心都回到真实位置：图标此前可能停在导航起点（假想位置）；
-        // 若正在导航，真实位置偏离路线会触发库内偏航自动重规划（正确的接管语义）
-        m_map->UpdateVehiclePosition(m_lastRealPos);
-        m_map->SetCurrentPosition(m_lastRealPos);
-        return;
-    }
-    statusBar()->showMessage(QString::fromUtf8("无实时位置源，正在通过 IP 定位兜底…"), 10000);
-    m_locatePending = true;
-    m_map->RequestIpLocation();
-}
-
-void MainWindow::CenterOnVehicle()
-{
-    qDebug("[locate] CenterOnVehicle %.4f,%.4f curZoom=%.1f",
-           m_map->VehiclePosition().Lat(), m_map->VehiclePosition().Lng(), m_map->ZoomTotal());
-    m_map->SetCurrentPosition(m_map->VehiclePosition());
-    if (m_map->ZoomTotal() < 15.0)
-        m_map->SetZoom(15.0);       // 定位时切到街区级缩放
-    statusBar()->showMessage(QString::fromUtf8("已定位到车辆当前位置"), 3000);
+    // 一键定位已下沉库：有车辆位置直接居中，无则库内自动 IP 定位兜底（只居中不喂车）
+    m_map->LocateCurrentPosition();
 }
 
 void MainWindow::onIpPollTimeout()
@@ -1351,25 +1322,19 @@ void MainWindow::onIpPollTimeout()
 
 void MainWindow::onIpLocationReady(opmap::PointLatLng pos, QString city)
 {
-    m_lastRealPos = pos;    // IP 兜底结果也计入真实位置记录（城市级精度）
-    m_hasRealPos = true;
-    m_map->UpdateVehiclePosition(pos);   // 惰性创建 UAV（库默认即大头针位置标记）
     statusBar()->showMessage(QString::fromUtf8("IP 定位（城市级，精度约数公里）：%1 (%2, %3)")
                              .arg(city).arg(pos.Lat(), 0, 'f', 4).arg(pos.Lng(), 0, 'f', 4), 10000);
-    if (m_locatePending) {
-        m_locatePending = false;
-        CenterOnVehicle();
+    // 仅当 IP 定位是当前选定的位置源时才喂入位置流（一键定位兜底由库内居中，不喂车）
+    if (m_posSourceCombo->currentIndex() == 2) {
+        m_lastRealPos = pos;
+        m_hasRealPos = true;
+        m_map->UpdateVehiclePosition(pos);   // 惰性创建 UAV（库默认即大头针位置标记）
     }
 }
 
 void MainWindow::onIpLocationFailed(QString reason)
 {
     statusBar()->showMessage(QString::fromUtf8("IP 定位失败：%1").arg(reason), 8000);
-    if (m_locatePending) {
-        m_locatePending = false;
-        QMessageBox::warning(this, QString::fromUtf8("定位失败"),
-                             QString::fromUtf8("IP 定位失败（%1），请检查网络后重试").arg(reason));
-    }
 }
 
 // ————————————————— 离线下载 —————————————————
