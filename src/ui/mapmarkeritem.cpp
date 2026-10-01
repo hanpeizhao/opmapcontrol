@@ -30,6 +30,7 @@ namespace opmap {
 MapMarkerItem::MapMarkerItem(const opmap::PointLatLng &coord, MapGraphicItem *map) :
     map(map),
     coord(coord),
+    trailItem(0),
     imgW(0),
     imgH(0)
 {
@@ -41,9 +42,27 @@ MapMarkerItem::MapMarkerItem(const opmap::PointLatLng &coord, MapGraphicItem *ma
     RefreshPos();
 }
 
+MapMarkerItem::~MapMarkerItem()
+{
+    delete trailItem;   // 轨迹线为地图画布的子项，随标记一起销毁
+}
+
+void MapMarkerItem::SetShowTrail(bool on)
+{
+    if (on && !trailItem) {
+        trailItem = new MarkerTrailItem(map);
+        trailItem->AppendPoint(coord);   // 开启时的位置作轨迹起点
+    } else if (!on && trailItem) {
+        delete trailItem;
+        trailItem = 0;
+    }
+}
+
 void MapMarkerItem::SetCoord(opmap::PointLatLng const& value)
 {
     coord = value;
+    if (trailItem)
+        trailItem->AppendPoint(value);   // 轨迹开启时记录移动足迹
     RefreshPos();
     update();
 }
@@ -162,6 +181,73 @@ void MapMarkerItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *opt
         painter->setPen(QPen(Qt::cyan, 1, Qt::DashLine));
         painter->drawRect(boundingRect());
     }
+}
+
+// ————————————————— 标记移动轨迹线 —————————————————
+
+static const int kMarkerTrailMaxPoints = 1000;   // 轨迹点上限（超过丢最老，防长时间移动无限增长）
+
+MarkerTrailItem::MarkerTrailItem(MapGraphicItem *m) :
+    map(m)
+{
+    setParentItem(map);
+    setZValue(3);   // 垫在 UAV(4)/标记(5) 下方，直接画在地图瓦片上
+    setAcceptedMouseButtons(Qt::NoButton);   // 不可交互：点击穿透到地图拖动
+    RefreshPos();
+}
+
+MarkerTrailItem::~MarkerTrailItem()
+{
+}
+
+void MarkerTrailItem::AppendPoint(opmap::PointLatLng const& c)
+{
+    if (!coords.isEmpty() && coords.last().Lat() == c.Lat() && coords.last().Lng() == c.Lng())
+        return;   // 原地重复喂点不记
+    coords.append(c);
+    if (coords.size() > kMarkerTrailMaxPoints)
+        coords.removeFirst();
+    RefreshPos();
+}
+
+void MarkerTrailItem::ClearTrail()
+{
+    coords.clear();
+    RefreshPos();
+}
+
+void MarkerTrailItem::RefreshPos()
+{
+    prepareGeometryChange();
+    screenPts.clear();
+    for (int i = 0; i < coords.size(); ++i) {
+        opmap::Point p = map->FromLatLngToLocal(coords.at(i));
+        screenPts.append(QPointF(p.X(), p.Y()));
+    }
+    update();
+}
+
+int MarkerTrailItem::type() const
+{
+    return Type;
+}
+
+QRectF MarkerTrailItem::boundingRect() const
+{
+    if (screenPts.isEmpty())
+        return QRectF();
+    return screenPts.boundingRect().adjusted(-2, -2, 2, 2);
+}
+
+void MarkerTrailItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget)
+{
+    Q_UNUSED(option);
+    Q_UNUSED(widget);
+    if (screenPts.size() < 2)
+        return;
+    painter->setRenderHint(QPainter::Antialiasing, true);
+    painter->setPen(QPen(QColor(255, 170, 0), 2, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));   // 橙色轨迹线，地图上醒目
+    painter->drawPolyline(screenPts);
 }
 
 } // end of namespace opmap

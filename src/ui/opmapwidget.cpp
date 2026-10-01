@@ -422,6 +422,7 @@ void OPMapWidget::SelectRoute(int index)
     routeProvider->setPreferredAlternative(index);   // 之后的导航/重规划沿选中的走
     routeItem->SetRoute(routeAlternatives.at(index)); // 预览画布立即切换
     routeItem->setVisible(true);
+    emit routeSelected(index, routeAlternatives.at(index));
 }
 
 /// 惰性取用 UAV：不存在则创建并套用默认跟踪样式——

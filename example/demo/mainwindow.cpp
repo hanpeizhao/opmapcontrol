@@ -116,6 +116,7 @@ MainWindow::MainWindow()
     connect(m_map, &opmap::OPMapWidget::routeAlternativesReady,
             this, &MainWindow::onRouteAlternativesReady);
     connect(m_map, SIGNAL(navigationProgress(double,int,QString)), this, SLOT(onNavProgress(double,int,QString)));
+    connect(m_map, SIGNAL(routeSelected(int,opmap::Route)), this, SLOT(onRouteSelected(int,opmap::Route)));
     connect(m_map, SIGNAL(offRouteDetected(opmap::PointLatLng,double)),
             this, SLOT(onOffRouteDetected(opmap::PointLatLng,double)));
     connect(m_map, SIGNAL(rerouteReady(opmap::Route)), this, SLOT(onRerouteReady(opmap::Route)));
@@ -979,6 +980,7 @@ void MainWindow::onPeersDemoToggled(bool on)
                 QString::fromUtf8(":/markers/images/marker.png"));
             m->SetImageSize(24, 24);
             m->SetText(s.name);
+            m->SetShowTrail(true);   // 演示标记移动轨迹（5Hz 上报点连成折线）
             m_peerSims.append(s);
             m_peerMarkers.insert(s.name, m);
         }
@@ -1175,6 +1177,15 @@ void MainWindow::onSwitchRouteClicked()
              .arg(m_altIndex == 0 ? QString::fromUtf8("推荐") : QString::fromUtf8("备选"))
              .arg(m_altRoutes.at(m_altIndex).totalDistanceMeters / 1000.0, 0, 'f', 1)
              .arg(qRound(m_altRoutes.at(m_altIndex).totalDurationSeconds / 60.0)));
+}
+
+/// 备选路线切换（库信号）：面板距离/预计时间同步到当前选中路线
+void MainWindow::onRouteSelected(int index, const opmap::Route &route)
+{
+    Q_UNUSED(index);
+    m_navInfo->setText(QString::fromUtf8("距离 %1 km，预计 %2 分钟（%3 点）")
+                       .arg(route.totalDistanceMeters / 1000.0, 0, 'f', 1)
+                       .arg(route.totalDurationSeconds / 60).arg(route.polyline.size()));
 }
 
 void MainWindow::onNavigateClicked()

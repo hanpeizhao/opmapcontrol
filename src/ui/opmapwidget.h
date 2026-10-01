@@ -799,6 +799,8 @@ signals:
     void navigationFailed(QString reason);
     /** @brief 本次规划的备选路线全集（第 0 条=推荐路线，与路线绘制同步） */
     void routeAlternativesReady(QList<opmap::Route> routes);
+    /** @brief 备选路线已切换（SelectRoute）：route 为当前选中并画出的路线，面板据此同步距离/时间 */
+    void routeSelected(int index, opmap::Route route);
 
     // ———————— IP 定位信号 ————————
     /** @brief IP 定位成功（pos 为 WGS-84 城市级坐标，city 为城市名） */

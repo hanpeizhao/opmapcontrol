@@ -72,6 +72,7 @@ private slots:
     void onStopNavClicked();
     void onRouteAlternativesReady(QList<opmap::Route> routes);   ///< 备选路线就绪：刷新切换按钮
     void onSwitchRouteClicked();                                 ///< 循环切换备选路线
+    void onRouteSelected(int index, const opmap::Route &route);  ///< 备选路线切换：同步面板距离/预计时间
     void onProviderChanged(int index);
     void onNavigationRouteReady(const opmap::Route &route);
     void onNavProgress(double remainingMeters, int remainingSeconds, const QString &instruction);

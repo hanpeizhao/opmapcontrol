@@ -36,6 +36,8 @@
 
 namespace opmap {
 
+class MarkerTrailItem;   ///< 移动轨迹线（定义见文件尾，MapMarkerItem 持其指针）
+
 /**
 * @brief 通用地图标记：把任意图片和/或文字标签钉在指定经纬度上。
 *
@@ -71,8 +73,11 @@ public:
     void SetImageSize(int width, int height);         ///< 图片显示尺寸（像素）；任一维度为 0 按另一维等比缩放，均 ≤0 恢复原始尺寸
     void SetText(QString const& text);                ///< 设置文字标签，空串=不显示
     void SetFontSize(int pointSize);                  ///< 文字字号（磅），默认 10 加粗
+    void SetShowTrail(bool on);                       ///< 开启移动轨迹显示：每次 SetCoord 记录足迹连为折线（关闭即清除）
 
     virtual void RefreshPos();                        ///< coord → 屏幕位置重算（拖动/缩放地图时由 ChildPosRefresh 驱动）
+
+    ~MapMarkerItem();                                 ///< 析构并移除附属轨迹线
 
     int type() const;
     QRectF boundingRect() const;
@@ -83,12 +88,45 @@ private:
 
     MapGraphicItem* map;
     opmap::PointLatLng coord;   ///< 锚点经纬度
+    MarkerTrailItem* trailItem; ///< 附属移动轨迹线（SetShowTrail 创建；独立于本图元——ItemIgnoresTransformations 会让轨迹在地图旋转时方向失真）
     QPixmap picture;            ///< 原始加载图片（未设置/加载失败为空）
     QPixmap display;            ///< 按 SetImageSize 缩放后的绘制用图
     int imgW;                   ///< 请求的显示宽（0=不限）
     int imgH;                   ///< 请求的显示高（0=不限）
     QString text;               ///< 文字标签（空=不显示）
     QFont font;                 ///< 文字字体
+};
+
+/**
+* @brief 标记移动轨迹线：MapMarkerItem::SetShowTrail 的附属图元。
+*
+*        独立于 MapMarkerItem（其 ItemIgnoresTransformations 会让轨迹在
+*        地图旋转时方向失真），直接挂在地图画布下按地理位置重算折线，
+*        随地图拖动/缩放/旋转自动跟随（实现 MapAnchoredItem 纳入统一刷新分派）。
+*        不可交互（无鼠标按键），点击穿透到地图拖动。
+*
+* @class MarkerTrailItem mapmarkeritem.h "mapmarkeritem.h"
+*/
+class MarkerTrailItem : public QGraphicsItem, public MapAnchoredItem
+{
+public:
+    enum { Type = UserType + 12 };   // 与既有 Type 分配错开（…/TrailLine=10/MapMarker=11）
+
+    explicit MarkerTrailItem(MapGraphicItem* map);
+    ~MarkerTrailItem();
+
+    void AppendPoint(opmap::PointLatLng const& coord);   ///< 追加轨迹点（超过上限丢最老）
+    void ClearTrail();                                   ///< 清空已记录轨迹
+    virtual void RefreshPos();                           ///< 地图拖动/缩放后重算屏幕折线
+
+    int type() const;
+    QRectF boundingRect() const;
+    void paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *widget);
+
+private:
+    MapGraphicItem* map;
+    QList<opmap::PointLatLng> coords;   ///< 轨迹地理点序列（时序）
+    QPolygonF screenPts;                ///< RefreshPos 换算的屏幕折线缓存
 };
 
 } // end of namespace opmap
