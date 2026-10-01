@@ -34,6 +34,7 @@
 #include "uavitem.h"
 #include "homeitem.h"
 #include "waypointitem.h"
+#include "mapmarkeritem.h"
 
 namespace {
 
@@ -842,6 +843,12 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     setSafeArea->setEnabled(m_map->Home != 0);
     QAction *setSpeed = menu.addAction(QString::fromUtf8("设置航点飞行速度…"));
 
+    // 通用标记演示：图片/文字/清除
+    menu.addSeparator();
+    QAction *addImgMarker = menu.addAction(QString::fromUtf8("在此处添加图片标记"));
+    QAction *addTextMarker = menu.addAction(QString::fromUtf8("在此处添加文字标记…"));
+    QAction *clearMarkers = menu.addAction(QString::fromUtf8("清除所有标记"));
+
     QAction *chosen = menu.exec(m_map->mapToGlobal(pos));
     if (chosen == addWp) {
         const opmap::PointLatLng p = m_map->currentMousePosition();
@@ -878,6 +885,27 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
             m_flightSpeedMps = mps;
             logEvent(QString::fromUtf8("航点飞行巡航速度已设为 %1 m/s").arg(mps));
         }
+    } else if (chosen == addImgMarker) {
+        // 演示库 API：创建即带图 + SetImageSize 控制显示尺寸（32×32），
+        // 返回句柄可再 SetCoord 移动 / SetText 追加标签 / RemoveMarker 删除
+        opmap::MapMarkerItem *m = m_map->AddMarker(m_map->currentMousePosition(),
+                                                   QString::fromUtf8(":/markers/images/marker.png"));
+        m->SetImageSize(32, 32);
+        logEvent(QString::fromUtf8("已添加图片标记（库图钉缩至 32×32）"));
+    } else if (chosen == addTextMarker) {
+        bool ok = false;
+        QString label = QInputDialog::getText(this, QString::fromUtf8("文字标记"),
+                                              QString::fromUtf8("标签内容："), QLineEdit::Normal,
+                                              QString(), &ok);
+        if (ok && !label.isEmpty()) {
+            opmap::MapMarkerItem *m = m_map->AddMarker(m_map->currentMousePosition());
+            m->SetText(label);
+            m->SetFontSize(11);
+            logEvent(QString::fromUtf8("已添加文字标记：%1").arg(label));
+        }
+    } else if (chosen == clearMarkers) {
+        m_map->ClearMarkers();
+        logEvent(QString::fromUtf8("已清除所有标记"));
     }
 }
 

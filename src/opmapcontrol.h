@@ -21,6 +21,7 @@
 #include "waypointmissionengine.h"
 #include "routeitem.h"
 #include "geofenceitem.h"
+#include "mapmarkeritem.h"
 #include "mavlinktelemetryprovider.h"
 
 #endif // OPMAPCONTROL_H

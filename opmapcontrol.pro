@@ -78,7 +78,7 @@ HEADERS += \
     ./src/ui/opmapwidget.h \
     ./src/ui/routeitem.h \
     ./src/ui/geofenceitem.h \
-    ./src/ui/imagemarkeritem.h \
+    ./src/ui/mapmarkeritem.h \
     ./src/ui/trailitem.h \
     ./src/ui/traillineitem.h \
     ./src/ui/uavitem.h \
@@ -135,7 +135,7 @@ SOURCES += \
     ./src/ui/opmapwidget.cpp \
     ./src/ui/routeitem.cpp \
     ./src/ui/geofenceitem.cpp \
-    ./src/ui/imagemarkeritem.cpp \
+    ./src/ui/mapmarkeritem.cpp \
     ./src/ui/trailitem.cpp \
     ./src/ui/traillineitem.cpp \
     ./src/ui/uavitem.cpp \

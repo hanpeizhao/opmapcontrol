@@ -62,7 +62,7 @@ namespace opmap {
 class UAVItem;
 class GPSItem;
 class HomeItem;
-class ImageMarkerItem;
+class MapMarkerItem;
 class AbstractRouteProvider;
 class IpLocationProvider;
 class GeofenceItem;
@@ -493,18 +493,25 @@ public:
     MapGraphicItem* GetMap() const { return map; }
 
     /**
-     * @brief 在指定经纬度放置一张图片标记（图钉语义：图片底部中心对准坐标点）
+     * @brief 在指定经纬度放置一个通用标记（图片和/或文字标签）
+     *
+     *        返回句柄后按需配置内容：
+     *          marker->SetImage(path);        图片（文件/qrc 路径）
+     *          marker->SetImageSize(32, 32);  图片显示尺寸（像素）
+     *          marker->SetText("标签");        文字标签（锚点下方，白字黑边）
+     *        图片底边中心对准坐标点；仅文字时标签显示在坐标点下方。
+     *        什么都不配则显示红点占位。
      *
      * @param pos 锚点经纬度（WGS-84）
-     * @param imagePath 图片路径（文件路径或 qrc 资源路径均可）
-     * @return 标记项指针——可留存后调 RemoveImageMarker 删除，
+     * @param imagePath 可选，创建即设置图片
+     * @return 标记项指针——可留存后调 RemoveMarker 删除，
      *         或直接 marker->SetCoord() 移动
      */
-    ImageMarkerItem *AddImageMarker(opmap::PointLatLng const& pos, QString const& imagePath);
-    /** @brief 删除一张图片标记（指针须来自 AddImageMarker 返回值） */
-    void RemoveImageMarker(ImageMarkerItem *marker);
-    /** @brief 清除全部图片标记 */
-    void ClearImageMarkers();
+    MapMarkerItem *AddMarker(opmap::PointLatLng const& pos, QString const& imagePath = QString());
+    /** @brief 删除一个标记（指针须来自 AddMarker 返回值） */
+    void RemoveMarker(MapMarkerItem *marker);
+    /** @brief 清除全部标记 */
+    void ClearMarkers();
     QGraphicsItemGroup* waypointLine(int id);
     void SetShowUAV(bool const& value);
     void SetShowGPS(bool const& value);   ///< 独立 GPS 位置标记（"我的位置"图标，与导航车互不相干）
@@ -580,8 +587,8 @@ private:
     opmap::RouteItem *routeItem;                   ///< 路线绘制项（随 map 析构）
     opmap::IpLocationProvider *ipLocator;          ///< IP 定位服务（城市级兜底）
     opmap::GeofenceItem *geofenceItem;             ///< 多边形地理围栏（多边形内为允许区）
-    bool geofenceBreached;                         ///< 当前是否处于越界状态（沿沿只发一次信号）
-    QList<opmap::ImageMarkerItem *> imageMarkers;  ///< 图片标记全集（AddImageMarker/RemoveImageMarker/ClearImageMarkers 维护）
+    bool geofenceBreached;                         ///< 当前是否处于越界状态（状态翻转只发一次信号）
+    QList<opmap::MapMarkerItem *> markers;  ///< 通用标记全集（AddMarker/RemoveMarker/ClearMarkers 维护）
     opmap::PointLatLng vehiclePos;                 ///< 最近喂入的车位置
     bool vehiclePosValid;
     // —— "我的位置"（一键定位目标：只认真实源，模拟车位置不参与）——

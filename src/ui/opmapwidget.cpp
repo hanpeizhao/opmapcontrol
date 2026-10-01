@@ -38,7 +38,7 @@
 #include "navigationengine.h"
 #include "waypointmissionengine.h"
 #include "routeitem.h"
-#include "imagemarkeritem.h"
+#include "mapmarkeritem.h"
 
 namespace opmap {
 
@@ -306,29 +306,31 @@ void OPMapWidget::SetShowHome(const bool &value)
     }
 }
 
-// ————————————————— 通用图片标记 —————————————————
+// ————————————————— 通用标记 —————————————————
 
-ImageMarkerItem *OPMapWidget::AddImageMarker(opmap::PointLatLng const& pos, QString const& imagePath)
+MapMarkerItem *OPMapWidget::AddMarker(opmap::PointLatLng const& pos, QString const& imagePath)
 {
-    ImageMarkerItem *marker = new ImageMarkerItem(pos, imagePath, map);
+    MapMarkerItem *marker = new MapMarkerItem(pos, map);
+    if (!imagePath.isEmpty())
+        marker->SetImage(imagePath);
     marker->setParentItem(map);
-    imageMarkers.append(marker);
+    markers.append(marker);
     return marker;
 }
 
-void OPMapWidget::RemoveImageMarker(ImageMarkerItem *marker)
+void OPMapWidget::RemoveMarker(MapMarkerItem *marker)
 {
     if (!marker)
         return;
-    imageMarkers.removeOne(marker);
+    markers.removeOne(marker);
     delete marker;
 }
 
-void OPMapWidget::ClearImageMarkers()
+void OPMapWidget::ClearMarkers()
 {
-    foreach(ImageMarkerItem *m, imageMarkers)
+    foreach(MapMarkerItem *m, markers)
         delete m;
-    imageMarkers.clear();
+    markers.clear();
 }
 
 // ————————————————— 车载导航 —————————————————
