@@ -1379,6 +1379,8 @@ void MainWindow::onMultiMissionToggled(bool on)
         else if (m_map->HasVehiclePosition())
             takeoff = m_map->VehiclePosition();
         m_map->StartWaypointMission(uavId, mu.seg, 15.0);   // 库：建 UAV/任务状态机/发首目标
+        if (opmap::UAVItem *u = m_map->GetUAV(uavId))
+            u->SetIcon(QString::fromUtf8(":/uavs/images/mapquad.png"));   // 飞行=四旋翼图标（与航点飞行一致，库默认大头针）
         mu.sim->start(takeoff, 80.0);                       // 从 Home 起飞
         m_map->StartTrailRecording(uavId);                  // 按机分道自动记录轨迹
         logEvent(QString::fromUtf8("[机%1]%2 任务开始：%3 个航点（%4→%5），从 Home 起飞，巡航 80 m/s")
