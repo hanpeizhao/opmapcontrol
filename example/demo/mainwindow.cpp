@@ -148,6 +148,10 @@ MainWindow::MainWindow()
             this, SLOT(onMeasureFinished(double,QList<opmap::PointLatLng>)));
     connect(m_map, SIGNAL(trailReplayFinished()), this, SLOT(onTrailReplayFinished()));
 
+    // 海拔查询（右键菜单触发）：结果进日志+状态栏
+    connect(m_map, SIGNAL(elevationReady(opmap::PointLatLng,int)), this, SLOT(onElevationReady(opmap::PointLatLng,int)));
+    connect(m_map, SIGNAL(elevationFailed(QString)), this, SLOT(onElevationFailed(QString)));
+
     setupMenus();
     setupDocks();
     setupStatusBar();
@@ -918,6 +922,10 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     QAction *clearMeasure = menu.addAction(QString::fromUtf8("清除测距结果"));
     clearMeasure->setEnabled(m_map->HasMeasurements());
 
+    // 海拔查询：地图瓦片无高程数据，走在线高程服务（open-meteo 免 key）
+    QAction *queryElev = menu.addAction(QString::fromUtf8("查询此处地面海拔"));
+    queryElev->setEnabled(!m_map->IsElevationBusy());
+
     // Home 返航点与飞行参数
     menu.addSeparator();
     QAction *setHome = menu.addAction(QString::fromUtf8("设置 Home 返航点到此位置"));
@@ -960,6 +968,12 @@ void MainWindow::onMapContextMenu(const QPoint &pos)
     } else if (chosen == clearMeasure) {
         m_map->ClearMeasurements();
         logEvent(QString::fromUtf8("已清除全部测距折线"));
+    } else if (chosen == queryElev) {
+        const opmap::PointLatLng p = m_map->currentMousePosition();
+        m_map->RequestElevation(p);
+        statusBar()->showMessage(QString::fromUtf8("正在查询 (%1, %2) 的地面海拔…")
+                                 .arg(p.Lat(), 0, 'f', 5).arg(p.Lng(), 0, 'f', 5), 8000);
+        logEvent(QString::fromUtf8("海拔查询请求已发出（open-meteo 在线高程，8 秒超时）"));
     } else if (chosen == setHome) {
         m_map->Home->SetCoord(m_map->currentMousePosition());
         m_map->Home->update();
@@ -1231,6 +1245,22 @@ void MainWindow::onMeasureFinished(double totalMeters, const QList<opmap::PointL
     statusBar()->showMessage(QString::fromUtf8("测距总距离 %1，可再次点击“开始测距”追加新测量").arg(dist), 8000);
 }
 
+void MainWindow::onElevationReady(opmap::PointLatLng pos, int altitudeMeters)
+{
+    const QString msg = QString::fromUtf8("(%1, %2) 地面海拔约 %3 米")
+                                .arg(pos.Lat(), 0, 'f', 5)
+                                .arg(pos.Lng(), 0, 'f', 5)
+                                .arg(altitudeMeters);
+    logEvent(QString::fromUtf8("海拔查询成功：%1").arg(msg));
+    statusBar()->showMessage(msg, 8000);
+}
+
+void MainWindow::onElevationFailed(QString reason)
+{
+    logEvent(QString::fromUtf8("海拔查询失败：%1").arg(reason));
+    statusBar()->showMessage(QString::fromUtf8("海拔查询失败：%1").arg(reason), 8000);
+}
+
 void MainWindow::onRecTrailClicked()
 {
     if (m_map->IsTrailReplaying())
@@ -1332,7 +1362,7 @@ void MainWindow::onClearWaypointsClicked()
 void MainWindow::onImportWaypointsClicked()
 {
     const QString path = QFileDialog::getOpenFileName(this, QString::fromUtf8("导入航点"),
-                                                      QString(), QString::fromUtf8("航点文件 (*.wp)"));
+                                                      QString(), QString::fromUtf8("航点文件 (*.json *.wp)"));
     if (path.isEmpty())
         return;
     QString err;
@@ -1346,7 +1376,8 @@ void MainWindow::onImportWaypointsClicked()
 void MainWindow::onExportWaypointsClicked()
 {
     const QString path = QFileDialog::getSaveFileName(this, QString::fromUtf8("导出航点"),
-                                                      QString(), QString::fromUtf8("航点文件 (*.wp)"));
+                                                      QString::fromUtf8("waypoints.json"),
+                                                      QString::fromUtf8("航点任务 JSON (*.json)"));
     if (path.isEmpty())
         return;
     QString err;

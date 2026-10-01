@@ -123,6 +123,10 @@ private slots:
     void onStopReplayClicked();
     void onTrailReplayFinished();
 
+    // 地面海拔查询（右键菜单触发，open-meteo 在线高程）
+    void onElevationReady(opmap::PointLatLng pos, int altitudeMeters);
+    void onElevationFailed(QString reason);
+
     // 地图右键菜单：切换地图源 / 航点增删
     void onMapContextMenu(const QPoint &pos);
     void SyncMapTypeActions();   ///< 菜单栏与右键菜单的地图源勾选状态同步

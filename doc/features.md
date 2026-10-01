@@ -40,6 +40,8 @@
 | 删除单个/全部航点 | `WPDelete()` / `WPDeleteAll()` | ✅ |
 | 查询全部/选中的航点 | `WPAll()` / `WPSelected()` | ✅ |
 | 重新编号（自动连锁） | `WPRenumber()` | ✅（选中移至末尾按钮） |
+| 航点任务文件 JSON 导出（全属性：编号/经纬度/海拔/描述/动作/悬停时长） | `WPExportToFile()` | ✅（导出按钮） |
+| 航点任务文件导入（自动嗅探 JSON 或旧 AP 列式 .wp） | `WPImportFromFile()` | ✅（导入按钮） |
 | 航点可拖拽编辑、显示高度 | `WayPointItem`（QGraphicsItem） | 部分 |
 | 航点间连线 | `waypointLines` / `WayPointLineItem` | — |
 
@@ -137,7 +139,9 @@
 - 引擎默认参数：偏航阈值 50m × 连续 3 次、到达阈值 30m、重规划最小间隔 5s、自动重规划开启（调整入口为 `NavigationEngine` 的 `SetOffRouteThresholdM` 等方法）
 - `geoutils`（platform 层）提供 haversine 距离、方位角等几何工具，模拟器与引擎共用
 
-## 9. IP 定位兜底（IpLocationProvider）
+## 9. IP 定位兜底与地面海拔查询
+
+库内置两项在线位置/高程增强：城市级 IP 定位与真实地面海拔查询。
 
 库内置城市级 IP 定位：通过公网出口 IP 估算所在城市，作为无 GPS 环境（桌面端等）的一键定位兜底。双源自动回退——主源 ip-api.com（国内城市识别准）、备源 ipwho.is（HTTPS），主源网络失败/返回异常/超时（8 秒）时静默切备源重试一次。坐标为 WGS-84 城市级精度（约数公里）。
 
@@ -159,6 +163,16 @@ IP 定位信号：
 - 实现位于 `src/providers/iplocationprovider.h/.cpp`，与路线规划 provider 同层，由 `OPMapWidget` 持有并转发信号
 - 调用方拿到 `ipLocationReady` 后自行决定喂给 `UpdateVehiclePosition`（example 的做法）或仅显示
 - 若需更换定位服务，可在 `OPMapWidget` 外自行实现并替换（provider 只依赖 Qt 网络模块，无库内耦合）
+
+**地面海拔查询**（`ElevationProvider`，open-meteo 免 key，8 秒超时）：地图瓦片是 2D 影像不含高程，查询某点真实地面海拔走在线高程服务，与 IP 定位同构接入。
+
+| 功能 | API | example |
+|------|:---:|:----:|
+| 查询 WGS-84 坐标处地面海拔（米，在途重复调用被忽略） | 槽 `RequestElevation(pos)` | ✅（右键菜单"查询此处地面海拔"） |
+| 回调式一步到位（完成/失败自动回调 `cb(ok, pos, altM)`，信号仍并行发射） | `RequestElevation(pos, ElevationCallback)` | — |
+| 查询是否有请求在途 | `IsElevationBusy()` | ✅（在途时菜单置灰） |
+
+海拔查询信号：`elevationReady(pos, altitudeMeters)` / `elevationFailed(reason)`。
 
 ## 10. 地图测距 / 运动轨迹（保存回放）/ 迁徙示例
 

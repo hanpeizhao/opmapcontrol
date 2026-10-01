@@ -66,6 +66,7 @@ class HomeItem;
 class MapMarkerItem;
 class AbstractRouteProvider;
 class IpLocationProvider;
+class ElevationProvider;
 class GeofenceItem;
 class NavigationEngine;
 class WaypointMissionEngine;
@@ -231,6 +232,13 @@ public:
      *        完成/失败自动回调一次，ipLocationReady/ipLocationFailed 信号仍照常发射
      */
     typedef std::function<void(bool ok, opmap::PointLatLng pos, QString city)> IpLocationCallback;
+
+    /**
+     * @brief 海拔查询完成回调（与 IpLocationCallback 同构的回调式包装）：
+     *        ok=true → altitudeMeters 有效；ok=false → 查询失败。
+     *        完成/失败自动回调一次，elevationReady/elevationFailed 信号仍照常发射
+     */
+    typedef std::function<void(bool ok, opmap::PointLatLng pos, int altitudeMeters)> ElevationCallback;
 
     QSize sizeHint() const;
 
@@ -641,6 +649,7 @@ private:
     opmap::WaypointMissionEngine *missionEngine;   ///< 航点任务状态机（喂点驱动）
     opmap::RouteItem *routeItem;                   ///< 路线绘制项（随 map 析构）
     opmap::IpLocationProvider *ipLocator;          ///< IP 定位服务（城市级兜底）
+    opmap::ElevationProvider *elevProvider;        ///< 地面高程查询服务（open-meteo）
     opmap::GeofenceItem *geofenceItem;             ///< 多边形地理围栏（多边形内为允许区）
     bool geofenceBreached;                         ///< 当前是否处于越界状态（状态翻转只发一次信号）
     QList<opmap::MapMarkerItem *> markers;  ///< 通用标记全集（AddMarker/RemoveMarker/ClearMarkers 维护）
@@ -653,6 +662,7 @@ private:
     bool followVehicle;                            ///< 地图跟随车辆开关（喂点时自动居中）
     bool locatePending;                            ///< 定位按钮触发的 IP 兜底在途（结果只居中）
     IpLocationCallback m_ipCallback;               ///< 回调式 IP 定位的 std::function（一次性：回调后清空）
+    ElevationCallback m_elevCallback;              ///< 回调式海拔查询的 std::function（一次性：回调后清空）
 
     // —— 地图点选状态 ——
     PickMode pickMode;                             ///< 当前取点模式
@@ -684,6 +694,9 @@ private slots:
     void onIpLocated(opmap::PointLatLng pos, QString city);
     /// IP 定位失败：清一键定位兜底标记再转发（防残留 locatePending 误居中后续结果）
     void onIpLocationFailed(QString reason);
+    /// 海拔查询结果：回调式取用后转发 elevationReady/elevationFailed
+    void onElevationReady(opmap::PointLatLng pos, int altitudeMeters);
+    void onElevationFailed(QString reason);
     /// 位置源喂点：记录真实源（GPS/MAVLink）位置供一键定位取用，并同步 GPS 图标
     void onPositionUpdate(opmap::PointLatLng pos, double altM, double headingDeg, int source);
     /// 轨迹回放插值点 → SetUAVPos（图标/轨迹/围栏/任务机全联动）
@@ -848,6 +861,12 @@ signals:
     void ipLocationReady(opmap::PointLatLng pos, QString city);
     /** @brief IP 定位失败（双源均不可用或返回异常） */
     void ipLocationFailed(QString reason);
+
+    // ———————— 地面海拔查询信号 ————————
+    /** @brief 海拔查询成功（pos 为请求坐标回显，altitudeMeters 为地面海拔米数） */
+    void elevationReady(opmap::PointLatLng pos, int altitudeMeters);
+    /** @brief 海拔查询失败（网络错误、超时或服务返回异常） */
+    void elevationFailed(QString reason);
     void geofenceBreach(opmap::PointLatLng position);   ///< UAV 飞出多边形围栏
 
     // —— 航点任务飞行（WaypointMissionEngine 转发）——
@@ -967,6 +986,23 @@ public slots:
 
     /// 是否有 IP 定位请求在途
     bool IsIpLocationBusy() const;
+
+    /**
+     * @brief 查询指定点真实地面海拔（open-meteo 免 key，8 秒超时；
+     *        地图瓦片无高程数据，真实海拔只能来自在线高程服务），
+     *        结果经 elevationReady/elevationFailed 信号返回；在途时重复调用被忽略
+     */
+    void RequestElevation(opmap::PointLatLng const& pos);
+
+    /**
+     * @brief 回调式一步到位海拔查询：完成/失败自动回调一次
+     *        （ok=true → altitudeMeters 有效），信号仍并行发射，两种消费方式任选；
+     *        在途时重复调用被忽略（回调保留至下次请求覆盖）
+     */
+    void RequestElevation(opmap::PointLatLng const& pos, ElevationCallback callback);
+
+    /// 是否有海拔查询在途
+    bool IsElevationBusy() const;
 
     // —— 多边形地理围栏（多边形内部为允许飞行区）——
     /// 设置/更新围栏顶点；空列表清除，1~2 点为取点预览（不参与越界判定），≥3 点生效

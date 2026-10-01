@@ -103,6 +103,27 @@ map->SetUAVPos(0, pos, 120);       // 任务飞行喂点（带围栏判定）
 
 航点变化信号：`WPInserted(编号, 航点)` / `WPDeleted(编号)` / `WPNumberChanged(旧, 新, 航点)` / `WPValuesChanged(航点)` / `WPReached(航点)`。
 
+**航点任务文件**（JSON 格式 `opmap-waypoints`，缩进可读可手改；旧 AP 列式 `.wp` 仍可导入）：
+
+| 方法 | 功能 |
+|------|------|
+| `WPExportToFile(path, *error)` | 导出全部航点为 JSON：编号/经纬度/海拔/描述/到达动作/悬停时长**全属性**保留 |
+| `WPImportFromFile(path, *error)` | 导入航点（先清空现有）；按文件头自动嗅探 JSON 或旧 `.wp` |
+
+```json
+{
+    "format": "opmap-waypoints",
+    "version": 1,
+    "count": 2,
+    "waypoints": [
+        { "number": 1, "lat": 34.34, "lng": 108.94, "alt": 100,
+          "description": "起飞点", "action": "hover", "hoverTime": 30 },
+        { "number": 2, "lat": 34.35, "lng": 108.95, "alt": 120,
+          "description": "", "action": "photo" }
+    ]
+}
+```
+
 ## 4. 位置元素与喂点（核心机制）
 
 地图不产生位置——**位置永远由外部喂入**，喂点同时驱动：UAV 图标移动、轨迹采样、导航进度/偏航检测、围栏越界判定、任务状态机推进。
@@ -254,6 +275,16 @@ map->StartTrailReplay(2.0);               // 2 倍速回放：插值喂 SetUAVPo
 
 信号：`ipLocationReady(pos, city)` / `ipLocationFailed(reason)`。坐标为城市级精度（约数公里），**只可作显示/兜底，不可喂导航引擎**。
 
+**地面海拔查询**（open-meteo 免 key，8 秒超时，库内置；地图瓦片不含高程数据，真实海拔只能来自在线高程服务）：
+
+| 方法 | 功能 |
+|------|------|
+| `RequestElevation(pos)` 槽 | 查询 WGS-84 坐标处地面海拔（米），结果经信号返回；在途重复调用被忽略 |
+| `RequestElevation(pos, ElevationCallback)` | 回调式一步到位：完成/失败自动回调一次 `cb(ok, pos, altM)`，信号仍并行发射，两种消费方式任选 |
+| `IsElevationBusy()` | 是否在途 |
+
+信号：`elevationReady(pos, altitudeMeters)` / `elevationFailed(reason)`（pos 为请求坐标回显）。
+
 **MAVLink 遥测**（`opmap::MavlinkTelemetryProvider`，独立类，真机/SITL 接入点）：
 
 ```cpp
@@ -311,6 +342,7 @@ connect(mav, SIGNAL(positionUpdated(double,double,double,double)),
 | 任务 | `missionStarted` / `missionCurrentWaypointChanged` / `missionWaypointReached` / `missionHoverStateChanged` / `missionActionTriggered` / `missionFinished` |
 | 围栏 | `geofenceBreach` / `geofenceEntered` |
 | IP 定位 | `ipLocationReady` / `ipLocationFailed` |
+| 海拔查询 | `elevationReady(pos, 海拔米)` / `elevationFailed` |
 | 位置源 | `positionUpdated(pos, altM, headingDeg, source)` / `positionSourceError(reason, fatal)` / `positionLinkAlive` / `positionLinkTimeout` |
 | 取点 | `positionPicked(mode, pos)` / `pickFinished(mode, points)` / `mapContextMenuRequested(pos)` |
 | 测距/轨迹 | `measureFinished(总米数, 点列表)` / `trailReplayFinished` |

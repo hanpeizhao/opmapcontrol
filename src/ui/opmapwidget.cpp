@@ -29,10 +29,16 @@
 #include "opmapwidget.h"
 #include <QtGui>
 #include <QMetaObject>
+#include <QFile>
+#include <QDateTime>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 #include "waypointitem.h"
 #include "geoutils.h"
 #include "osrmrouteprovider.h"
 #include "iplocationprovider.h"
+#include "elevationprovider.h"
 #include "positionsource.h"
 #include "geofenceitem.h"
 #include "navigationengine.h"
@@ -66,6 +72,7 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
     missionEngine(0),
     routeItem(0),
     ipLocator(0),
+    elevProvider(0),
     geofenceItem(0),
     geofenceBreached(false),
     vehiclePosValid(false),
@@ -127,6 +134,13 @@ OPMapWidget::OPMapWidget(QWidget *parent, Configuration *config) : QGraphicsView
             this, SLOT(onIpLocated(opmap::PointLatLng,QString)));
     connect(ipLocator, SIGNAL(locationFailed(QString)),
             this, SLOT(onIpLocationFailed(QString)));
+
+    // —— 地面海拔查询：回调式取用后转发 elevationReady/elevationFailed ——
+    elevProvider = new ElevationProvider(this);
+    connect(elevProvider, SIGNAL(elevationReady(opmap::PointLatLng,int)),
+            this, SLOT(onElevationReady(opmap::PointLatLng,int)));
+    connect(elevProvider, SIGNAL(elevationFailed(QString)),
+            this, SLOT(onElevationFailed(QString)));
 
     // —— 位置源管理：统一互斥切换；位置点自动喂车 + 分发 positionUpdated ——
     posSourceManager = new PositionSourceManager(this);
@@ -349,7 +363,7 @@ void OPMapWidget::ClearMarkers()
     markers.clear();
 }
 
-// ————————————————— 航点文件（.wp） —————————————————
+// ————————————————— 航点文件（JSON，兼容旧 .wp） —————————————————
 
 bool OPMapWidget::WPExportToFile(const QString &path, QString *error)
 {
@@ -359,32 +373,95 @@ bool OPMapWidget::WPExportToFile(const QString &path, QString *error)
             *error = QString::fromUtf8("地图上没有航点");
         return false;
     }
-    AP_WPArray arrWP;
+    // JSON 任务文件：携带航点全部属性（编号/经纬度/海拔/描述/到达动作/悬停时长），
+    // 缩进可读可手改；旧 .wp 列式文本只导出不再支持，导入仍兼容（见 WPImportFromFile 嗅探）
+    QJsonArray wps;
     QMap<int, WayPointItem*>::const_iterator it = wpMap.constBegin();
     for (; it != wpMap.constEnd(); ++it) {
-        AP_WayPoint wp;
-        wp.idx = it.key();
-        wp.set(it.value()->Coord().Lat(), it.value()->Coord().Lng(),
-               it.value()->Altitude());
-        arrWP.set(wp);
+        WayPointItem *wp = it.value();
+        QJsonObject o;
+        o.insert(QLatin1String("number"), it.key());
+        o.insert(QLatin1String("lat"), wp->Coord().Lat());
+        o.insert(QLatin1String("lng"), wp->Coord().Lng());
+        o.insert(QLatin1String("alt"), wp->Altitude());
+        o.insert(QLatin1String("description"), wp->Description());
+        if (wp->Action() == WayPointItem::WayPointActionPhoto)
+            o.insert(QLatin1String("action"), QLatin1String("photo"));
+        else if (wp->Action() == WayPointItem::WayPointActionHover)
+            o.insert(QLatin1String("action"), QLatin1String("hover"));
+        else
+            o.insert(QLatin1String("action"), QLatin1String("none"));
+        if (wp->HoverTime() > 0)
+            o.insert(QLatin1String("hoverTime"), wp->HoverTime());
+        wps.append(o);
     }
-    if (arrWP.save(path.toStdString()) != 0) {
+    QJsonObject root;
+    root.insert(QLatin1String("format"), QLatin1String("opmap-waypoints"));
+    root.insert(QLatin1String("version"), 1);
+    root.insert(QLatin1String("created"), QDateTime::currentDateTime().toString(Qt::ISODate));
+    root.insert(QLatin1String("count"), wps.size());
+    root.insert(QLatin1String("waypoints"), wps);
+
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         if (error)
             *error = QString::fromUtf8("写入文件失败: %1").arg(path);
         return false;
     }
+    f.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
     return true;
 }
 
 bool OPMapWidget::WPImportFromFile(const QString &path, QString *error)
 {
-    AP_WPArray arrWP;
-    if (arrWP.load(path.toStdString()) != 0) {
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly)) {
         if (error)
             *error = QString::fromUtf8("读取文件失败: %1").arg(path);
         return false;
     }
+    QByteArray raw = f.readAll();
+    if (raw.startsWith("\xEF\xBB\xBF"))   // 容忍手改时编辑器加的 UTF-8 BOM
+        raw.remove(0, 3);
+
     WPDeleteAll();
+
+    // 格式嗅探：JSON 走新链路（全属性还原）；否则按旧 AP .wp 列式文本走 AP_WPArray
+    if (QString::fromUtf8(raw.trimmed().left(1)) == QLatin1String("{")) {
+        const QJsonObject root = QJsonDocument::fromJson(raw).object();
+        if (root.value(QLatin1String("format")).toString() != QLatin1String("opmap-waypoints")) {
+            if (error)
+                *error = QString::fromUtf8("不是有效的 opmap-waypoints JSON 文件");
+            return false;
+        }
+        const QJsonArray wps = root.value(QLatin1String("waypoints")).toArray();
+        for (int i = 0; i < wps.size(); ++i) {
+            const QJsonObject o = wps.at(i).toObject();
+            const PointLatLng coord(o.value(QLatin1String("lat")).toDouble(),
+                                    o.value(QLatin1String("lng")).toDouble());
+            WayPointItem *item = WPCreate(coord,
+                                          o.value(QLatin1String("alt")).toDouble());
+            item->SetDescription(o.value(QLatin1String("description")).toString());
+            const QString action = o.value(QLatin1String("action")).toString();
+            if (action == QLatin1String("photo"))
+                item->SetAction(WayPointItem::WayPointActionPhoto);
+            else if (action == QLatin1String("hover"))
+                item->SetAction(WayPointItem::WayPointActionHover);
+            const int hoverSec = o.value(QLatin1String("hoverTime")).toInt();
+            if (hoverSec > 0)
+                item->SetHoverTime(hoverSec);
+            item->SetReached(false);
+        }
+        return true;
+    }
+
+    // 旧 .wp：AP_WPArray 列式文本（idx/lat/lng/alt/heading），保留导入兼容
+    AP_WPArray arrWP;
+    if (arrWP.load(std::string(raw.constData(), raw.size())) != 0) {
+        if (error)
+            *error = QString::fromUtf8("不是有效的航点文件（JSON 或 .wp）");
+        return false;
+    }
     AP_WayPointMap *wpMap = arrWP.getAll();
     for (AP_WayPointMap::const_iterator it = wpMap->begin(); it != wpMap->end(); ++it) {
         WayPointItem *item = WPCreate(PointLatLng(it->second->lat, it->second->lng),
@@ -617,6 +694,45 @@ void OPMapWidget::onIpLocationFailed(QString reason)
         cb(false, opmap::PointLatLng(), QString());
     }
     emit ipLocationFailed(reason);
+}
+
+// ———————— 地面海拔查询 ————————
+
+void OPMapWidget::onElevationReady(opmap::PointLatLng pos, int altitudeMeters)
+{
+    if (m_elevCallback) {   // 回调式通知（与信号并行，不影响 emit）
+        ElevationCallback cb;
+        cb.swap(m_elevCallback);
+        cb(true, pos, altitudeMeters);
+    }
+    emit elevationReady(pos, altitudeMeters);
+}
+
+void OPMapWidget::onElevationFailed(QString reason)
+{
+    if (m_elevCallback) {   // 回调式通知（与信号并行，不影响 emit）
+        ElevationCallback cb;
+        cb.swap(m_elevCallback);
+        cb(false, opmap::PointLatLng(), 0);
+    }
+    emit elevationFailed(reason);
+}
+
+void OPMapWidget::RequestElevation(opmap::PointLatLng const& pos)
+{
+    if (elevProvider)
+        elevProvider->requestElevation(pos);
+}
+
+void OPMapWidget::RequestElevation(opmap::PointLatLng const& pos, ElevationCallback callback)
+{
+    m_elevCallback = callback;      // 一次性：完成/失败时取出调用并清空
+    RequestElevation(pos);
+}
+
+bool OPMapWidget::IsElevationBusy() const
+{
+    return elevProvider ? elevProvider->isBusy() : false;
 }
 
 // ———————— 位置源管理（互斥切换） ————————

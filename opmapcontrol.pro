@@ -57,6 +57,7 @@ HEADERS += \
     ./src/providers/osrmrouteprovider.h \
     ./src/providers/amaprouteprovider.h \
     ./src/providers/iplocationprovider.h \
+    ./src/providers/elevationprovider.h \
     ./src/providers/positionsource.h \
     ./src/providers/mavlinktelemetryprovider.h \
     ./src/engine/mapservice.h \
@@ -118,6 +119,7 @@ SOURCES += \
     ./src/providers/osrmrouteprovider.cpp \
     ./src/providers/amaprouteprovider.cpp \
     ./src/providers/iplocationprovider.cpp \
+    ./src/providers/elevationprovider.cpp \
     ./src/providers/positionsource.cpp \
     ./src/providers/mavlinktelemetryprovider.cpp \
     ./src/engine/mapservice.cpp \
