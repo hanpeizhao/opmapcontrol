@@ -38,6 +38,7 @@
 #include "navigationengine.h"
 #include "waypointmissionengine.h"
 #include "routeitem.h"
+#include "imagemarkeritem.h"
 
 namespace opmap {
 
@@ -303,6 +304,31 @@ void OPMapWidget::SetShowHome(const bool &value)
             Home=0;
         }
     }
+}
+
+// ————————————————— 通用图片标记 —————————————————
+
+ImageMarkerItem *OPMapWidget::AddImageMarker(opmap::PointLatLng const& pos, QString const& imagePath)
+{
+    ImageMarkerItem *marker = new ImageMarkerItem(pos, imagePath, map);
+    marker->setParentItem(map);
+    imageMarkers.append(marker);
+    return marker;
+}
+
+void OPMapWidget::RemoveImageMarker(ImageMarkerItem *marker)
+{
+    if (!marker)
+        return;
+    imageMarkers.removeOne(marker);
+    delete marker;
+}
+
+void OPMapWidget::ClearImageMarkers()
+{
+    foreach(ImageMarkerItem *m, imageMarkers)
+        delete m;
+    imageMarkers.clear();
 }
 
 // ————————————————— 车载导航 —————————————————

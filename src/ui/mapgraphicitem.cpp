@@ -31,6 +31,7 @@
 #include "homeitem.h"
 #include "geofenceitem.h"
 #include "mapgraphicitem.h"
+#include "imagemarkeritem.h"
 #include "waypointlineitem.h"
 #include <QGraphicsSceneMouseEvent>
 
@@ -114,6 +115,9 @@ void MapGraphicItem::Core_OnNeedInvalidation()
         TrailLineItem* tl=qgraphicsitem_cast<TrailLineItem*>(i);
         if(tl)
             tl->RefreshPos();
+        ImageMarkerItem* im=qgraphicsitem_cast<ImageMarkerItem*>(i);
+        if(im)
+            im->RefreshPos();
 
         emit mapChanged();
     }
@@ -144,6 +148,9 @@ void MapGraphicItem::ChildPosRefresh()
         TrailLineItem* tl=qgraphicsitem_cast<TrailLineItem*>(i);
         if(tl)
             tl->RefreshPos();
+        ImageMarkerItem* im=qgraphicsitem_cast<ImageMarkerItem*>(i);
+        if(im)
+            im->RefreshPos();
 
         emit mapChanged();
     }

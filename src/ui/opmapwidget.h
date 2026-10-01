@@ -62,6 +62,7 @@ namespace opmap {
 class UAVItem;
 class GPSItem;
 class HomeItem;
+class ImageMarkerItem;
 class AbstractRouteProvider;
 class IpLocationProvider;
 class GeofenceItem;
@@ -490,6 +491,20 @@ public:
     const QList<UAVItem*> GetUAVS();
     /** @brief 内部地图画布访问器：供上层直接挂载自定义地理锚定图元（WayPointItem 等） */
     MapGraphicItem* GetMap() const { return map; }
+
+    /**
+     * @brief 在指定经纬度放置一张图片标记（图钉语义：图片底部中心对准坐标点）
+     *
+     * @param pos 锚点经纬度（WGS-84）
+     * @param imagePath 图片路径（文件路径或 qrc 资源路径均可）
+     * @return 标记项指针——可留存后调 RemoveImageMarker 删除，
+     *         或直接 marker->SetCoord() 移动
+     */
+    ImageMarkerItem *AddImageMarker(opmap::PointLatLng const& pos, QString const& imagePath);
+    /** @brief 删除一张图片标记（指针须来自 AddImageMarker 返回值） */
+    void RemoveImageMarker(ImageMarkerItem *marker);
+    /** @brief 清除全部图片标记 */
+    void ClearImageMarkers();
     QGraphicsItemGroup* waypointLine(int id);
     void SetShowUAV(bool const& value);
     void SetShowGPS(bool const& value);   ///< 独立 GPS 位置标记（"我的位置"图标，与导航车互不相干）
@@ -566,6 +581,7 @@ private:
     opmap::IpLocationProvider *ipLocator;          ///< IP 定位服务（城市级兜底）
     opmap::GeofenceItem *geofenceItem;             ///< 多边形地理围栏（多边形内为允许区）
     bool geofenceBreached;                         ///< 当前是否处于越界状态（沿沿只发一次信号）
+    QList<opmap::ImageMarkerItem *> imageMarkers;  ///< 图片标记全集（AddImageMarker/RemoveImageMarker/ClearImageMarkers 维护）
     opmap::PointLatLng vehiclePos;                 ///< 最近喂入的车位置
     bool vehiclePosValid;
     // —— "我的位置"（一键定位目标：只认真实源，模拟车位置不参与）——
