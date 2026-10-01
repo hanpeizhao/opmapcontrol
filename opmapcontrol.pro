@@ -85,6 +85,7 @@ HEADERS += \
     ./src/ui/mapanchoreditem.h \
     ./src/ui/scalebaritem.h \
     ./src/ui/measureitem.h \
+    ./src/ui/arclineitem.h \
     ./src/ui/trailitem.h \
     ./src/ui/traillineitem.h \
     ./src/ui/uavitem.h \
@@ -147,6 +148,7 @@ SOURCES += \
     ./src/ui/mapmarkeritem.cpp \
     ./src/ui/scalebaritem.cpp \
     ./src/ui/measureitem.cpp \
+    ./src/ui/arclineitem.cpp \
     ./src/ui/trailitem.cpp \
     ./src/ui/traillineitem.cpp \
     ./src/ui/uavitem.cpp \

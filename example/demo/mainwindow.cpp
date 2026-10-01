@@ -34,6 +34,7 @@
 #include "homeitem.h"
 #include "waypointitem.h"
 #include "mapmarkeritem.h"
+#include "arclineitem.h"
 #include <QtMath>
 
 namespace {
@@ -1119,36 +1120,6 @@ void MainWindow::onPeerTick()
 
 // ————————————————— 候鸟迁徙演示 —————————————————
 
-namespace {
-/// 大圆弧（球面）插值：把两经纬点投到单位球做 slerp 后转回经纬度，
-/// 远距离迁徙路线呈地球表面最短弧线而非墨卡托直线
-opmap::PointLatLng SlerpLatLng(const opmap::PointLatLng &a, const opmap::PointLatLng &b, double f)
-{
-    if (f <= 0.0)
-        return a;
-    if (f >= 1.0)
-        return b;
-    const double d2r = M_PI / 180.0;
-    const double latA = a.Lat() * d2r, lngA = a.Lng() * d2r;
-    const double latB = b.Lat() * d2r, lngB = b.Lng() * d2r;
-    // 经纬度 → 单位球笛卡尔
-    const double ax = qCos(latA) * qCos(lngA), ay = qCos(latA) * qSin(lngA), az = qSin(latA);
-    const double bx = qCos(latB) * qCos(lngB), by = qCos(latB) * qSin(lngB), bz = qSin(latB);
-    const double dot = qBound(-1.0, ax * bx + ay * by + az * bz, 1.0);
-    const double omega = qAcos(dot);
-    if (omega < 1e-9)   // 两点重合/极近：线性退化
-        return a;
-    const double s = qSin(omega);
-    const double wA = qSin((1.0 - f) * omega) / s;
-    const double wB = qSin(f * omega) / s;
-    const double x = wA * ax + wB * bx;
-    const double y = wA * ay + wB * by;
-    const double z = wA * az + wB * bz;
-    const double r2r = 180.0 / M_PI;
-    return opmap::PointLatLng(qAsin(qBound(-1.0, z, 1.0)) * r2r, qAtan2(y, x) * r2r);
-}
-}
-
 void MainWindow::onMigrationToggled(bool on)
 {
     if (on) {
@@ -1162,13 +1133,13 @@ void MainWindow::onMigrationToggled(bool on)
         // 长途演示压缩到 1 分钟级：tick 200ms，全程 45~75s
         m_migrants.clear();
         m_migrantMarkers.clear();
-        struct Seed { const char *name; int durationS;
-                      double pts[3][2]; };   // 每个体 3 个途经点（纬度,经度）
+        struct Seed { const char *name; int durationS; QColor color;
+                      double pts[3][2]; };   // 每个体 3 个途经点（纬度,经度）+ 航线色
         const Seed seeds[] = {
-            { "红嘴鸥", 60, { {52.5, 107.2}, {39.2, 119.6}, {29.1, 116.3} } },  // 贝加尔湖→渤海湾→鄱阳湖
-            { "大天鹅", 50, { {47.2, 103.8}, {37.8, 119.1}, {37.2, 122.6} } },  // 蒙古高原→黄河三角洲→荣成
-            { "白鹤",   75, { {62.0, 129.7}, {45.3, 132.5}, {29.1, 116.3} } },  // 雅库特→兴凯湖→鄱阳湖
-            { "绿头鸭", 55, { {52.0, 112.0}, {35.0, 122.5}, {31.2, 121.9} } },  // 贝加尔湖东→黄海→长江口
+            { "红嘴鸥", 60, QColor(255, 150, 0),   { {52.5, 107.2}, {39.2, 119.6}, {29.1, 116.3} } },  // 贝加尔湖→渤海湾→鄱阳湖
+            { "大天鹅", 50, QColor(245, 235, 210), { {47.2, 103.8}, {37.8, 119.1}, {37.2, 122.6} } },  // 蒙古高原→黄河三角洲→荣成
+            { "白鹤",   75, QColor(255, 80, 80),   { {62.0, 129.7}, {45.3, 132.5}, {29.1, 116.3} } },  // 雅库特→兴凯湖→鄱阳湖
+            { "绿头鸭", 55, QColor(90, 200, 120),  { {52.0, 112.0}, {35.0, 122.5}, {31.2, 121.9} } },  // 贝加尔湖东→黄海→长江口
         };
         for (int i = 0; i < 4; ++i) {
             MigrantSim m;
@@ -1177,10 +1148,16 @@ void MainWindow::onMigrationToggled(bool on)
                 m.route.append(opmap::PointLatLng(seeds[i].pts[j][0], seeds[i].pts[j][1]));
             m.durationMs = seeds[i].durationS * 1000;
             m.arrived = false;
+            // 各段弧线航线（拱弧+箭头+流动光效）：个体间/段间交替拱向呈 S 形，
+            // 鸟沿 ArcPointAt(t) 飞行，位置与弧线严格重合
+            for (int j = 0; j < m.route.size() - 1; ++j) {
+                const int side = (i % 2 == 0 ? 1 : -1) * (j % 2 == 0 ? 1 : -1);
+                m.arcLines.append(m_map->AddArcLine(m.route.at(j), m.route.at(j + 1),
+                                                    seeds[i].color, side));
+            }
             opmap::MapMarkerItem *mk = m_map->AddMarker(m.route.first());
             mk->SetText(m.name);
             mk->SetFontSize(10);
-            mk->SetShowTrail(true);   // 移动轨迹连为橙色折线（库内 MarkerTrailItem）
             m_migrants.append(m);
             m_migrantMarkers.insert(m.name, mk);
         }
@@ -1188,13 +1165,14 @@ void MainWindow::onMigrationToggled(bool on)
         m_map->SetCurrentPosition(opmap::PointLatLng(44.0, 119.0));   // 视野罩住东亚迁飞区
         m_map->SetZoom(4);
         m_migrantTimer->start(200);
-        logEvent(QString::fromUtf8("候鸟迁徙演示开始：4 只候鸟沿大圆弧迁飞区路线南迁（每 200ms 推进，橙色线为飞行轨迹）"));
+        logEvent(QString::fromUtf8("候鸟迁徙演示开始：4 条彩色弧线航线（沿弧箭头 + 流动光效），候鸟沿弧飞行"));
     } else {
         m_migrantTimer->stop();
         m_map->ClearMarkers();
         m_migrantMarkers.clear();
+        m_map->ClearArcLines();   // 清各段弧线航线
         m_migrants.clear();
-        logEvent(QString::fromUtf8("候鸟迁徙演示停止，标记已清除"));
+        logEvent(QString::fromUtf8("候鸟迁徙演示停止，标记与航线已清除"));
     }
 }
 
@@ -1205,12 +1183,12 @@ void MainWindow::onMigrantTick()
     for (int i = 0; i < m_migrants.size(); ++i) {
         MigrantSim &m = m_migrants[i];
         const double f = qMin(1.0, (double)m_migrantElapsed / m.durationMs);
-        // 全程按段均分时间：段内大圆弧插值推进
+        // 全程按段均分时间：段内沿该段弧线贝塞尔插值推进（鸟与弧线重合）
         const int legs = m.route.size() - 1;
         const double scaled = f * legs;
         const int leg = qMin(legs - 1, (int)scaled);
         const double legF = scaled - leg;
-        const opmap::PointLatLng pos = SlerpLatLng(m.route.at(leg), m.route.at(leg + 1), legF);
+        const opmap::PointLatLng pos = m.arcLines.at(leg)->ArcPointAt(legF);
         m_migrantMarkers.value(m.name)->SetCoord(pos);
         if (f >= 1.0) {
             ++arrivedCount;

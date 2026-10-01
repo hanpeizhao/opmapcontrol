@@ -45,6 +45,7 @@
 #include "waypointmissionengine.h"
 #include "routeitem.h"
 #include "mapmarkeritem.h"
+#include "arclineitem.h"
 #include "scalebaritem.h"
 #include "measureitem.h"
 #include "trailrecorder.h"
@@ -361,6 +362,31 @@ void OPMapWidget::ClearMarkers()
     foreach(MapMarkerItem *m, markers)
         delete m;
     markers.clear();
+}
+
+// ————————————————— 贝塞尔弧线航线 —————————————————
+
+ArcLineItem *OPMapWidget::AddArcLine(opmap::PointLatLng const& from, opmap::PointLatLng const& to,
+                                     QColor const& color, int side)
+{
+    ArcLineItem *line = new ArcLineItem(map, from, to, color, side, map);
+    arcLines.append(line);
+    return line;
+}
+
+void OPMapWidget::RemoveArcLine(ArcLineItem *line)
+{
+    if (!line)
+        return;
+    arcLines.removeOne(line);
+    delete line;
+}
+
+void OPMapWidget::ClearArcLines()
+{
+    foreach(ArcLineItem *l, arcLines)
+        delete l;
+    arcLines.clear();
 }
 
 // ————————————————— 航点文件（JSON，兼容旧 .wp） —————————————————

@@ -74,6 +74,7 @@ class RouteItem;
 class ScaleBarItem;
 class MeasureItem;
 class TrailRecorder;
+class ArcLineItem;
 
 /**
     * @brief Collection of static functions to help dealing with various enums used
@@ -564,6 +565,21 @@ public:
     /** @brief 清除全部标记 */
     void ClearMarkers();
 
+    // ———————— 贝塞尔弧线航线（迁徙图/航线可视化）———————
+    /**
+     * @brief 添加弧线航线：地理空间贝塞尔拱弧 + 沿弧方向箭头 + 流动光效，
+     *        地图拖动/缩放自动跟随。ECharts 迁徙图风格的航线可视化。
+     * @param side 拱向：+1 航向右侧拱，-1 左侧拱（相邻段交替呈 S 形更自然）
+     * @return 弧线项指针：ArcPointAt(t) 供上层驱动标记沿弧飞行，
+     *         SetColor/SetArrowCount/SetFlowEnabled 调样式；RemoveArcLine 删除
+     */
+    ArcLineItem *AddArcLine(opmap::PointLatLng const& from, opmap::PointLatLng const& to,
+                            QColor const& color = QColor(255, 140, 0), int side = 1);
+    /** @brief 删除一条弧线（指针须来自 AddArcLine 返回值，可空安全） */
+    void RemoveArcLine(ArcLineItem *line);
+    /** @brief 清除全部弧线 */
+    void ClearArcLines();
+
     // ———————— 航点文件（.wp）———————
     /** @brief 把地图当前航点导出为 APM .wp 任务文件
      *  @return 成功 true；失败返回 false 并填充 *error（error 传 0 可忽略原因） */
@@ -653,6 +669,7 @@ private:
     opmap::GeofenceItem *geofenceItem;             ///< 多边形地理围栏（多边形内为允许区）
     bool geofenceBreached;                         ///< 当前是否处于越界状态（状态翻转只发一次信号）
     QList<opmap::MapMarkerItem *> markers;  ///< 通用标记全集（AddMarker/RemoveMarker/ClearMarkers 维护）
+    QList<opmap::ArcLineItem *> arcLines;   ///< 弧线航线全集（AddArcLine/RemoveArcLine/ClearArcLines 维护）
     opmap::PointLatLng vehiclePos;                 ///< 最近喂入的车位置
     bool vehiclePosValid;
     // —— "我的位置"（一键定位目标：只认真实源，模拟车位置不参与）——

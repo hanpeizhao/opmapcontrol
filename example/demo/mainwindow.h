@@ -26,6 +26,8 @@
 
 #include "opmapcontrol.h"
 
+namespace opmap { class ArcLineItem; }   // MigrantSim 持有弧线句柄用（完整定义在 arclineitem.h）
+
 class NavigationSimulator;
 class WaypointFlightSimulator;
 class QAction;
@@ -229,6 +231,7 @@ private:
     struct MigrantSim {                        ///< 模拟候鸟个体运动参数
         QString name;
         QList<opmap::PointLatLng> route;       // 繁殖地→中停地→越冬地多段路线
+        QList<opmap::ArcLineItem *> arcLines;  // 各段弧线航线（鸟沿 ArcPointAt(t) 飞）
         int durationMs;                        // 全程飞行时长（演示加速倍）
         bool arrived;                          // 是否已抵达终点（到达只记一次日志）
     };
